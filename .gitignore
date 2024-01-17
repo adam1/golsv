@@ -1,0 +1,10 @@
+bin/*
+cayley-*.pdf
+run-*.log
+coverage.out
+coverage.html
+cpu.out
+cpu.pdf
+golsv.test
+runs
+*~

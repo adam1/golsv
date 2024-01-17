@@ -1,0 +1,5 @@
+#!/bin/bash
+
+P=$1
+
+kill -USR1 $P && sleep 300 && kill -USR1 $P

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+n=0
+base="log"
+log=`printf "%s%02d" "$base" "$n"`
+
+while [ -e "$log" ]; do
+    n=$((n+1))
+    log=`printf "%s%02d" "$base" "$n"`
+done
+
+echo "$log"
