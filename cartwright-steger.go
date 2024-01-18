@@ -342,22 +342,43 @@ func (p F2Polynomial) Equal(q F2Polynomial) bool {
 }
 
 func (p F2Polynomial) InverseModf(f F2Polynomial) F2Polynomial {
-	if !f.Equal(F2Polynomial111) {
-		panic(fmt.Sprintf("not implemented: mod f=%s", f))
-	}
-	var q F2Polynomial
 	if p.IsZero() {
 		panic("not a unit")
-	} else if p.Equal(F2PolynomialOne) {
-		q = p
-	} else if p.Equal(F2PolynomialY) {
-		q = F2PolynomialOnePlusY
-	} else if p.Equal(F2PolynomialOnePlusY) {
-		q = F2PolynomialY
-	} else {
-		panic(fmt.Sprintf("%v not reduced mod f=%v", p, f))
 	}
-	return q
+	switch f {
+	case "111":
+		switch p {
+		case F2PolynomialOne:
+			return F2PolynomialOne
+		case F2PolynomialY:
+			return F2PolynomialOnePlusY
+		case F2PolynomialOnePlusY:
+			return F2PolynomialY
+		default:
+			panic(fmt.Sprintf("%v not reduced mod f=%v", p, f))
+		}
+	case "1101":
+		switch p {
+		case F2PolynomialOne:
+			return F2PolynomialOne
+		case F2PolynomialY:
+			return "101"
+		case F2PolynomialOnePlusY:
+			return "011"
+		case "001":
+			return "111"
+		case "101":
+			return F2PolynomialY
+		case "011":
+			return F2PolynomialOnePlusY
+		case "111":
+			return "001"
+		default:
+			panic(fmt.Sprintf("%v not reduced mod f=%v", p, f))
+		}
+	default:
+		panic(fmt.Sprintf("not implemented: mod f=%s", f))
+	}
 }
 
 func (p F2Polynomial) IsOne() bool {

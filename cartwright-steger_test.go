@@ -259,6 +259,13 @@ func TestCSF2PolynomialInverseModf(t *testing.T) {
 		{F2PolynomialOne, F2Polynomial111, F2PolynomialOne},
 		{F2PolynomialY, F2Polynomial111, F2PolynomialOnePlusY},
 		{F2PolynomialOnePlusY, F2Polynomial111, F2PolynomialY},
+		{F2PolynomialOne, F2Polynomial("1101"), F2PolynomialOne},
+		{F2PolynomialY, F2Polynomial("1101"), F2Polynomial("101")},
+		{F2PolynomialOnePlusY, F2Polynomial("1101"), F2Polynomial("011")},
+		{F2Polynomial("001"), F2Polynomial("1101"), F2Polynomial("111")},
+		{F2Polynomial("101"), F2Polynomial("1101"), F2PolynomialY},
+		{F2Polynomial("011"), F2Polynomial("1101"), F2PolynomialOnePlusY},
+		{F2Polynomial("111"), F2Polynomial("1101"), F2Polynomial("001")},
 	}
 	for n, test := range tests {
 		got := test.a.InverseModf(test.f)
