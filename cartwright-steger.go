@@ -13,6 +13,7 @@ import (
 
 func init() {
 	initCalGMultTable()
+	initInverseModfTable()
 }
 
 // We generally adhere to the notation in [LSV], except:
@@ -341,44 +342,43 @@ func (p F2Polynomial) Equal(q F2Polynomial) bool {
 	return p == q
 }
 
+var inverseModfTable map[F2Polynomial]map[F2Polynomial]F2Polynomial
+
+func initInverseModfTable() {
+	log.Printf("initializing InverseModf lookup table")
+	fs := []struct {
+		f, g, invg F2Polynomial
+	}{
+		{"111", F2PolynomialY, F2PolynomialOnePlusY},
+		{"1101", F2PolynomialY, "101"},
+	}
+	inverseModfTable = make(map[F2Polynomial]map[F2Polynomial]F2Polynomial)
+	for _, poly := range fs {
+		f, g, invg := poly.f, poly.g, poly.invg
+		if !g.Mul(invg).Modf(f).Equal(F2PolynomialOne) {
+			panic(fmt.Sprintf("%v and %v are not inverses mod %v", g, invg, f))
+		}
+		inverseModfTable[f] = make(map[F2Polynomial]F2Polynomial)
+		e, inve := F2PolynomialOne, F2PolynomialOne
+		for i := 0; i < (1 << f.Degree()) - 1; i++ {
+			inverseModfTable[f][e] = inve
+			e = e.Mul(g).Modf(f)
+			inve = inve.Mul(invg).Modf(f)
+		}
+	}
+}
+
 func (p F2Polynomial) InverseModf(f F2Polynomial) F2Polynomial {
 	if p.IsZero() {
 		panic("not a unit")
 	}
-	switch f {
-	case "111":
-		switch p {
-		case F2PolynomialOne:
-			return F2PolynomialOne
-		case F2PolynomialY:
-			return F2PolynomialOnePlusY
-		case F2PolynomialOnePlusY:
-			return F2PolynomialY
-		default:
-			panic(fmt.Sprintf("%v not reduced mod f=%v", p, f))
-		}
-	case "1101":
-		switch p {
-		case F2PolynomialOne:
-			return F2PolynomialOne
-		case F2PolynomialY:
-			return "101"
-		case F2PolynomialOnePlusY:
-			return "011"
-		case "001":
-			return "111"
-		case "101":
-			return F2PolynomialY
-		case "011":
-			return F2PolynomialOnePlusY
-		case "111":
-			return "001"
-		default:
-			panic(fmt.Sprintf("%v not reduced mod f=%v", p, f))
-		}
-	default:
-		panic(fmt.Sprintf("not implemented: mod f=%s", f))
+	if _, ok := inverseModfTable[f]; !ok {
+		panic(fmt.Sprintf("not implemented: mod f=%v", f))
 	}
+	if _, ok := inverseModfTable[f][p]; !ok {
+		panic(fmt.Sprintf("%v not reduced mod f=%v", p, f))
+	}
+	return inverseModfTable[f][p]
 }
 
 func (p F2Polynomial) IsOne() bool {

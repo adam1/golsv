@@ -277,6 +277,21 @@ func TestCSF2PolynomialInverseModf(t *testing.T) {
 			t.Errorf("test %d: inverse failed", n)
 		}
 	}
+	polys := []F2Polynomial { "111", "1101" }
+	for _, f := range polys {
+		for i := 1; i < (1 << f.Degree()); i++ {
+			a := F2PolynomialZero
+			for j := 0; j < f.Degree(); j++ {
+				if (i >> j) & 1 != 0 {
+					a = a.AddMonomial(j)
+				}
+			}
+			got := a.InverseModf(f)
+			if !a.Mul(got).Modf(f).Equal(F2PolynomialOne) {
+				t.Errorf("invert %v mod %v: got %v", a, f, got)
+			}
+		}
+	}
 }
 
 func TestCSF2PolynomialIsOne(t *testing.T) {
