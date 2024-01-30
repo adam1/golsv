@@ -1,4 +1,4 @@
-all: dim-H1.txt systole.txt
+all: dim-H1.txt
 
 log=$(shell logser)
 $(info log is $(log))
@@ -40,7 +40,7 @@ $(shell touch $(log))
 #
 # for the Cartwright-Steger generating set S, as encoded into the
 # program.
-d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt:
+pgl-cayley:
 	cayley -base-field F4 -d1 d1.txt -d2 d2.txt -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt 2>&1 | tee cayley.$(log)
 
 # Tool 2.  This tool is more specialized (perhaps convoluted).  It
@@ -51,7 +51,10 @@ d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt:
 # quotient complex, and projects the systolic candidates down to
 # cycles in the finite complex.  So in addition to the basis and
 # boundary files, it also produces a systolic candidates file S.txt.
-d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt: modulus.txt
+#
+# We are focusing on the second tool at present, hence this target
+# rule is designated as producing the basis and boundary files.
+calg-cayley d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt:
 	calg-cayley -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
 		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee S.$(log)
@@ -173,18 +176,39 @@ d1S.txt: d1.txt S.txt
 check-d1S: d1S.txt
 	rank=$$(dim -in d1S.txt -image) && if [[ $$rank -eq '0' ]]; then echo "candidates S are contained in ker d1"; else echo "candidates S are NOT contained in ker d1!"; false; fi
 
-
-# xxx =============
-#
-# redo the cosystole targets - do them in the same dir instead of a subdir
-
-init-cosystole:
-	mkdir -p cosystole
-	transpose -in d1.txt -out cosystole/d2.txt
-	cp d2T.txt cosystole/d1.txt
-	cp d2Tsmith.txt cosystole/d1smith.txt
-	cp d2Tcolops.txt cosystole/d1colops.txt
-	cd cosystole && ln -s ../../Makefile .
-
 really-clean:
 	rm -f d1smith.txt d1colops.txt d2smith.txt d2colops.txt dim-Z1.txt dim-B1.txt dim-H1.txt Z1.txt d2coimage.txt B1.txt B1smith.txt B1colops.txt Q.txt U.txt KB1.txt K.txt KT.txt d2Tsmith.txt d2Tcolops.txt d2T.txt d1U.txt KU.txt *.log*
+
+# cochain complex / cosystole targets
+#
+# we are using the convention here that chain-related items are named
+# with subscript index, e.g. d_1, often abbreviated to just d1.  and
+# cochain-related items are named with a superscript index, e.g. d^1.
+#
+# the chain complex is
+#
+#         d_2          d_1
+#   C_2 -------> C_1 -------> C_0
+#
+# and the cochain complex is
+#
+#         d^1          d^0
+#   C_2 <------- C_1 <------- C_0
+
+d^1.txt: d2.txt
+	transpose -in d2.txt -out d^1.txt
+
+d^0.txt: d1.txt
+	transpose -in d1.txt -out d^0.txt
+
+d^1smith.txt: d2Tsmith.txt
+	cp d2Tsmith.txt d^1smith.txt
+
+d^1colops.txt: d2Tcolops.txt
+	cp d2Tcolops.txt d^1colops.txt
+
+
+# xxx want: the cosystolic candidates as obtained by aligning B^1 in Z^1
+
+# xxx make targets for the rest of the linear algebra stuff
+
