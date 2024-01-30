@@ -20,22 +20,41 @@ $(shell touch $(log))
 # Cartwright-Steger algebra (prior to the PGL matrix representation).
 # It can compute either upstairs, in the infinite simplicial complex
 # that is the affine building or downstairs, in the finite quotient.
-
-
-# This target computes simplicial complex
 #
-#     X= Cay(PGL(F_4), S)
-#
-# for the Cartwright-Steger generating set S.  It produces the
-# following files:
+# These two tools thus amount to different ways of computing a complex
+# X, specificaly producing the files:
 #
 #    d1.txt: matrix for boundary map d_1
 #    d2.txt: matrix for boundary map d_2
 #    vertex-basis.txt: basis for the vertex space (X_0)
 #    edge-basis.txt: basis for the edge space (X_1)
 #    triangle-basis.txt: basis for the triangle space (X_2)
+#
+# The subsequent linear algebra processing is common to both
+# approaches.
+
+
+# Tool 1.  This target computes simplicial complex
+#
+#     X= Cay(PGL(F_4), S)
+#
+# for the Cartwright-Steger generating set S, as encoded into the
+# program.
 d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt:
 	cayley -base-field F4 -d1 d1.txt -d2 d2.txt -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt 2>&1 | tee cayley.$(log)
+
+# Tool 2.  This tool is more specialized (perhaps convoluted).  It
+# produces the basis and boundary files for a Cayley complex, but it
+# does so in a completely different manner.  It realizes the
+# Cartwright-Steger group, looks for systolic candidate lifts in the
+# affine building (infinite complex), then computes the finite
+# quotient complex, and projects the systolic candidates down to
+# cycles in the finite complex.  So in addition to the basis and
+# boundary files, it also produces a systolic candidates file S.txt.
+d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt: modulus.txt
+	calg-cayley -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt \
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
+		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee S.$(log)
 
 # This target computes a Smith normal form for the matrix d_1.
 d1smith.txt d1colops.txt: d1.txt
@@ -132,6 +151,33 @@ KU.txt: K.txt U.txt
 systole.txt: U.txt
 	systole -trials 1000 -B B1.txt -U U.txt -min systole.txt 2>&1 | tee systole.$(log)
 
+# Multiplying K by S gives a matrix in which each column corresponds
+# to a systolic candidate and each coordinate within the column gives
+# a dot product with the corresponding row of K, which is a generator
+# for the kernel of d_2^T.  Hence if the column is all zeros, then the
+# corresponding candidate is orthogonal to the kernel of d_2^T.  Thus
+# by linear algebra, that candidate vector is in the image of d_2.
+KS.txt: K.txt S.txt
+	multiply -A K.txt -B S.txt -C KS.txt 2>&1 | tee KS.$(log)
+
+rank-KSsmith.txt: KSsmith.txt
+	dim -in KSsmith.txt -image > rank-KSsmith.txt
+
+KSsmith.txt: KS.txt
+	smith -in KS.txt -smith KSsmith.txt 2>&1 | tee KSsmith.$(log)
+
+# Verify that the systolic candidates are in the kernel of d_1.
+d1S.txt: d1.txt S.txt
+	multiply -A d1.txt -B S.txt -C d1S.txt 2>&1 | tee d1S.$(log)
+
+check-d1S: d1S.txt
+	rank=$$(dim -in d1S.txt -image) && if [[ $$rank -eq '0' ]]; then echo "candidates S are contained in ker d1"; else echo "candidates S are NOT contained in ker d1!"; false; fi
+
+
+# xxx =============
+#
+# redo the cosystole targets - do them in the same dir instead of a subdir
+
 init-cosystole:
 	mkdir -p cosystole
 	transpose -in d1.txt -out cosystole/d2.txt
@@ -142,87 +188,3 @@ init-cosystole:
 
 really-clean:
 	rm -f d1smith.txt d1colops.txt d2smith.txt d2colops.txt dim-Z1.txt dim-B1.txt dim-H1.txt Z1.txt d2coimage.txt B1.txt B1smith.txt B1colops.txt Q.txt U.txt KB1.txt K.txt KT.txt d2Tsmith.txt d2Tcolops.txt d2T.txt d1U.txt KU.txt *.log*
-
-# The following targets use the second Cayley expander mentioned above.
-
-# This target searches breadth-first for group elements in the
-# principle congruence subgroup corresponding to the given modulus.
-calg-congruence-subgroup-elements:
-	calg-cayley -max-depth 8 2>&1 | tee calg-congruence-subgroup-elements.$(log)
-
-# This target computes a finite Cayley complex for the given
-# congruence subgroup.
-# 
-#    calg-d1.txt: matrix for boundary map d_1
-#    calg-d2.txt: matrix for boundary map d_2
-#    calg-vertex-basis.txt: basis for the vertex space (X_0)
-#    calg-edge-basis.txt: basis for the edge space (X_1)
-#    calg-triangle-basis.txt: basis for the triangle space (X_2)
-#    calg-S.txt: matrix of systolic candidates as column vectors
-calg-d1.txt calg-d2.txt calg-vertex-basis.txt calg-edge-basis.txt calg-triangle-basis.txt calg-S.txt: modulus.txt
-	calg-cayley -max-depth 8 -modulus `cat modulus.txt` -d1 calg-d1.txt -d2 calg-d2.txt \
-		-vertex-basis calg-vertex-basis.txt -edge-basis calg-edge-basis.txt \
-		-triangle-basis calg-triangle-basis.txt --systolic-candidates calg-S.txt  2>&1 | tee calg-S.$(log)
-
-# This target computes a Smith normal form for the matrix d_1.
-calg-d1smith.txt calg-d1colops.txt: calg-d1.txt
-	smith -in calg-d1.txt -smith calg-d1smith.txt -colops calg-d1colops.txt 2>&1 | tee calg-d1smith.$(log)
-
-# This target computes a Smith normal form for the matrix d_2.
-calg-d2smith.txt calg-d2colops.txt: calg-d2.txt
-	smith -in calg-d2.txt -smith calg-d2smith.txt -colops calg-d2colops.txt 2>&1 | tee calg-d2smith.$(log)
-
-# This targets computes the dimension of Z_1, the kernel of d_1.
-calg-dim-Z1.txt: calg-d1smith.txt
-	dim -in calg-d1smith.txt -kernel > calg-dim-Z1.txt
-
-# This targets computes the dimension of B_1, the image of d_2.
-calg-dim-B1.txt: calg-d2smith.txt
-	dim -in calg-d2smith.txt -image > calg-dim-B1.txt
-
-# This target computes the dimension of H_1 = Z_1/B_1, the first homology group.
-calg-dim-H1.txt: calg-dim-Z1.txt calg-dim-B1.txt
-	expr `cat calg-dim-Z1.txt` - `cat calg-dim-B1.txt` > calg-dim-H1.txt
-
-# Multiplying K by S gives a matrix in which each column corresponds
-# to a systolic candidate and each coordinate within the column gives
-# a dot product with the corresponding row of K, which is a generator
-# for the kernel of d_2^T.  Hence if the column is all zeros, then the
-# corresponding candidate is orthogonal to the kernel of d_2^T.  Thus
-# by linear algebra, that candidate vector is in the image of d_2.
-calg-KS.txt: calg-K.txt calg-S.txt
-	multiply -A calg-K.txt -B calg-S.txt -C calg-KS.txt 2>&1 | tee calg-KS.$(log)
-
-calg-rank-KSsmith.txt: calg-KSsmith.txt
-	dim -in calg-KSsmith.txt -image > calg-rank-KSsmith.txt
-
-calg-KSsmith.txt: calg-KS.txt
-	smith -in calg-KS.txt -smith calg-KSsmith.txt 2>&1 | tee calg-KSsmith.$(log)
-
-# The rows of matrix K are generators for the kernel of d_2^T.
-calg-K.txt: calg-KT.txt
-	transpose -in calg-KT.txt -out calg-K.txt 2>&1 | tee calg-K.$(log)
-
-calg-KT.txt: calg-d2Tcolops.txt calg-d2Tsmith.txt
-	automorphism -in calg-d2Tcolops.txt -dim `dim -in calg-d2Tsmith.txt -domain` -crop-start `dim -in calg-d2Tsmith.txt -image` -out calg-KT.txt 2>&1 | tee calg-KT.$(log)
-
-calg-d2Tsmith.txt calg-d2Tcolops.txt: calg-d2T.txt
-	smith -in calg-d2T.txt -smith calg-d2Tsmith.txt -colops calg-d2Tcolops.txt 2>&1 | tee calg-d2Tsmith.$(log)
-
-calg-d2T.txt: calg-d2.txt
-	transpose -in calg-d2.txt -out calg-d2T.txt 2>&1 | tee calg-d2T.$(log)
-
-# Verify that the systolic candidates are in the kernel of d_1.
-calg-d1S.txt: calg-d1.txt calg-S.txt
-	multiply -A calg-d1.txt -B calg-S.txt -C calg-d1S.txt 2>&1 | tee calg-d1S.$(log)
-
-calg-check-d1S: calg-d1S.txt
-	rank=$$(dim -in calg-d1S.txt -image) && if [[ $$rank -eq '0' ]]; then echo "candidates S are contained in ker d1"; else echo "candidates S are NOT contained in ker d1!"; false; fi
-
-calg-init-cosystole: calg-d1.txt
-	mkdir -p cosystole
-	cp ../Makefile cosystole/
-	transpose -in calg-d1.txt -out cosystole/calg-d2.txt
-	cp calg-d2T.txt cosystole/calg-d1.txt
-	cp calg-d2Tsmith.txt cosystole/calg-d1smith.txt
-	cp calg-d2Tcolops.txt cosystole/calg-d1colops.txt
