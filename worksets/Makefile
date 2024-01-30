@@ -207,8 +207,54 @@ d^1smith.txt: d2Tsmith.txt
 d^1colops.txt: d2Tcolops.txt
 	cp d2Tcolops.txt d^1colops.txt
 
+d^0smith.txt d^0colops.txt: d^0.txt
+	smith -in d^0.txt -smith d^0smith.txt -colops d^0colops.txt 2>&1 | tee d^0smith.$(log)
 
-# xxx want: the cosystolic candidates as obtained by aligning B^1 in Z^1
+dim-Z^1.txt: d^1smith.txt
+	dim -in d^1smith.txt -kernel > dim-Z^1.txt
 
-# xxx make targets for the rest of the linear algebra stuff
+dim-B^1.txt: d^0smith.txt
+	dim -in d^0smith.txt -image > dim-B^1.txt
+
+dim-H^1.txt: dim-Z^1.txt dim-B^1.txt
+	expr `cat dim-Z^1.txt` - `cat dim-B^1.txt` > dim-H^1.txt
+
+# This target computes a basis for Z^1.
+Z^1.txt: d^1smith.txt d^1colops.txt dim-Z^1.txt
+	automorphism -in d^1colops.txt -dim `dim -in d^1smith.txt -domain` -crop-start `dim -in d^1smith.txt -image` -crop-end `dim -in d^1smith.txt -domain` -out Z^1.txt 2>&1 | tee Z^1.$(log)
+
+# This target checks that the basis for Z^1 we found is actually
+# contained in the kernel of d^1.
+check-Z^1: d^1Z^1.txt
+	rank=$$(dim -in d^1Z^1.txt -image) && if [[ $$rank -eq '0' ]]; then echo "Z^1 is contained in ker d^1"; else echo "Z^1 is NOT contained in ker d^1!"; false; fi
+
+# This target multiplies matrices: d^1 * Z^1, producing d^1Z^1.txt,
+# which should be all zeros.
+d^1Z^1.txt: d^1.txt Z^1.txt
+	multiply -A d^1.txt -B Z^1.txt -C d^1^Z1.txt 2>&1 | tee d^1Z^1.$(log)
+
+# This target computes a basis for the coimage of d^0.
+d^0coimage.txt: d^0smith.txt d^0colops.txt
+	automorphism -in d^0colops.txt -dim `dim -in d^0smith.txt -domain` -crop-start 0 -crop-end `dim -in d^0smith.txt -image` -out d^0coimage.txt 2>&1 | tee d^0coimage.$(log)
+
+# This target computes a basis for B^1, the image of d^0.
+B^1.txt: d^0coimage.txt
+	multiply -A d^0.txt -B d^0coimage.txt -C B^1.txt 2>&1 | tee B^1.$(log)
+
+# This target computes a Smith normal form for the matrix B^1 (whose
+# columns are a basis for B^1).
+B^1smith.txt B^1rowops.txt B^1colops: B^1.txt
+	smith -in B^1.txt -smith B^1smith.txt -rowops B^1rowops.txt -colops B^1colops.txt 2>&1 | tee B^1smith.$(log)
+
+# The next three targets are used to compute an aligned basis for B^1
+# inside of Z^1.  The resulting basis is stored as columns of matrix U^1
+# in U^1.txt.
+P^1T.txt: B^1rowops.txt d^1.txt
+	automorphism -in B^1rowops.txt -dim `dim -in d^1.txt -domain` -out P^1T.txt 2>&1 | tee P^1T.$(log)
+
+P^1.txt: P^1T.txt
+	transpose -in P^1T.txt -out P^1.txt 2>&1 | tee P^1.$(log)
+
+U^1.txt: B^1smith.txt P^1.txt B^1colops.txt Z^1.txt
+	align -B1smith B^1smith.txt -P P^1.txt -B1colops B^1colops.txt -Z1 Z^1.txt -out U^1.txt 2>&1 | tee U^1.$(log)
 
