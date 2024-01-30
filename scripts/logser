@@ -1,7 +1,7 @@
 #!/bin/bash
 
 n=0
-base="log"
+base=".log"
 log=`printf "%s%02d" "$base" "$n"`
 
 while [ -e "$log" ]; do
