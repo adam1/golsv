@@ -271,20 +271,12 @@ func initInverseModfTable() {
 	inverseModfTable = make(map[F2Polynomial]map[F2Polynomial]F2Polynomial)
 	for _, poly := range fs {
 		f, g := poly.f, poly.g
-		invg := F2PolynomialZero
-		for i := 1; i < (1 << f.Degree()); i++ {
-			a := F2PolynomialZero
-			for j := 0; j < f.Degree(); j++ {
-				if (i >> j) & 1 != 0 {
-					a = a.AddMonomial(j)
-				}
+		invg := g
+		for i := 1; i < (1 << f.Degree())-2; i++ {
+			invg = invg.Mul(g).Modf(f)
+			if invg.Equal(F2PolynomialOne) {
+				panic(fmt.Sprintf("%v is not a generator mod %v", g, f))
 			}
-			if a.Mul(g).Modf(f).Equal(F2PolynomialOne) {
-				invg = a
-			}
-		}
-		if invg == F2PolynomialZero {
-			panic(fmt.Sprintf("no inverse found for generator %v mod %v", g, f))
 		}
 		if !g.Mul(invg).Modf(f).Equal(F2PolynomialOne) {
 			panic(fmt.Sprintf("%v and %v are not inverses mod %v", g, invg, f))
