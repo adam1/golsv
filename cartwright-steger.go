@@ -347,14 +347,29 @@ var inverseModfTable map[F2Polynomial]map[F2Polynomial]F2Polynomial
 func initInverseModfTable() {
 	log.Printf("initializing InverseModf lookup table")
 	fs := []struct {
-		f, g, invg F2Polynomial
+		f, g F2Polynomial
 	}{
-		{"111", F2PolynomialY, F2PolynomialOnePlusY},
-		{"1101", F2PolynomialY, "101"},
+		{"111", F2PolynomialY},
+		{"1101", F2PolynomialY},
 	}
 	inverseModfTable = make(map[F2Polynomial]map[F2Polynomial]F2Polynomial)
 	for _, poly := range fs {
-		f, g, invg := poly.f, poly.g, poly.invg
+		f, g := poly.f, poly.g
+		invg := F2PolynomialZero
+		for i := 1; i < (1 << f.Degree()); i++ {
+			a := F2PolynomialZero
+			for j := 0; j < f.Degree(); j++ {
+				if (i >> j) & 1 != 0 {
+					a = a.AddMonomial(j)
+				}
+			}
+			if a.Mul(g).Modf(f).Equal(F2PolynomialOne) {
+				invg = a
+			}
+		}
+		if invg == F2PolynomialZero {
+			panic(fmt.Sprintf("no inverse found for generator %v mod %v", g, f))
+		}
 		if !g.Mul(invg).Modf(f).Equal(F2PolynomialOne) {
 			panic(fmt.Sprintf("%v and %v are not inverses mod %v", g, invg, f))
 		}
@@ -372,13 +387,15 @@ func (p F2Polynomial) InverseModf(f F2Polynomial) F2Polynomial {
 	if p.IsZero() {
 		panic("not a unit")
 	}
-	if _, ok := inverseModfTable[f]; !ok {
+	lut, ok := inverseModfTable[f]
+	if !ok {
 		panic(fmt.Sprintf("not implemented: mod f=%v", f))
 	}
-	if _, ok := inverseModfTable[f][p]; !ok {
+	invp, ok := lut[p]
+	if !ok {
 		panic(fmt.Sprintf("%v not reduced mod f=%v", p, f))
 	}
-	return inverseModfTable[f][p]
+	return invp
 }
 
 func (p F2Polynomial) IsOne() bool {
