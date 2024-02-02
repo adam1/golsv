@@ -36,10 +36,6 @@ func TestF2PolynomialAdd(t *testing.T) {
 		{F2PolynomialOne, F2PolynomialY, F2PolynomialOnePlusY},
 		{NewF2Polynomial("101"), F2PolynomialY, NewF2Polynomial("111")},
 		{NewF2Polynomial("1011"), NewF2Polynomial("001000000000000001"), NewF2Polynomial("100100000000000001")},
-		{F2PolynomialZero, "0", F2PolynomialZero},
-		{"0", F2PolynomialZero, F2PolynomialZero},
-		{"0", "0", F2PolynomialZero},
-		{"1", "1", F2PolynomialZero},
 	}
 	for n, test := range tests {
 		c := test.a.Add(test.b)
@@ -193,14 +189,6 @@ func TestF2PolynomialEqual(t *testing.T) {
 		{NewF2PolynomialFromSupport(1, 2), NewF2PolynomialFromSupport(1, 2, 3), false},
 		{NewF2PolynomialFromSupport(1, 2, 3), NewF2PolynomialFromSupport(1, 2), false},
 		{F2PolynomialZero, F2PolynomialZero, true},
-		{F2PolynomialZero, "0", false},
-		{"0", "01", false},
-		// in the trailing zero cases - we should always store
-		// normalized strings - i.e. no trailing zeros.  this makes
-		// string comparison work as expected, such as when we use an
-		// ElementCalG as a map key.
-		{"0", "00", false},
-		{"1", "10", false},
 	}
 	for n, test := range tests {
 		if got := test.a.Equal(test.b); got != test.want {
@@ -216,13 +204,13 @@ func TestF2PolynomialInverseModf(t *testing.T) {
 		{F2PolynomialOne, F2Polynomial111, F2PolynomialOne},
 		{F2PolynomialY, F2Polynomial111, F2PolynomialOnePlusY},
 		{F2PolynomialOnePlusY, F2Polynomial111, F2PolynomialY},
-		{F2PolynomialOne, F2Polynomial("1101"), F2PolynomialOne},
-		{F2PolynomialY, F2Polynomial("1101"), F2Polynomial("101")},
-		{F2PolynomialOnePlusY, F2Polynomial("1101"), F2Polynomial("011")},
-		{F2Polynomial("001"), F2Polynomial("1101"), F2Polynomial("111")},
-		{F2Polynomial("101"), F2Polynomial("1101"), F2PolynomialY},
-		{F2Polynomial("011"), F2Polynomial("1101"), F2PolynomialOnePlusY},
-		{F2Polynomial("111"), F2Polynomial("1101"), F2Polynomial("001")},
+		{F2PolynomialOne, NewF2Polynomial("1101"), F2PolynomialOne},
+		{F2PolynomialY, NewF2Polynomial("1101"), NewF2Polynomial("101")},
+		{F2PolynomialOnePlusY, NewF2Polynomial("1101"), NewF2Polynomial("011")},
+		{NewF2Polynomial("001"), NewF2Polynomial("1101"), NewF2Polynomial("111")},
+		{NewF2Polynomial("101"), NewF2Polynomial("1101"), F2PolynomialY},
+		{NewF2Polynomial("011"), NewF2Polynomial("1101"), F2PolynomialOnePlusY},
+		{NewF2Polynomial("111"), NewF2Polynomial("1101"), NewF2Polynomial("001")},
 	}
 	for n, test := range tests {
 		got := test.a.InverseModf(test.f)
@@ -234,7 +222,7 @@ func TestF2PolynomialInverseModf(t *testing.T) {
 			t.Errorf("test %d: inverse failed", n)
 		}
 	}
-	polys := []F2Polynomial { "111", "1101" }
+	polys := []F2Polynomial { NewF2Polynomial("111"), NewF2Polynomial("1101") }
 	for _, f := range polys {
 		for i := 1; i < (1 << f.Degree()); i++ {
 			a := F2PolynomialZero

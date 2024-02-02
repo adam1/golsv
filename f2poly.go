@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"sort"
-	"strings"
 )
 
 func init() {
@@ -17,169 +15,107 @@ func init() {
 // We would like the ElementCalG type to be comparable (in the native
 // Go sense) so that we can use it as a map key.  since ElementCalG is
 // an array of nine F2Polynomials, we need F2Polynomial to be
-// comparable.  in principle, the degree of such a polynomial not
-// bounded; a polynomial can contain an arbitrarily large amount of
-// information. the only natively comparable type that supports an
-// unbounded length is string. so we store polynomials as strings, in
-// particular a string of 0s and 1s.  this is not the most efficient
-// representation, but it is simple and it works.
+// comparable.
 
-// F2Polynomial is a polynomial in y with coefficients in \F_2.
-// it is represented as a string of 0s and 1s, where the i-th
-// character is the coefficient of y^i.
-type F2Polynomial string
+const f2PolynomialSize = 2
 
-// nb. the zero polynomial is represented by the empty string. it
-// could also be represented by "0", but we choose to use strings
-// normalized in the sense of removing trailing zeros.  this is to
-// make equality equivalent to native golang string equality.
-const F2PolynomialZero = F2Polynomial("")
-
-const F2PolynomialOne = F2Polynomial("1")
-const F2PolynomialY = F2Polynomial("01")
-const F2PolynomialOnePlusY = F2Polynomial("11")
-const F2Polynomial111 = F2Polynomial("111")
-
-func NewF2Polynomial(s string) F2Polynomial {
-	return F2Polynomial(s).normalize()
+type F2Polynomial struct {
+	w [f2PolynomialSize]uint64
 }
 
-// xxx DEPRECATED and broken
-// coeffs is a slice of 0s and 1s
-// func NewF2PolynomialFromCoefficients(coeffs []int) F2Polynomial {
-// 	runes := make([]rune, len(coeffs))
-// 	for i, c := range coeffs {
-// 		switch c {
-// 		case 0:
-// 			runes[i] = '0'
-// 		case 1:
-// 			runes[i] = '1'
-// 		default:
-// 			panic("NewF2PolynomialFromCoefficients: bad coefficient")
-// 		}
-// 		runes[i] = rune(c)
-// 	}
-// 	return F2Polynomial(runes)
-// }
+func smallF2Polynomial(p uint64) F2Polynomial {
+	q := F2Polynomial {}
+	q.w[0] = p
+	return q
+}
+
+// arrays cannot be constant, careful not to reassign constants
+var F2PolynomialZero = smallF2Polynomial(0)
+
+var F2PolynomialOne = smallF2Polynomial(1)
+var F2PolynomialY = smallF2Polynomial(2)
+var F2PolynomialOnePlusY = smallF2Polynomial(3)
+var F2Polynomial111 = smallF2Polynomial(7)
+
+func checkF2PolynomialDegree(degree int) {
+	if degree >= f2PolynomialSize * 64 {
+		panic(fmt.Sprintf("F2Polynomial degree %d too high", degree))
+	}
+}
+
+func NewF2Polynomial(s string) F2Polynomial {
+	if len(s) > f2PolynomialSize * 64 {
+		panic("NewF2Polynomial: too many terms")
+	}
+	p := F2Polynomial {}
+	for i, k := range s {
+		b := uint64(0)
+		if k == '1' {
+			b = 1
+		} else if k != '0' {
+			panic(fmt.Sprintf("unrecognized rune %c", k))
+		}
+		p.w[i/64] |= (b << (i%64))
+	}
+	return p
+}
 
 func NewF2PolynomialFromSupport(support ...int) F2Polynomial {
-	if len(support) == 0 {
-		return F2PolynomialZero
-	}
-	supp := make([]int, len(support))
-	copy(supp, support)
-	sort.Ints(supp)
-	runes := make([]rune, supp[len(supp)-1]+1)
-	for i := 0; i < len(runes); i++ {
-		runes[i] = '0'
-	}
+	p := F2Polynomial {}
 	for _, k := range support {
-		runes[k] = '1'
+		checkF2PolynomialDegree(k)
+		p.w[k/64] |= (uint64(1) << (k%64))
 	}
-	return NewF2Polynomial(string(runes))
+	return p
 }
 
 func NewF2PolynomialRandom(maxDegree int) F2Polynomial {
-	runes := make([]rune, maxDegree+1)
-	for i := 0; i <= maxDegree; i++ {
-		if rand.Intn(2) == 0 {
-			runes[i] = '0'
-		} else {
-			runes[i] = '1'
-		}
+	checkF2PolynomialDegree(maxDegree)
+	p := F2Polynomial {}
+	highestWord := maxDegree/64
+	for i := 0; i < highestWord; i++ {
+		p.w[i] = rand.Uint64()
 	}
-	return NewF2Polynomial(string(runes))
+	p.w[highestWord] = rand.Uint64() >> (63-(maxDegree%64))
+	return p
 }
 
 // returns a + b
 func (p F2Polynomial) Add(q F2Polynomial) F2Polynomial {
-	n := len(p)
-	if len(q) > n {
-		n = len(q)
+	r := F2Polynomial {}
+	for i := 0; i < f2PolynomialSize; i++ {
+		r.w[i] = p.w[i] ^ q.w[i]
 	}
-	runes := make([]rune, n)
-	pb := []rune(p)
-	qb := []rune(q)
-	for i := 0; i < n; i++ {
-		if i < len(pb) && i < len(qb) {
-			if pb[i] == qb[i] {
-				runes[i] = '0'
-			} else {
-				runes[i] = '1'
-			}
-		} else if i < len(pb) {
-			runes[i] = pb[i]
-		} else {
-			runes[i] = qb[i]
-		}
-	}
-	return NewF2Polynomial(string(runes))
+	return r
 }
 
 func (p F2Polynomial) AddMonomial(degree int) F2Polynomial {
-	var runes []rune
-	if degree + 1 > len(p) {
-		runes = make([]rune, degree+1)
-		copy(runes, []rune(p))
-		for i := len(p); i < degree; i++ {
-			runes[i] = '0'
-		}
-	} else {
-		runes = []rune(p)
-	}
-	if runes[degree] == '1' {
-		runes[degree] = '0'
-	} else {
-		runes[degree] = '1'
-	}
-	return NewF2Polynomial(string(runes))
+	checkF2PolynomialDegree(degree)
+	r := p
+	r.w[degree/64] ^= (uint64(1) << (degree%64))
+	return r
 }
 
 func (p F2Polynomial) Coefficient(degree int) int {
-	if degree < 0 || degree >= len(p) {
+	if degree < 0 || degree >= f2PolynomialSize * 64 {
 		return 0
 	}
-	if p[degree] == '0' {
-		return 0
-	}
-	return 1
+	return int((p.w[degree/64] >> (degree%64)) & 1)
 }
 
-// xxx do we even use this?  DEPRECATED
-// func (p F2Polynomial) Coefficients() []int {
-// 	coeffs := make([]int, len(p))
-// 	for i, c := range []rune(p) {
-// 		switch c {
-// 		case '0':
-// 			coeffs[i] = 0
-// 		case '1':
-// 			coeffs[i] = 1
-// 		default:
-// 			panic("F2Polynomial.Coefficients: bad coefficient")
-// 		}
-// 	}
-// 	return coeffs
-// }
-
-// xxx deprecated; strings are immutable
-// func (p F2Polynomial) Copy(q *F2Polynomial) {
-// 	if p == nil {
-// 		if q.IsZero() {
-// 			return
-// 		}
-// 		panic("F2Polynomial.Copy: p is nil")
-// 	}
-// 	if q.IsZero() {
-// 		p.support = p.support[:0]
-// 		return
-// 	}
-// 	p.support = append(p.support[:0], q.support...)
-// }
+func highestOneBit(p uint64) int {
+	for i := 63; i >= 0; i-- {
+		if (p >> i) & 1 == 1 {
+			return i
+		}
+	}
+	return -1
+}
 
 func (p F2Polynomial) Degree() int {
-	for i := len(p) - 1; i >= 0; i-- {
-		if p[i] == '1' {
-			return i
+	for i := f2PolynomialSize-1; i >= 0; i-- {
+		if p.w[i] != 0 {
+			return highestOneBit(p.w[i]) + i * 64
 		}
 	}
 	return -1
@@ -204,56 +140,22 @@ func (p F2Polynomial) Div(f F2Polynomial) (quotient, remainder F2Polynomial) {
 	return q, r
 }
 
-// xxx deprecate
-// // sets p = p * y^{-n}.  panics if power would become negative.
-// func (p *F2Polynomial) DivY(n int) {
-// 	if n == 0 {
-// 		return
-// 	}
-// 	for i, _ := range p.support {
-// 		p.support[i] -= n
-// 		if p.support[i] < 0 {
-// 			panic("F2Polynomial.DivY: negative power")
-// 		}
-// 	}
-// }
-
-// // sets p = p / (1+y).  returns quotient and remainder.
-// func (p *F2Polynomial) Div1PlusY() (quotient, remainder *F2Polynomial) {
-// 	// if p has an odd number of terms, it is not divisible by
-// 	// 1+y. use this fact to avoid computing an infinite series.
-// 	if len(p.support) % 2 == 1 {
-// 		return nil, p
-// 	}
-// 	coeffs := p.Coefficients()
-// 	quotientCoeffs := make([]int, len(coeffs))
-// 	remainderCoeffs := make([]int, len(coeffs))
-// 	copy(remainderCoeffs, coeffs)
-
-// 	for i := 0; i < len(coeffs); i++ {
-// 		c := remainderCoeffs[i]
-// 		if c == 1 {
-// 			quotientCoeffs[i] = 1
-// 			remainderCoeffs[i] = 0
-// 			remainderCoeffs[i+1] ^= 1
-// 		}
-// 	}
-// 	quotient = NewF2PolynomialFromCoefficients(quotientCoeffs)
-// 	remainder = NewF2PolynomialFromCoefficients(remainderCoeffs)
-// 	return
-// }
-
 func (p F2Polynomial) Dump() string {
-	return "(" + string(p) + ")"
+	runes := make([]rune, p.Degree()+1)
+	for i := 0; i <= p.Degree(); i++ {
+		if p.Coefficient(i) == 0 {
+			runes[i] = '0'
+		} else {
+			runes[i] = '1'
+		}
+	}
+	return string(runes)
 }
 
 func (p F2Polynomial) Dup() F2Polynomial {
-	return NewF2Polynomial(string(append([]byte(nil), p...)))
+	return p
 }
 
-// it's important that this equality match ordinary string equality,
-// so that F2Polynomial is a "comparable" type, e.g. can be used as a
-// map key.
 func (p F2Polynomial) Equal(q F2Polynomial) bool {
 	return p == q
 }
@@ -265,8 +167,8 @@ func initInverseModfTable() {
 	fs := []struct {
 		f, g F2Polynomial
 	}{
-		{"111", F2PolynomialY},
-		{"1101", F2PolynomialY},
+		{smallF2Polynomial(7), F2PolynomialY},
+		{smallF2Polynomial(11), F2PolynomialY},
 	}
 	inverseModfTable = make(map[F2Polynomial]map[F2Polynomial]F2Polynomial)
 	for _, poly := range fs {
@@ -307,21 +209,17 @@ func (p F2Polynomial) InverseModf(f F2Polynomial) F2Polynomial {
 }
 
 func (p F2Polynomial) IsOne() bool {
-	if p.Degree() == 0 {
-		if len(p) >= 1 {
-			runes := []rune(p)
-			return runes[0] == '1'
+	for i := 1; i < f2PolynomialSize; i++ {
+		if p.w[i] != 0 {
+			return false
 		}
 	}
-	return false
+	return p.w[0] == 1
 }
 
 func (p F2Polynomial) IsZero() bool {
-	if len(p) == 0 {
-		return true
-	}
-	for _, b := range p {
-		if b == '1' {
+	for i := 0; i < f2PolynomialSize; i++ {
+		if p.w[i] != 0 {
 			return false
 		}
 	}
@@ -330,22 +228,24 @@ func (p F2Polynomial) IsZero() bool {
 
 // xxx test
 func (p F2Polynomial) Less(q F2Polynomial) bool {
-	return p < q
+	for i := f2PolynomialSize-1; i >= 0; i-- {
+		if p.w[i] < q.w[i] {
+			return true
+		} else if p.w[i] > q.w[i] {
+			return false
+		}
+	}
+	return false
 }
 
 // returns the highest power of y that divides p
 func (p F2Polynomial) MaxYFactor() int {
-	minPower := -1
-	for i, c := range p {
-		if c == '1' {
-			minPower = i
-			break
+	for i := 0; i < f2PolynomialSize * 64; i++ {
+		if (p.w[i/64] >> (i%64)) & 1 == 1 {
+			return i
 		}
 	}
-	if minPower < 1 {
-		return 0
-	}
-	return minPower
+	return 0
 }
 
 // returns the highest power of 1+y that divides p
@@ -373,28 +273,23 @@ func (p F2Polynomial) Modf(f F2Polynomial) F2Polynomial {
 
 // return p * q
 func (p F2Polynomial) Mul(q F2Polynomial) F2Polynomial {
-	n := p.Degree()
-	m := q.Degree()
-	runes := make([]rune, n+m+1)
-	for i := 0; i < n+m+1; i++ {
-		runes[i] = '0'
+	if p.Degree() + q.Degree() >= f2PolynomialSize * 64 {
+		panic("F2Polynomial product overflow")
 	}
-	for i, a := range p {
-		for j, b := range q {
-			if a == '1' && b == '1' {
-				if runes[i+j] == '1' {
-					runes[i+j] = '0'
-				} else {
-					runes[i+j] = '1'
-				}
+	r := F2Polynomial {}
+	w := q.w
+	for i := 0; i <= p.Degree(); i++ {
+		if p.Coefficient(i) == 1 {
+			for j := 0; j < f2PolynomialSize; j++ {
+				r.w[j] ^= w[j]
 			}
 		}
+		for j := f2PolynomialSize-1; j >= 1; j-- {
+			w[j] = (w[j] << 1) | (w[j-1] >> 63)
+		}
+		w[0] = w[0] << 1
 	}
-	return NewF2Polynomial(string(runes))
-}
-
-func (p F2Polynomial) normalize() F2Polynomial {
-	return F2Polynomial(strings.TrimRight(string(p), "0"))
+	return r
 }
 
 // returns p^n
@@ -407,5 +302,5 @@ func (p F2Polynomial) Pow(n int) F2Polynomial {
 }
 
 func (p F2Polynomial) String() string {
-	return string(p)
+	return p.Dump()
 }
