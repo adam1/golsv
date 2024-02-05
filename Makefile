@@ -13,6 +13,7 @@ build all:
 	go build -o bin/lift ./cmd/lift
 	go build -o bin/menum-cayley ./cmd/menum-cayley
 	go build -o bin/multiply ./cmd/multiply
+	go build -o bin/random-complex ./cmd/random-complex
 	go build -o bin/shorten ./cmd/shorten
 	go build -o bin/smith ./cmd/smith
 	go build -o bin/systole ./cmd/systole

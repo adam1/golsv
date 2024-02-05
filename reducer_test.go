@@ -19,7 +19,12 @@ func doKernelBasisTest(t *testing.T, A BinaryMatrix, numSamples int) (kernelMatr
 	var reducer Reducer
 	verbose := showSteps
 	reducer = NewDiagonalReducer(verbose)
-	reducer.Reduce(B)
+	D, _, _ := reducer.Reduce(B)
+	DSparse := D.Sparse()
+	isSmith, rank := DSparse.IsSmithNormalForm()
+	if !isSmith {
+		t.Errorf("Matrix is not in Smith normal form")
+	}
 	// xxx temp hack until the colOps -> kernelBasis API is fixed
 	reducer.(*DiagonalReducer).computeKernelBasis()
 	kernelMatrix = reducer.(*DiagonalReducer).kernelBasis
@@ -29,7 +34,9 @@ func doKernelBasisTest(t *testing.T, A BinaryMatrix, numSamples int) (kernelMatr
 	}
 	dreducer := reducer.(*DiagonalReducer) 
 	coimageMatrix := dreducer.CoimageBasis()
-
+	if rank != coimageMatrix.NumColumns() {
+		t.Errorf("Rank of reduced matrix does not match length of coimage basis")
+	}
 	// the matrix should produce zero for vectors in the kernel
 	zeroImageVector := ZeroVector(A.NumRows())
 	var inputs []BinaryVector
@@ -142,6 +149,21 @@ func TestReducer_KernelBasis(t *testing.T) {
 0 1 0 1 0 1 0
 0 1 0 1 0 1 0`),
 			dimKernel: 2,
+		},
+		{
+			name: "Test 9",
+			A: NewSparseBinaryMatrixFromString(
+`1 0 0 0 0 0 1 0 1 0 0 0 1 0 0 0 0
+ 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0
+ 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1
+ 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 1
+ 1 0 0 0 0 0 1 0 1 0 0 0 1 0 1 0 1
+ 1 0 1 0 1 0 0 0 0 0 1 0 1 0 1 0 1
+ 0 0 1 0 1 0 1 0 1 0 1 0 0 0 1 0 0
+ 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+ 0 0 1 0 0 0 0 0 0 0 1 0 0 0 1 0 0
+ 1 0 0 0 1 0 0 0 0 0 1 0 1 0 0 0 1`),
+				dimKernel: 9,
 		},
 	}
 	for _, tt := range tests {

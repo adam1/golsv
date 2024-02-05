@@ -23,13 +23,13 @@ func main() {
 		return
 	}
 
-	var visualizer *golsv.CalGVisualizer
+	var observer golsv.CalGObserver
 	if args.MeshFile != "" {
-		visualizer = golsv.NewCalGVisualizer(args.MeshFile)
+		observer = golsv.NewCalGVisualizer(args.MeshFile)
 	}
 	E := golsv.NewCalGCayleyExpander(gens,
 		args.MaxDepth, args.Verbose, &f, args.Quotient,
-		visualizer)
+		observer)
 	E.Expand()
 
 	log.Printf("computing complex")

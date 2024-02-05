@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+
+import os
+import subprocess
+
+N = 100
+dimC0 = 20
+
+for i in range(N):
+    dir = "r%00d" % i
+    os.makedirs(dir, exist_ok=True)
+    command = f"cd {dir} && random-complex -dimC0 {dimC0} -d1 d1.txt -d2 d2.txt"
+    subprocess.run(command, shell=True)
+    command = f"cp ../Makefile {dir}"
+    subprocess.run(command, shell=True)
+    command = f"cd {dir} && make dim-H1.txt dim-H^1.txt systole.txt cosystole.txt"
+    subprocess.run(command, shell=True)

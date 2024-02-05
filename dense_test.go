@@ -460,6 +460,31 @@ func TestDenseBinaryMatrixAddMatrix(t *testing.T) {
 			
 }
 
+func TestNewRandomDenseBinaryMatrixWithDensity(t *testing.T) {
+	trials := 10
+	minRows := 10
+	maxRows := 100
+	minCols := 10
+	maxCols := 100
+	for i := 0; i < trials; i++ {
+		numRows := rand.Intn(maxRows-minRows) + minRows
+		numCols := rand.Intn(maxCols-minCols) + minCols
+		density := rand.Float64()
+		M := NewRandomDenseBinaryMatrixWithDensity(numRows, numCols, density)
+		if M.NumRows() != numRows {
+			t.Errorf("numRows = %v, want %v", M.NumRows(), numRows)
+		}
+		if M.NumColumns() != numCols {
+			t.Errorf("numCols = %v, want %v", M.NumColumns(), numCols)
+		}
+		gotDensity := M.Density(0, 0)
+		delta := gotDensity - density
+		if delta > 0.1 {
+			t.Errorf("density = %v, want %v", gotDensity, density)
+		}
+	}
+}
+
 const bNumRows = 1000*100
 const bNumCols = 1000*100
 const bDensity = 0.005

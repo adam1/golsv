@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
 	"reflect"
 	"strconv"
@@ -55,7 +56,7 @@ func NewSparseBinaryMatrixFromString(s string) *Sparse {
 
 func NewRandomSparseBinaryMatrix(rows, cols int, density float64, secureRandom bool) *Sparse {
 	if secureRandom {
-		M := NewRandomDenseBinaryMatrixWithDensity(rows, cols, 0.5)
+		M := NewRandomDenseBinaryMatrixWithDensity(rows, cols, density)
 		return M.Sparse()
 	}
 	M := NewSparseBinaryMatrix(rows, cols)
@@ -343,6 +344,12 @@ func (S *Sparse) SetColumnData(col int, data orderedIntSet) {
 
 func (S *Sparse) SetVerbose(verbose bool) {
 	S.verbose = verbose
+}
+
+func (S *Sparse) ShuffleColumns() {
+	rand.Shuffle(S.Cols, func(i, j int) {
+		S.ColData[i], S.ColData[j] = S.ColData[j], S.ColData[i]
+	})
 }
 
 func (S *Sparse) Sparse() *Sparse {

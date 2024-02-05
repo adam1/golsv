@@ -7,5 +7,5 @@ if [ $# -gt 0 ]; then
     cmd="$@"
 fi
 
-fswatch -l 0.2 -e '\.#' -e '#' -e '~' -e '/bin/' -e worksets -e log . | xargs -n1 sh -c \
+fswatch -l 0.2 -e '\.git' -e '#' -e '~' -e '/bin/' -e worksets -e log . | xargs -n1 sh -c \
     "echo  && echo =======\> EXEC; $cmd && echo && date && echo =======\> RESULT \$?"

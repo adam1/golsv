@@ -25,6 +25,10 @@ import (
 // weight of the resulting vector.  Repeatedly doing this, it records
 // the minimum found to min.txt, which is overwritten each time a new
 // minimum is found.
+//
+// xxx add option for complete enumeration; then run at size small
+// enough to run in reasonable time: 2^(k + m) where k = dim H_1 and m = dim B_1
+// (= 2^t where t = dim Z_1)
 
 func main() {
 	args := parseFlags()
