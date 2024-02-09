@@ -277,6 +277,33 @@ func TestF2PolynomialIsZero(t *testing.T) {
 	}
 }
 
+func TestF2PolynomialLess(t *testing.T) {
+	p := NewF2PolynomialFromSupport(1,2,3,48)
+	q := NewF2PolynomialFromSupport(1,2,3,48,70,127)
+	r := NewF2PolynomialFromSupport(1,2,3,48,49,70,127)
+	if p.Less(p) {
+		t.Errorf("Less() returned true for %v and %v", p, p)
+	}
+	if !p.Less(q) {
+		t.Errorf("Less() returned false for %v and %v", p, q)
+	}
+	if !q.Less(r) {
+		t.Errorf("Less() returned false for %v and %v", q, r)
+	}
+	if !p.Less(r) {
+		t.Errorf("Less() returned false for %v and %v", p, r)
+	}
+	if q.Less(p) {
+		t.Errorf("Less() returned true for %v and %v", q, p)
+	}
+	if r.Less(q) {
+		t.Errorf("Less() returned true for %v and %v", r, q)
+	}
+	if r.Less(p) {
+		t.Errorf("Less() returned true for %v and %v", r, p)
+	}
+}
+
 func TestF2PolynomialMaxYFactor(t *testing.T) {
 	tests := []struct {
 		f F2Polynomial

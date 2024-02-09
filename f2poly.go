@@ -226,7 +226,6 @@ func (p F2Polynomial) IsZero() bool {
 	return true
 }
 
-// xxx test
 func (p F2Polynomial) Less(q F2Polynomial) bool {
 	for i := f2PolynomialSize-1; i >= 0; i-- {
 		if p.w[i] < q.w[i] {
