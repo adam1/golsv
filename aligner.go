@@ -30,10 +30,11 @@ type Aligner struct {
 	Z1 *Sparse
 	U BinaryMatrix // output matrix
 	minWeight int
+	verbose bool
 }
 
 func NewAligner(B1smith *Sparse, P *DenseBinaryMatrix, B1colops []Operation,
-	Z1 *Sparse) *Aligner {
+	Z1 *Sparse, verbose bool) *Aligner {
 	return &Aligner{
 		B1smith: B1smith,
 		P: P,
@@ -41,6 +42,7 @@ func NewAligner(B1smith *Sparse, P *DenseBinaryMatrix, B1colops []Operation,
 		Z1: Z1,
 		U: NewSparseBinaryMatrix(B1smith.NumRows(), 0),
 		minWeight: math.MaxInt,
+		verbose: verbose,
 	}
 }
 
@@ -51,7 +53,9 @@ func (a *Aligner) Align() BinaryMatrix {
 	if !BIsSmith {
 		log.Fatal("matrix B1smith is not in Smith normal form")
 	}
-	log.Printf("B1smith = %v, Brank = %d", a.B1smith, Brank)
+	if a.verbose {
+		log.Printf("B1smith = %v, Brank = %d", a.B1smith, Brank)
+	}
 
 	// nb. unexpectedly B1colops keeps coming out empty. xxx why?  for
 	// now assume it is true.
@@ -82,7 +86,9 @@ func (a *Aligner) Align() BinaryMatrix {
 	// in our main example, this should produce 19 column vectors in U,
 	// since we already know that dim H_1 = 19.
 
- 	log.Printf("beginning alignment")
+	if a.verbose {
+		log.Printf("beginning alignment")
+	}
 	Z := a.Z1
 	rows := Z.NumRows()
 
@@ -106,9 +112,11 @@ func (a *Aligner) Align() BinaryMatrix {
 			totalElapsed := now.Sub(timeStart)
 			cRate := float64(doneLastReport) / reportElapsed.Seconds()
 			tRate := float64(j) / totalElapsed.Seconds()
-			log.Printf("align: processed %d/%d (%.2f%%) cols; crate=%1.0f trate=%1.0f found=%d",
-				j, Z.NumColumns(), 100.0 * float64(j) / float64(Z.NumColumns()),
-				cRate, tRate, a.U.NumColumns())
+			if a.verbose {
+				log.Printf("align: processed %d/%d (%.2f%%) cols; crate=%1.0f trate=%1.0f found=%d",
+					j, Z.NumColumns(), 100.0 * float64(j) / float64(Z.NumColumns()),
+					cRate, tRate, a.U.NumColumns())
+			}
 			timeLastReport = now
 			doneLastReport = 0
 			if reportElapsed.Seconds() < 1 {
@@ -118,24 +126,34 @@ func (a *Aligner) Align() BinaryMatrix {
 			}
 		}
 	}
-	log.Printf("done; min weight is %d", a.minWeight)
+	if a.verbose {
+		log.Printf("done; min weight is %d", a.minWeight)
+	}
 	return a.U
 }
 
 func (a *Aligner) handleIndependentVector(v BinaryMatrix, w BinaryMatrix, Brank int, k int) {
 	a.U.(*Sparse).AppendColumn(v)
-	log.Printf("found independent vector; found=%d total", a.U.NumColumns())
+	if a.verbose {
+		log.Printf("found independent vector; found=%d total", a.U.NumColumns())
+	}
 	// sneak peak at systole
 	weight := v.(*Sparse).ColumnWeight(0)
 	if weight < a.minWeight {
 		a.minWeight = weight
-		log.Printf("new min weight %d", weight)
+		if a.verbose {
+			log.Printf("new min weight %d", weight)
+		}
 	}
 	a.B1smith.AppendColumn(w)
 	a.makePivot(Brank, k)
-	log.Printf("clearing column")
+	if a.verbose {
+		log.Printf("clearing column")
+	}
 	a.clearColumn(Brank)
-	log.Printf("done clearing column")
+	if a.verbose {
+		log.Printf("done clearing column")
+	}
 }
 
 func (a *Aligner) makePivot(Brank int, k int) {
@@ -163,8 +181,12 @@ func (a *Aligner) clearColumn(Brank int) {
 		row++
 		ops++
 		if ops % reportInterval == 0 {
-			log.Printf("did %d row ops", ops)
+			if a.verbose {
+				log.Printf("did %d row ops", ops)
+			}
 		}
 	}
-	log.Printf("did %d row ops", ops)
+	if a.verbose {
+		log.Printf("did %d row ops", ops)
+	}
 }

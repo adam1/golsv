@@ -153,7 +153,7 @@ func (S *Sparse) ColumnVector(index int) BinaryVector {
 	return genericColumnVector(S, index)
 }
 
-// xxx test; add to interface
+// xxx test
 func (S *Sparse) ColumnWeight(index int) int {
 	return len(S.ColData[index])
 }
@@ -162,6 +162,10 @@ func (S *Sparse) Copy() BinaryMatrix {
 	N := NewSparseBinaryMatrix(S.Rows, S.Cols)
 	genericCopy(S, N)
 	return N
+}
+
+func (S *Sparse) Dense() *DenseBinaryMatrix {
+	return S.DenseSubmatrix(0, S.NumRows(), 0, S.NumColumns())
 }
 
 func (S *Sparse) DenseSubmatrix(rowStart, rowEnd, colStart, colEnd int) *DenseBinaryMatrix {

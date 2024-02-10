@@ -24,7 +24,9 @@ type BinaryMatrix interface {
 	ColumnIsZero(index int) bool
 	Columns() []BinaryVector
 	ColumnVector(index int) BinaryVector
+	ColumnWeight(index int) int
 	Copy() BinaryMatrix
+	Dense() *DenseBinaryMatrix
 	DenseSubmatrix(rowStart, rowEnd, colStart, colEnd int) *DenseBinaryMatrix
 	Density(row, col int) float64
 	// xxx wip; for now hacked into SparseBinaryMatrix directly
@@ -154,6 +156,11 @@ func genericCopy(source, target BinaryMatrix) {
 			target.Set(i, j, source.Get(i, j))
 		}
 	}
+}
+
+// xxx test
+func genericDense(M BinaryMatrix) *DenseBinaryMatrix {
+	return genericDenseSubmatrix(M, 0, M.NumRows(), 0, M.NumColumns())
 }
 
 // xxx test
@@ -556,7 +563,7 @@ func dumpMatrix(M BinaryMatrix) string {
 			if M.Get(i, j) == 1 {
 				str += "1 "
 			} else {
-				str += "  "
+				str += "0 "
 			}
 		}
 		str += "\n"

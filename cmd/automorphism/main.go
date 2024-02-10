@@ -8,11 +8,11 @@ import (
 
 // Usage:
 //
-//   automorphism -dim n -ops ops.gob -out M.txt
+//   automorphism -dim n -ops ops.txt -out M.txt
 //
 // The program generates the identity matrix of size n, and then
-// applies the operations in ops.gob to it.  The result is written as
-// a sparse matrix to M.gob.
+// applies the operations in ops.txt to it.  The result is written as
+// a sparse matrix to M.txt.
 func main() {
 	args := parseFlags()
 	args.ProfileArgs.Start()
@@ -27,7 +27,13 @@ func main() {
 	// amount of work.  hence is not worth the effort.
 
  	M := golsv.NewDenseBinaryMatrixIdentity(args.Dim)
-	streamer := golsv.NewOpsFileMatrixStreamer(args.In, M, args.Reverse, args.Verbose)
+	var reader golsv.OperationReader
+	if args.Reverse {
+		reader = golsv.OpenOperationFileReverse(args.In)
+	} else {
+		reader = golsv.OpenOperationFile(args.In)
+	}
+	streamer := golsv.NewOpsFileMatrixStreamer(reader, M, args.Verbose)
 	streamer.Stream()
 	log.Printf("done computing matrix M: %v", M)
 
@@ -85,10 +91,10 @@ func parseFlags() *Args {
 	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "verbose logging")
 	flag.BoolVar(&args.Reverse, "reverse", args.Reverse, "reverse the order of the operations")
 	flag.BoolVar(&args.Transpose, "transpose", args.Transpose, "transpose the matrix")
-	flag.StringVar(&args.In, "in", args.In, "ops input file (stream of Operation gobs)")
-	flag.StringVar(&args.Out, "out", args.Out, "matrix output file (BinaryMatrix gob)")
+	flag.StringVar(&args.In, "in", args.In, "ops input file (custom txt format)")
+	flag.StringVar(&args.Out, "out", args.Out, "matrix output file (Sparse txt format)")
 	flag.Parse()
-	if args.Dim <= 0 {
+	if args.Dim < 0 {
 		flag.Usage()
 		log.Fatal("-dim must be greater than 0")
 	}

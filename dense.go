@@ -207,6 +207,10 @@ func (M *DenseBinaryMatrix) Copy() BinaryMatrix {
 	return N
 }
 
+func (M *DenseBinaryMatrix) Dense() *DenseBinaryMatrix {
+	return M
+}
+
 func (M *DenseBinaryMatrix) DenseSubmatrix(rowStart, rowEnd, colStart, colEnd int) *DenseBinaryMatrix {
 	if columnFirst {
 		if rowStart == 0 && rowEnd == M.Rows {

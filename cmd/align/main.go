@@ -41,7 +41,8 @@ func main() {
 	aligner := golsv.NewAligner(B1smith.(*golsv.Sparse),
 		Pdense,
 		B1colops,
-		Z1.(*golsv.Sparse))
+		Z1.(*golsv.Sparse),
+		args.Verbose)
 	U := aligner.Align()
 	log.Printf("U = %v", U)
 

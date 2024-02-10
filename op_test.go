@@ -84,9 +84,9 @@ func TestReadOpsToColumnMatrix(t *testing.T) {
 		// log.Printf("xxx M: %s\n%s", M, dumpMatrix(M))
 
 		N := NewDenseBinaryMatrixIdentity(dim)
-		reverse := false
 		verbose := false
-		streamer := NewOpsFileMatrixStreamer(filename, N, reverse, verbose)
+		reader := OpenOperationFile(filename)
+		streamer := NewOpsFileMatrixStreamer(reader, N, verbose)
 		streamer.Stream()
 		// log.Printf("xxx N: %s\n%s", N, dumpMatrix(N))
 

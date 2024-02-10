@@ -4,10 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
-	"math/rand"
 	"os"
-	"time"
 	"golsv"
 )
 
@@ -20,15 +17,14 @@ import (
 // minimum weight is an upper bound for the minimum weight of a
 // nonzero vector Z_1 \setminus B_1. (see the align program.)
 // 
-// Then, for N iterations, it picks a random column vector from U and
-// adds random vector from the column space of B.  It measures the
-// weight of the resulting vector.  Repeatedly doing this, it records
-// the minimum found to min.txt, which is overwritten each time a new
-// minimum is found.
-//
-// xxx add option for complete enumeration; then run at size small
-// enough to run in reasonable time: 2^(k + m) where k = dim H_1 and m = dim B_1
-// (= 2^t where t = dim Z_1)
+// If N is zero, the program exhaustively enumerates all sums of
+// columns of B and U, and records the minimum weight to min.txt.
+// 
+// If N > 0, then for N iterations, it picks a random column vector
+// from U and adds random vector from the column space of B.  It
+// measures the weight of the resulting vector.  Repeatedly doing
+// this, it records the minimum found to min.txt, which is overwritten
+// each time a new minimum is found.
 
 func main() {
 	args := parseFlags()
@@ -53,57 +49,14 @@ func main() {
 	Udense := U.DenseSubmatrix(0, U.NumRows(), 0, U.NumColumns())
 	log.Printf("done; dense form of U is %s", Udense)
 
-	log.Printf("sampling minimum nonzero weight for %d trials", args.trials)
-
-	minWeight := math.MaxInt
-	for j := 0; j < U.NumColumns(); j++ {
-		weight := Udense.ColumnWeight(j)
-		if weight == 0 {
-			panic(fmt.Sprintf("column %d of U weight is zero", j))
-		}
-		log.Printf("column %d has weight %d", j, weight)
-		if weight < minWeight {
-			minWeight = weight
-			log.Printf("new min weight: %d", minWeight)
-			if args.min != "" {
-				writeMinWeight(minWeight, args.min)
-			}
-		}
+	var minWeight int
+	if args.trials <= 0 {
+		minWeight = golsv.SystoleExhaustiveSearch(Udense, Bdense, args.verbose)
+	} else {
+		minWeight = golsv.SystoleRandomSearch(Udense, Bdense, args.trials, args.verbose)
 	}
-	reportInterval := 10
-	timeStart := time.Now()
-	timeLast := timeStart
-		
-	for n := 0; n < args.trials; n++ {
-		// pick a random column of U
-		j := rand.Intn(U.NumColumns())
-		a := Udense.DenseSubmatrix(0, Udense.NumRows(), j, j+1)
-		// pick a random vector in the column space of B
-		b := golsv.RandomLinearCombination(Bdense)
-		// add b to a
-		a.AddMatrix(b)
-		// measure the weight
-		weight := a.ColumnWeight(0)
-		if weight == 0 {
-			panic(fmt.Sprintf("random linear combination of B and U is zero"))
-		}
-		if weight < minWeight {
-			minWeight = weight
-			log.Printf("new min weight: %d", minWeight)
-			if args.min != "" {
-				writeMinWeight(minWeight, args.min)
-			}
-		}
-		if n > 0 && n % reportInterval == 0 {
-			timeNow := time.Now()
-			timeElapsed := timeNow.Sub(timeStart)
-			timeInterval := timeNow.Sub(timeLast)
-			timeLast = timeNow
-			log.Printf("trial %d/%d (%.2f%%) minwt=%d crate=%.2f trate=%.2f",
-				n, args.trials, 100.0*float64(n)/float64(args.trials), minWeight,
-				float64(reportInterval)/timeInterval.Seconds(),
-				float64(n)/timeElapsed.Seconds())
-		}
+	if args.min != "" {
+		writeMinWeight(minWeight, args.min)
 	}
 	log.Printf("done; minimum nonzero weight found is %d", minWeight)
 }

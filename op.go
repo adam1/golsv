@@ -180,35 +180,25 @@ func ColumnOperationsMatrix(M BinaryMatrix, ops []Operation, verbose bool) {
 // xxx new streamer
 
 type OpsFileMatrixStreamer struct {
-	filename string
+	reader OperationReader
 	matrix BinaryMatrix
-	reverse bool
 	verbose bool
 }
 
-func NewOpsFileMatrixStreamer(filename string, matrix BinaryMatrix, reverse bool, verbose bool) *OpsFileMatrixStreamer {
+func NewOpsFileMatrixStreamer(reader OperationReader, matrix BinaryMatrix, verbose bool) *OpsFileMatrixStreamer {
 	return &OpsFileMatrixStreamer{
-		filename: filename,
+		reader: reader,
 		matrix: matrix,
-		reverse: reverse,
 		verbose: verbose,
 	}
 }
 
 func (S *OpsFileMatrixStreamer) Stream() {
 	if S.verbose {
-		log.Printf("streaming ops from %s, reverse=%v", S.filename, S.reverse)
+		log.Printf("streaming ops from %v", S.reader)
 	}
-	var reader OperationReader
-	if S.reverse {
-		// xxx
-		// reader = OpenOperationFileSimpleReverse(S.filename)
-		reader = OpenOperationFileReverse(S.filename)
-	} else {
-		reader = OpenOperationFile(S.filename)
-	}
-	defer reader.Close()
-	batcher := NewOpsBatchReader(reader, S.matrix)
+	defer S.reader.Close()
+	batcher := NewOpsBatchReader(S.reader, S.matrix)
 	colWorkGroup := NewWorkGroup(S.verbose)
 	statInterval := 1000
 	statOps := 0
@@ -248,6 +238,27 @@ func (S *OpsFileMatrixStreamer) Stream() {
 type OperationReader interface {
 	Read() (Operation, error)
 	Close() error
+}
+
+type OperationSliceReader struct {
+	ops []Operation
+}
+
+func NewOperationSliceReader(ops []Operation) *OperationSliceReader {
+	return &OperationSliceReader{ops}
+}
+
+func (R *OperationSliceReader) Read() (Operation, error) {
+	if len(R.ops) == 0 {
+		return nil, io.EOF
+	}
+	op := R.ops[0]
+	R.ops = R.ops[1:]
+	return op, nil
+}
+
+func (R *OperationSliceReader) Close() error {
+	return nil
 }
 
 type OperationFileReader struct {

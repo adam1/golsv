@@ -24,7 +24,7 @@ func main() {
 	log.Printf("done; read %s", A)
 
 	log.Printf("converting A to dense")
-	Adense := A.(*golsv.Sparse).DenseSubmatrix(0, A.NumRows(), 0, A.NumColumns())
+	Adense := A.Dense()
 	log.Printf("done converting A to dense")
 
 	log.Printf("reading matrix B from %s", args.B)

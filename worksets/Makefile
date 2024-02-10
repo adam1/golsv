@@ -155,7 +155,7 @@ KU.txt: K.txt U.txt
 	multiply -A K.txt -B U.txt -C KU.txt 2>&1 | tee KU.$(log)
 
 # This target searches for systolic vectors in Z_1 \setminus B_1.
-systole.txt: U.txt
+systole.txt: U.txt B1.txt
 	systole -trials 1000 -B B1.txt -U U.txt -min systole.txt 2>&1 | tee systole.$(log)
 
 # Multiplying K by S gives a matrix in which each column corresponds
