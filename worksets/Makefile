@@ -40,8 +40,12 @@ $(shell touch $(log))
 #
 # for the Cartwright-Steger generating set S, as encoded into the
 # program.
-pgl-cayley:
+pgl-cayley-F4:
 	cayley -base-field F4 -d1 d1.txt -d2 d2.txt -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt 2>&1 | tee cayley.$(log)
+
+# This target corresponds to the section 10 example from [LSV].
+pgl-cayley-F16:
+	cayley -base-field F16 -d1 d1.txt -d2 d2.txt -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt 2>&1 | tee cayley.$(log)
 
 # Tool 2.  This tool is more specialized (perhaps convoluted).  It
 # produces the basis and boundary files for a Cayley complex, but it
