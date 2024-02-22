@@ -845,6 +845,51 @@ func TestBinaryMatrix_AddRow(t *testing.T) {
 	}
 }
 
+func TestBinaryMatrix_ColumnWeight(t *testing.T) {
+	for _, mType := range matrixTypes {
+		tests := []struct {
+			m    BinaryMatrix
+			col  int
+			want int
+		}{
+			{
+				m: mType.fromInts([][]uint8{
+					{1, 0, 1, 0},
+					{0, 1, 1, 0},
+					{1, 1, 0, 1},
+				}),
+				col:  0,
+				want: 2,
+			},
+			{
+				m: mType.fromInts([][]uint8{
+					{1, 0, 1, 0},
+					{0, 1, 1, 0},
+					{1, 1, 0, 1},
+				}),
+				col:  1,
+				want: 2,
+			},
+			{
+				m: mType.fromInts([][]uint8{
+					{1, 0, 1, 0},
+					{0, 1, 1, 0},
+					{1, 1, 0, 1},
+				}),
+				col:  3,
+				want: 1,
+			},
+		}
+		for i, tt := range tests {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				if got := tt.m.ColumnWeight(tt.col); got != tt.want {
+					t.Errorf("BinaryMatrix.ColumnWeight() = %v, want %v", got, tt.want)
+				}
+			})
+		}
+	}
+}
+
 func TestBinaryMatrix_ScanDown(t *testing.T) {
 	for _, mType := range matrixTypes {
 		tests := []struct {
@@ -964,6 +1009,25 @@ func TestDenseTransposeSparseTranspose(t *testing.T) {
 		if !M.Equal(U) {
 			t.Errorf("M=%v\n%s\nU=%v\n%s", M, dumpMatrix(M), U, dumpMatrix(U))
 		}
+	}
+}
+
+func TestGenericDense(t *testing.T) {
+	n := 10
+	M := NewSparseBinaryMatrixIdentity(n)
+	N := genericDense(M)
+	if !N.Equal(NewSparseBinaryMatrixIdentity(n)) {
+		t.Errorf("N=%v", N)
+	}
+}
+
+func TestGenericDenseSubmatrix(t *testing.T) {
+	n := 10
+	m := n - 1
+	M := NewSparseBinaryMatrixIdentity(n)
+	N := genericDenseSubmatrix(M, 0, m, 0, m)
+	if !N.Equal(NewSparseBinaryMatrixIdentity(m)) {
+		t.Errorf("N=%v", N)
 	}
 }
 

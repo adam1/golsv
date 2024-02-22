@@ -153,7 +153,6 @@ func (S *Sparse) ColumnVector(index int) BinaryVector {
 	return genericColumnVector(S, index)
 }
 
-// xxx test
 func (S *Sparse) ColumnWeight(index int) int {
 	return len(S.ColData[index])
 }

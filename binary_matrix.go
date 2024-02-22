@@ -2,11 +2,9 @@ package golsv
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 )
@@ -158,12 +156,10 @@ func genericCopy(source, target BinaryMatrix) {
 	}
 }
 
-// xxx test
 func genericDense(M BinaryMatrix) *DenseBinaryMatrix {
 	return genericDenseSubmatrix(M, 0, M.NumRows(), 0, M.NumColumns())
 }
 
-// xxx test
 func genericDenseSubmatrix(M BinaryMatrix, rowStart, rowEnd, colStart, colEnd int) *DenseBinaryMatrix {
 	rows := rowEnd - rowStart
 	cols := colEnd - colStart
@@ -600,160 +596,6 @@ func genericSwapRows(M BinaryMatrix, i, j int) {
 }
 
 
-
-// // xxx deprecate TransposedBinaryMatrix. this wrapper pattern makes it
-// // too cumbersome to have optimized algorithms in some instances.
-// // instead, have the Transpose() method actually do the transpose,
-// // producing a new BinaryMatrix of the same underlying type.
-// // e.g. Sparse.Transpose() produces a Sparse matrix, etc.
-// type TransposedBinaryMatrix struct {
-// 	M BinaryMatrix
-// }
-
-// func NewTransposedBinaryMatrix(M BinaryMatrix) *TransposedBinaryMatrix {
-// 	return &TransposedBinaryMatrix{M}
-// }
-
-// func (T *TransposedBinaryMatrix) AddColumn(source, target int) {
-// 	T.M.AddRow(source, target)
-// }
-
-// func (T *TransposedBinaryMatrix) AddRow(source, target int) {
-// 	T.M.AddColumn(source, target)
-// }
-
-// func (T *TransposedBinaryMatrix) ApplyColumnOperation(op Operation) {
-// 	T.M.ApplyRowOperation(op)
-// }
-
-// func (T *TransposedBinaryMatrix) ApplyRowOperation(op Operation) {
-// 	T.M.ApplyColumnOperation(op)
-// }
-
-// func (T *TransposedBinaryMatrix) AsColumnVector() BinaryVector {
-// 	return T.M.AsRowVector()
-// }
-
-// func (T *TransposedBinaryMatrix) AsRowVector() BinaryVector {
-// 	return T.M.AsColumnVector()
-// }
-
-// func (T *TransposedBinaryMatrix) ColumnIsZero(index int) bool {
-// 	return T.M.RowIsZero(index)
-// }
-
-// func (T *TransposedBinaryMatrix) Columns() []BinaryVector {
-// 	return T.M.GetRows()
-// }
-
-// func (T *TransposedBinaryMatrix) ColumnVector(index int) BinaryVector {
-// 	return T.M.RowVector(index)
-// }
-
-// func (T *TransposedBinaryMatrix) Copy() BinaryMatrix {
-// 	return T.M.Copy().Transpose()
-// }
-
-// func (T *TransposedBinaryMatrix) DenseSubmatrix(rowStart, rowEnd, colStart, colEnd int) *DenseBinaryMatrix {
-// 	return genericDenseSubmatrix(T, rowStart, rowEnd, colStart, colEnd)
-// }
-
-// func (T *TransposedBinaryMatrix) Density(row, col int) float64 {
-// 	return T.M.Density(col, row)
-// }
-
-// func (T *TransposedBinaryMatrix) Equal(other BinaryMatrix) bool {
-// 	return genericEqual(T, other)
-// }
-
-// func (T *TransposedBinaryMatrix) Get(i, j int) uint8 {
-// 	return T.M.Get(j, i)
-// }
-
-// func (T *TransposedBinaryMatrix) IsZero() bool {
-// 	return T.M.IsZero()
-// }
-
-// func (T *TransposedBinaryMatrix) MultiplyLeft(B BinaryMatrix) BinaryMatrix {
-// 	return B.MultiplyRight(T)
-// }
-
-// // xxx test
-// func (T *TransposedBinaryMatrix) MultiplyRight(B BinaryMatrix) BinaryMatrix {
-// 	product := NewDenseBinaryMatrix(T.M.NumColumns(), B.NumColumns())
-// 	genericMultiply(T, B, product)
-// 	return product
-// }
-
-// func (T *TransposedBinaryMatrix) NumColumns() int {
-// 	return T.M.NumRows()
-// }
-
-// func (T *TransposedBinaryMatrix) NumRows() int {
-// 	return T.M.NumColumns()
-// }
-
-// func (T *TransposedBinaryMatrix) Overwrite(row int, col int, M BinaryMatrix) {
-// 	genericOverwrite(T, row, col, M)
-// }
-
-// func (T *TransposedBinaryMatrix) RowIsZero(index int) bool {
-// 	return T.M.ColumnIsZero(index)
-// }
-
-// func (T *TransposedBinaryMatrix) GetRows() []BinaryVector {
-// 	return T.M.Columns()
-// }
-
-// func (T *TransposedBinaryMatrix) RowVector(index int) BinaryVector {
-// 	return T.M.ColumnVector(index)
-// }
-
-// func (T *TransposedBinaryMatrix) ScanDown(row, col int) int {
-// 	return genericScanRight(T.M, col, row)
-// }
-
-// func (T *TransposedBinaryMatrix) ScanRight(row, col int) int {
-// 	return genericScanDown(T.M, col, row)
-// }
-
-// func (T *TransposedBinaryMatrix) Set(i, j int, b uint8) {
-// 	T.M.Set(j, i, b)
-// }
-
-// // xxx
-// // func (T *TransposedBinaryMatrix) SplitColumns(offset int) (left, right []BinaryVector) {
-// // 	return T.M.SplitRows(offset)
-// // }
-
-// // func (T *TransposedBinaryMatrix) SplitRows(offset int) (left, right []BinaryVector) {
-// // 	return T.M.SplitColumns(offset)
-// // }
-
-// func (T *TransposedBinaryMatrix) Sparse() *Sparse {
-// 	return genericSparse(T)
-// }
-
-// func (T *TransposedBinaryMatrix) Submatrix(rowStart, rowEnd, colStart, colEnd int) BinaryMatrix {
-// 	return genericSubmatrix(T, rowStart, rowEnd, colStart, colEnd)
-// }
-
-// func (T *TransposedBinaryMatrix) SwapColumns(i, j int) {
-// 	T.M.SwapRows(i, j)
-// }
-
-// func (T *TransposedBinaryMatrix) SwapRows(i, j int) {
-// 	T.M.SwapColumns(i,j)
-// }
-
-// func (T *TransposedBinaryMatrix) Transpose() BinaryMatrix {
-// 	return T.M
-// }
-
-
-
-
-
 // xxx densify?
 type BinaryVector []uint8
 
@@ -898,68 +740,6 @@ func pow(base, exp int) int {
 		result *= base
 	}
 	return result
-}
-
-// xxx test
-// xxx deprecate
-// func WriteMatrixFile(M BinaryMatrix, filename string) {
-// 	f, err := os.Create(filename)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	defer func() {
-// 		err = f.Close()
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 	}()
-// 	encoder := gob.NewEncoder(f)
-// 	err = encoder.Encode(M)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// }
-
-// xxx test
-
-// xxx test limit here - the issue may only be that we are trying to
-// encode the whole slice at once.  instead, we could feed the encoder
-// the elements one at a time.
-func WriteGobFile(filename string, data any) {
-	f, err := os.Create(filename)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-	encoder := gob.NewEncoder(f)
-	err = encoder.Encode(data)
-	if err != nil {
-		panic(err)
-	}
-}
-
-// xxx test
-func ReadGobFile(filename string, data any) {
-	f, err := os.Open(filename)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-	decoder := gob.NewDecoder(f)
-	err = decoder.Decode(data)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func countPivotRows(m BinaryMatrix) int {

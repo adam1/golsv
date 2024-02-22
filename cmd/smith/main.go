@@ -46,13 +46,7 @@ func main() {
 	defer args.ProfileArgs.Stop()
 	var M golsv.BinaryMatrix
 
-	// xxx temporary support for old Gob format; deprecate
-	if args.Mgob != "" {
-		log.Printf("reading M from %s", args.M)
-		M = golsv.NewSparseBinaryMatrix(0, 0)
-		golsv.ReadGobFile(args.M, M)
-		log.Printf("done; read %s", M)
-	} else if args.M != "" {
+	if args.M != "" {
 		log.Printf("reading M from %s", args.M)
 		M = golsv.ReadSparseBinaryMatrixFile(args.M)
 		log.Printf("done; read %s", M)
@@ -86,7 +80,6 @@ func main() {
 type Args struct {
 	golsv.ProfileArgs
 	M string
-	Mgob string
 	D string
 	RowOps string
 	ColOps string
@@ -99,15 +92,14 @@ func parseFlags() *Args {
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "verbose logging")
-	flag.StringVar(&args.Mgob, "ingob", args.M, "matrix input file (BinaryMatrix gob)")
 	flag.StringVar(&args.M, "in", args.M, "matrix input file (Sparse txt format)")
-	flag.StringVar(&args.D, "smith", args.D, "smith normal form matrix output file (BinaryMatrix gob)")
+	flag.StringVar(&args.D, "smith", args.D, "smith normal form matrix output file (Sparse txt format)")
 	flag.StringVar(&args.RowOps, "rowops", args.RowOps, "rowops output file (text)")
 	flag.StringVar(&args.ColOps, "colops", args.ColOps, "colops output file (text)")
 	flag.Parse()
-	if args.M == "" && args.Mgob == "" {
+	if args.M == "" {
 		flag.Usage()
-		log.Fatal("missing required -in or -ingob flag")
+		log.Fatal("missing required -in flag")
 	}
 	return &args
 }

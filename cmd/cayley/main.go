@@ -55,8 +55,12 @@ func main() {
 	log.Printf("done")
 }
 
-func prepareGenerators(lsv *golsv.LsvContext, args *CayleyExpanderArgs) []golsv.MatGF {
-	gens := lsv.Generators()
+func prepareGenerators(lsv *golsv.LsvContext, args *CayleyExpanderArgs) (gens []golsv.MatGF) {
+	if args.genV2 {
+		gens = lsv.GeneratorsV2()
+	} else {
+		gens = lsv.Generators()
+	}
 	if args.TruncateGenerators > 0 {
 		log.Printf("truncating generators to %d", args.TruncateGenerators)
 		gens = gens[:args.TruncateGenerators]
@@ -75,6 +79,7 @@ type CayleyExpanderArgs struct {
 	EdgeBasisFile      string
 	TriangleBasisFile  string
 	sortBases          bool
+	genV2			   bool
 	golsv.ProfileArgs
 }
 
@@ -96,6 +101,7 @@ func parseFlags() *CayleyExpanderArgs {
 	flag.StringVar(&args.VertexBasisFile, "vertex-basis", args.VertexBasisFile, "vertex basis output file (text)")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", args.EdgeBasisFile, "edge basis output file (text)")
 	flag.StringVar(&args.TriangleBasisFile, "triangle-basis", args.TriangleBasisFile, "triangle basis output file (text)")
+	flag.BoolVar(&args.genV2, "genV2", args.genV2, "use V2 generators (default V1)")
 	flag.Parse()
 	return &args
 }

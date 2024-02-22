@@ -658,3 +658,135 @@ func TestCSCosetRep(t *testing.T) {
 	}
 }
 
+// experimenting with calculating the dim d^2 matrix representation of
+// the Cartwright-Steger group. the output can be manually checked
+// against the table in the paper. xxx not sure if this currently
+// matches the table in the paper; and we don't currently use this
+// representation anyway.
+func DisabledTestCSMatrixRepD2(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	p := NewElementCalGIdentity()
+	q := NewElementCalGIdentity()
+	for k, b_u := range gens {
+		b_uInv := CartwrightStegerGeneratorsInverse(gens, k)
+		for i := 0; i < 3; i++ {
+			for j := 0; j < 3; j++ {
+				var array [9]F2Polynomial
+				array[i*3+j] = F2PolynomialOne
+				h := newElementCalGArrayNotNormalized(array)
+				p.Mul(b_u, h)
+				q.Mul(p, b_uInv)
+			}
+		}
+	}
+}
+
+func TestCSMatrixRepFieldElement(t *testing.T) {
+	id := F2PolynomialOne
+	mId := cartwrightStegerMatrixRepFieldElement(id)
+	wantMId := MatF2PolyIdentity
+	if !mId.Equal(wantMId) {
+		t.Errorf("mId=%v want=%v", mId, wantMId)
+	}
+	// quick check: powers of a non-identity element should generate
+	// the whole multiplicative group of F_8.
+	u := NewF2Polynomial("110")
+	mU := cartwrightStegerMatrixRepFieldElement(u)
+	v := mId
+	for i := 0; i <= 7; i++ {
+		if v.Equal(MatF2PolyIdentity) {
+			if i != 0 && i != 7 {
+				t.Errorf("unexpected identity at i=%d", i)
+			}
+		} else {
+			if i == 7 {
+				t.Errorf("unexpected non-identity at i=%d", i)
+			}
+		}
+		v = v.Mul(mU)
+	}
+}
+
+func TestCSMatrixRepBeta(t *testing.T) {
+	beta := cartwrightStegerEmbeddingBeta
+	wantBeta := NewF2Polynomial("11")
+	if !beta.Equal(wantBeta) {
+		t.Errorf("beta=%v want=%v", beta, wantBeta)
+	}
+	// let lambda be the linear map on F_8 defined by multiplication
+	// by beta.
+	lambda := cartwrightStegerMatrixRepFieldElement(beta)
+	wantLambda := NewMatF2PolyFromString("[1 0 1 1 1 1 0 1 1]")
+	if !lambda.Equal(wantLambda) {
+		t.Errorf("lambda=%v want=%v", lambda, wantLambda)
+	}
+	tr := lambda.Trace()
+	if tr.Equal(F2PolynomialZero) {
+		t.Errorf("trace(lambda)=%v want=nonzero", tr)
+	}
+}
+
+func TestCSMatrixRepOnePlusBetaX(t *testing.T) {
+	mat := cartwrightStegerMatrixRepOnePlusBetaX()
+	wantMat := NewMatF2PolyFromString("[11 0 01 01 11 01 0 01 11]")
+	if !mat.Equal(wantMat) {
+		t.Errorf("mat=%v want=%v", mat, wantMat)
+	}
+}
+
+func TestCSMatrixRepOneTensorPhi(t *testing.T) {
+	mat := cartwrightStegerMatrixRepOneTensorPhi()
+	wantMat := NewMatF2PolyFromString("[1 0 0 0 0 1 0 1 1]")
+	if !mat.Equal(wantMat) {
+		t.Errorf("mat=%v want=%v", mat, wantMat)
+	}
+}
+
+func TestCSMatrixRepZ(t *testing.T) {
+	zMat := cartwrightStegerMatrixRepZ()
+	wantZMat := NewMatF2PolyFromString("[11 01 01 01 01 1 0 11 1]")
+	if !zMat.Equal(wantZMat) {
+		t.Errorf("zMat=%v want=%v", zMat, wantZMat)
+	}
+	// verify that z^3 = 1 + y(x)
+	// where y(x) = x + x^3
+	y := NewF2Polynomial("0101")
+	onePlusY := MatF2PolyIdentity.Add(MatF2PolyIdentity.Scale(y))
+	zCubed := zMat.Pow(3)
+	if !zCubed.Equal(onePlusY) {
+		t.Errorf("zCubed=%v want=%v", zCubed, onePlusY)
+	}
+}
+
+func TestCSMatrixRepB(t *testing.T) {
+	bMat := cartwrightStegerMatrixRepB()
+	wantBMat := NewProjMatF2PolyFromString("[0101 001 011 01 0001 111 011 101 1001]")
+	if !bMat.Equal(wantBMat) {
+		t.Errorf("bMat=%v want=%v", bMat, wantBMat)
+	}
+}
+
+func TestCSMatrixRepBInv(t *testing.T) {
+	bMat := cartwrightStegerMatrixRepB()
+	bInvMat := cartwrightStegerMatrixRepBInverse()
+	c := bMat.Mul(bInvMat)
+	if !c.Equal(ProjMatF2Poly(MatF2PolyIdentity)) {
+		t.Errorf("c=%v want=I", c)
+	}
+}
+
+func TestCSGeneratorsMatrixReps(t *testing.T) {
+	gens := CartwrightStegerGeneratorsMatrixReps()
+	want := 14
+	if len(gens) != want {
+		t.Errorf("len(gens)=%d want=%d", len(gens), want)
+	}
+	for i := 0; i < len(gens); i += 2 {
+		g := gens[i]
+		gInv := gens[i+1]
+		c := g.Mul(gInv)
+		if !c.Equal(ProjMatF2Poly(MatF2PolyIdentity)) {
+			t.Errorf("c=%v want=I", c)
+		}
+	}
+}

@@ -222,14 +222,12 @@ func TestF2PolynomialInverseModf(t *testing.T) {
 			t.Errorf("test %d: inverse failed", n)
 		}
 	}
-	polys := []F2Polynomial { NewF2Polynomial("111"), NewF2Polynomial("1101") }
-	for _, f := range polys {
-		for i := 1; i < (1 << f.Degree()); i++ {
-			a := F2PolynomialZero
-			for j := 0; j < f.Degree(); j++ {
-				if (i >> j) & 1 != 0 {
-					a = a.AddMonomial(j)
-				}
+	moduli := []F2Polynomial { NewF2Polynomial("111"), NewF2Polynomial("1101") }
+	for _, f := range moduli {
+		polys := EnumerateF2Polynomials(f.Degree() - 1)
+		for _, a := range polys {
+			if a.IsZero() {
+				continue
 			}
 			got := a.InverseModf(f)
 			if !a.Mul(got).Modf(f).Equal(F2PolynomialOne) {
@@ -446,3 +444,20 @@ func TestF2PolynomialPow(t *testing.T) {
 		}
 	}
 }
+
+func TestF2PolynomialEnumerate(t *testing.T) {
+	d := 4
+	want := 1 << (d + 1)
+	polys := EnumerateF2Polynomials(d)
+	if len(polys) != want {
+		t.Errorf("len(polys)=%d want=%d", len(polys), want)
+	}
+	seen := make(map[F2Polynomial]bool)
+	for _, p := range polys {
+		if seen[p] {
+			t.Errorf("duplicate polynomial")
+		}
+		seen[p] = true
+	}
+}
+

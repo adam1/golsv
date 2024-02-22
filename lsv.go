@@ -7,6 +7,7 @@ import (
 
 type LsvContext struct {
 	GF *galoisfield.GF
+	modulus F2Polynomial
 }
 
 func NewLsvContext(baseField string) *LsvContext {
@@ -14,13 +15,54 @@ func NewLsvContext(baseField string) *LsvContext {
 	switch baseField {
 	case "F16":
 		ctx.GF = galoisfield.Poly410_g2 // x^4 + x + 1
+		ctx.modulus = NewF2Polynomial("11001")
+	case "F8":
+		// important: modulus "1101", i.e. x^3 + x + 1 does NOT work.
+		ctx.GF = galoisfield.New(8, 0xd, 2) // x^3 + x^2 + 1
+		ctx.modulus = NewF2Polynomial("1011")
 	case "F4":
 		ctx.GF = galoisfield.Poly210_g2 // x^2 + x + 1
+		ctx.modulus = NewF2Polynomial("111")
+	case "F2":
+		panic("F2 not supported")
 	default:
 		log.Fatalf("unknown base field: %s", baseField)
 	}
 	// log.Printf("base field: %v", ctx.GF)
 	return ctx
+}
+
+func LsvContextSupportedBaseFields() []string {
+	// package galoisfield doesn't support F2.  we would have to work
+	// around that. for example, we could replace MatGF with MatF2Poly
+	// in CayleyExpander (or replace it with an interface and type
+	// parameter).
+	return []string{"F4", "F8", "F16"}
+}
+
+// xxx not sure this is accurate. [LSV] and [EKZ] are not clear.
+// func (lsv *LsvContext) algebraSplits() bool {
+// 	// verify by enumeration that we have a d^th root of 1+x in the
+// 	// field extension.
+// 	n := lsv.GF.Size()
+// 	d := 3
+// 	want := byte(3) // 1+x
+// 	for i := uint(0); i < n; i++ {
+// 		f := byte(i)
+// 		g := gfpow(lsv.GF, f, d)
+// 		if g == want {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
+
+func gfpow(gf *galoisfield.GF, x byte, n int) byte {
+	y := byte(1)
+	for i := 0; i < n; i++ {
+		y = gf.Mul(y, x)
+	}
+	return y
 }
 
 func (lsv *LsvContext) originalCartwrightStegerGenerators() []MatGF {
@@ -72,6 +114,30 @@ func (lsv *LsvContext) Generators() []MatGF {
 		a[offset+i] = *g.Inverse(lsv)
 	}
 	return a[:]
+}
+
+// Here we use the Cartwright-Steger generators computed ourselves.
+func (lsv *LsvContext) GeneratorsV2() []MatGF {
+	gens := CartwrightStegerGeneratorsMatrixReps()
+	if len(gens) != 14 {
+		log.Fatalf("unexpected number of generators: %d", len(gens))
+	}
+	// reduce by the modulus of the base field
+	reduced := make([]ProjMatF2Poly, len(gens))
+	for i, g := range gens {
+		reduced[i] = g.ReduceModf(lsv.modulus)
+	}
+	// convert to MatGF normalized form (canonical representative).
+	converted := make([]MatGF, len(reduced))
+	for i, g := range reduced {
+		mgf := NewMatGFFromProjMatF2Poly(lsv, g)
+		if mgf.Determinant(lsv) == 0 {
+			panic("generator has zero determinant")
+		}
+		mgf.MakeCanonical(lsv)
+		converted[i] = mgf
+	}
+	return converted
 }
 
 // xxx test

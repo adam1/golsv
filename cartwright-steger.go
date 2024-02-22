@@ -3,7 +3,6 @@ package golsv
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math"
 	"regexp"
 )
@@ -22,11 +21,11 @@ func init() {
 // We pick f(v) = v^3 + v + 1.
 // Let \varphi be the Frobenius automorphism u \mapsto u^2.
 // We choose normal basis
-//   \zeta_0 = 1+v
-//   \zeta_1 = 1+v^2
-//   \zeta_2 = 1+v+v^2
+//   w_0 = 1+v
+//   w_1 = 1+v^2
+//   w_2 = 1+v+v^2
 // so
-//   \varphi(\zeta_i) = \zeta_{i + 1 \mod 3}.
+//   \varphi(w_i) = w_{i + 1 \mod 3}.
 //
 // 0,1 coefficients in the normal basis
 type ElementFqd [3]byte
@@ -223,7 +222,7 @@ func (g *ElementCalG) Copy(h ElementCalG) {
 func (g ElementCalG) Dump() string {
 	s := ""
 	for i := 0; i < 9; i++ {
-		s += fmt.Sprintf("g[%d] = %s\n", i, g[i].Dump())
+		s += fmt.Sprintf("g[%d] = %s\n", i, g[i])
 	}
 	return s
 }
@@ -527,7 +526,7 @@ func (g *ElementCalG) zero() {
 var calGMultTable [9][9]ElementCalG
 
 func initCalGMultTable() {
-	log.Printf("initializing calG multiplication table")
+	// log.Printf("initializing calG multiplication table")
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
 			for k := 0; k < 3; k++ {
@@ -690,4 +689,123 @@ func CartwrightStegerGeneratorsInverse(gens []ElementCalG, n int) ElementCalG {
 		panic("n too small")
 	}
 	return gens[n-1]
+}
+
+var cartwrightStegerModulus F2Polynomial = NewF2Polynomial("1101") // 1 + v + v^3
+
+var cartwrightStegerEmbeddingBeta F2Polynomial = NewF2Polynomial("11") // beta = 1 + v
+
+var cartwrightStegerEmbeddingY F2Polynomial = NewF2Polynomial("0101") // y(x) = x + x^3
+
+// Construct the matrix representations of the Cartwright-Steger
+// generators.  Here, we follow the notation of LSV section 10.
+func CartwrightStegerGeneratorsMatrixReps() []ProjMatF2Poly {
+	// per the example in LSV section 10, we don't need to use the
+	// normal basis of F_8; we can use the standard basis instead.
+	repB := cartwrightStegerMatrixRepB()
+	repBInv := cartwrightStegerMatrixRepBInverse()
+
+	gens := make([]ProjMatF2Poly, 0)
+	fieldElements := EnumerateF2Polynomials(2)
+	for _, u := range fieldElements {
+		if u.IsZero() {
+			continue
+		}
+		uRep := ProjMatF2Poly(cartwrightStegerMatrixRepFieldElement(u))
+		uInvRep := ProjMatF2Poly(cartwrightStegerMatrixRepFieldElement(u.InverseModf(cartwrightStegerModulus)))
+		// b_u = u b u^{-1}
+		b_u := uRep.Mul(repB).Mul(uInvRep)
+		gens = append(gens, b_u)
+		// b_u^{-1} = u b^{-1} u^{-1}
+		b_uInv := uRep.Mul(repBInv).Mul(uInvRep)
+		gens = append(gens, b_uInv)
+	}
+	return gens
+}
+
+func cartwrightStegerMatrixRepOnePlusBetaX() MatF2Poly {
+	// We assume beta = 1 + v.  Note that for computing matrix
+	// representations for other values of q or d, we will need to
+	// find another appropriate value for beta.
+	beta := cartwrightStegerEmbeddingBeta
+	betaMat := cartwrightStegerMatrixRepFieldElement(beta)
+	xBetaMat := betaMat.Scale(NewF2Polynomial("01"))
+	return MatF2PolyIdentity.Add(xBetaMat)
+}
+
+func cartwrightStegerMatrixRepOneTensorPhi() MatF2Poly {
+	// phi is assumed to be the Frobenius automophism v -> v^2.
+	mod := cartwrightStegerModulus
+	col0 := NewF2Polynomial("1").Pow(2).Modf(mod)
+	col1 := NewF2Polynomial("01").Pow(2).Modf(mod)
+	col2 := NewF2Polynomial("001").Pow(2).Modf(mod)
+	if col0.Degree() > 2 || col1.Degree() > 2 || col2.Degree() > 2 {
+		panic("degree too high")
+	}
+	return NewMatF2Poly(
+		coeffToPoly(col0.Coefficient(0)), coeffToPoly(col1.Coefficient(0)), coeffToPoly(col2.Coefficient(0)),
+		coeffToPoly(col0.Coefficient(1)), coeffToPoly(col1.Coefficient(1)), coeffToPoly(col2.Coefficient(1)),
+		coeffToPoly(col0.Coefficient(2)), coeffToPoly(col1.Coefficient(2)), coeffToPoly(col2.Coefficient(2)))
+}
+
+func cartwrightStegerMatrixRepZ() MatF2Poly {
+	onePlusBetaX := cartwrightStegerMatrixRepOnePlusBetaX()
+	oneTensorPhi := cartwrightStegerMatrixRepOneTensorPhi()
+	return onePlusBetaX.Mul(oneTensorPhi)
+}
+
+func cartwrightStegerMatrixRepB() ProjMatF2Poly {
+	// b = 1 - z^{-1}
+	//
+	// since z^2 = 1 + y(x),
+	//
+	// z^{-1} = 1/(1 + y(x)) z^2
+	//
+	// repB = 1/(1 + y(x))((1 + y(x))I - repZ^2)
+	//
+	// and projectivizing, we drop the scalar factor
+	//
+	// projRepB = (1 + y(x))I - repZ^2
+	repZ := cartwrightStegerMatrixRepZ()
+	repZSq := repZ.Mul(repZ)
+	id := MatF2PolyIdentity
+	y := MatF2PolyIdentity.Scale(cartwrightStegerEmbeddingY)
+	return (ProjMatF2Poly)(id.Add(y).Add(repZSq))
+}
+
+func cartwrightStegerMatrixRepBInverse() ProjMatF2Poly {
+	// this was computed with Sage
+	return NewProjMatF2PolyFromString("[1001 011 001 0 0101 011 011 011 0001]")
+}
+
+// Compute the matrix corresponding to multiplication by a field
+// element.
+func cartwrightStegerMatrixRepFieldElement(u F2Polynomial) MatF2Poly {
+	// the columns of the matrix are the coefficients of
+	//
+	//   u*v^0  u*v^1  u*v^2
+	//
+	// in the {1, v, v^2} basis.
+	mod := cartwrightStegerModulus
+	col0 := u.Modf(mod)
+	col1 := u.Mul(NewF2Polynomial("01")).Modf(mod)
+	col2 := u.Mul(NewF2Polynomial("001")).Modf(mod)
+	if col0.Degree() > 2 || col1.Degree() > 2 || col2.Degree() > 2 {
+		panic("degree too high")
+	}
+	return NewMatF2Poly(
+		coeffToPoly(col0.Coefficient(0)), coeffToPoly(col1.Coefficient(0)), coeffToPoly(col2.Coefficient(0)),
+		coeffToPoly(col0.Coefficient(1)), coeffToPoly(col1.Coefficient(1)), coeffToPoly(col2.Coefficient(1)),
+		coeffToPoly(col0.Coefficient(2)), coeffToPoly(col1.Coefficient(2)), coeffToPoly(col2.Coefficient(2)))
+}
+
+func coeffToPoly(c int) F2Polynomial {
+	switch c {
+	case 0:
+		return NewF2Polynomial("0")
+	case 1:
+		return NewF2Polynomial("1")
+	default:
+		panic("invalid coefficient")
+	}
 }

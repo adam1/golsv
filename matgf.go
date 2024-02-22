@@ -97,6 +97,29 @@ func NewReducedMatGF(lsv *LsvContext, a *MatGF) *MatGF {
 	return b
 }
 
+func NewMatGFFromProjMatF2Poly(lsv *LsvContext, p ProjMatF2Poly) MatGF {
+	m := MatGF{}
+	gfSize := lsv.GF.Size()
+	modDegree := log2(gfSize)
+	for i := 0; i < len(m); i++ {
+		if p[i].Degree() >= int(modDegree) {
+			panic("degree too high")
+		}
+		m[i] = byteFromBinaryString(p[i].String())
+	}
+	return m
+}
+
+func log2(x uint) uint {
+	var r uint
+	for x > 1 {
+		x >>= 1
+		r++
+	}
+	return r
+}
+	
+
 // ===================================================
 // xxx wip; borrowed from go-galoisfield/gf.go
 //
@@ -291,6 +314,21 @@ func byteToBits(b byte) []byte {
 		bits[i] = byte((b >> i) & 1)
 	}
 	return bits
+}
+
+func byteFromBinaryString(s string) (b byte) {
+	if len(s) > 8 {
+		panic("binary string too long")
+	}
+	for i, c := range s {
+		if c != '0' && c != '1' {
+			panic("invalid binary string")
+		}
+		if c == '1' {
+			b |= 1 << uint(i)
+		}
+	}
+	return
 }
 
 // xxx returns a string representation of the polynomial at the given

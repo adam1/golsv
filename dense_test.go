@@ -367,49 +367,6 @@ func TestDenseBinaryMatrixMaxColumnSupport(t *testing.T) {
 		
 }
 
-func TestDenseBinaryMatrixColumnWeight(t *testing.T) {
-	tests := []struct {
-		m    *DenseBinaryMatrix
-		col  int
-		want int
-	}{
-		{
-			m: NewDenseBinaryMatrixFromRowInts([][]uint8{
-				{1, 0, 1, 0},
-				{0, 1, 1, 0},
-				{1, 1, 0, 1},
-			}),
-			col:  0,
-			want: 2,
-		},
-		{
-			m: NewDenseBinaryMatrixFromRowInts([][]uint8{
-				{1, 0, 1, 0},
-				{0, 1, 1, 0},
-				{1, 1, 0, 1},
-			}),
-			col:  1,
-			want: 2,
-		},
-		{
-			m: NewDenseBinaryMatrixFromRowInts([][]uint8{
-				{1, 0, 1, 0},
-				{0, 1, 1, 0},
-				{1, 1, 0, 1},
-			}),
-			col:  3,
-			want: 1,
-		},
-	}
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			if got := tt.m.ColumnWeight(tt.col); got != tt.want {
-				t.Errorf("DenseBinaryMatrix.ColumnWeight() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestDenseBinaryMatrixAddMatrix(t *testing.T) {
 	tests := []struct {
 		m    *DenseBinaryMatrix

@@ -5,7 +5,6 @@ import (
 	"log"
 )
 
-// xxx rename CayleyComplex?
 type CayleyExpander struct {
 	lsv        *LsvContext
 	gens       []MatGF

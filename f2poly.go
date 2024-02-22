@@ -2,7 +2,6 @@ package golsv
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 )
 
@@ -80,6 +79,22 @@ func NewF2PolynomialRandom(maxDegree int) F2Polynomial {
 	return p
 }
 
+func EnumerateF2Polynomials(maxDegree int) []F2Polynomial {
+	if maxDegree < 0 {
+		panic("EnumerateF2Polynomials: negative degree")
+	}
+	n := 1 << (maxDegree + 1)
+	ps := make([]F2Polynomial, n)
+	for i := 0; i < n; i++ {
+		for j := 0; j <= maxDegree + 1; j++ {
+			if (i >> j) & 1 == 1 {
+				ps[i] = ps[i].AddMonomial(j)
+			}
+		}
+	}
+	return ps
+}
+
 // returns a + b
 func (p F2Polynomial) Add(q F2Polynomial) F2Polynomial {
 	r := F2Polynomial {}
@@ -140,18 +155,6 @@ func (p F2Polynomial) Div(f F2Polynomial) (quotient, remainder F2Polynomial) {
 	return q, r
 }
 
-func (p F2Polynomial) Dump() string {
-	runes := make([]rune, p.Degree()+1)
-	for i := 0; i <= p.Degree(); i++ {
-		if p.Coefficient(i) == 0 {
-			runes[i] = '0'
-		} else {
-			runes[i] = '1'
-		}
-	}
-	return string(runes)
-}
-
 func (p F2Polynomial) Dup() F2Polynomial {
 	return p
 }
@@ -163,7 +166,7 @@ func (p F2Polynomial) Equal(q F2Polynomial) bool {
 var inverseModfTable map[F2Polynomial]map[F2Polynomial]F2Polynomial
 
 func initInverseModfTable() {
-	log.Printf("initializing InverseModf lookup table")
+	// log.Printf("initializing InverseModf lookup table")
 	fs := []struct {
 		f, g F2Polynomial
 	}{
@@ -301,5 +304,16 @@ func (p F2Polynomial) Pow(n int) F2Polynomial {
 }
 
 func (p F2Polynomial) String() string {
-	return p.Dump()
+	if p.IsZero() {
+		return "0"
+	}
+	runes := make([]rune, p.Degree()+1)
+	for i := 0; i <= p.Degree(); i++ {
+		if p.Coefficient(i) == 0 {
+			runes[i] = '0'
+		} else {
+			runes[i] = '1'
+		}
+	}
+	return string(runes)
 }

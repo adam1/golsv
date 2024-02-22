@@ -56,3 +56,17 @@ func TestLsvGeneratorsInflationPair(t *testing.T) {
 		}
 	}
 }
+
+// xxx not sure this is accurate. [LSV] and [EKZ] are not clear.
+// func DisabledTestLsvContextAlgebraSplits(t *testing.T) {
+// 	// verify that the chosen modulus satisfies the splitting
+// 	// condition for the cartwright-steger algebra: the field
+// 	// extension must have a d^th root of 1+y.
+// 	baseFields := LsvContextSupportedBaseFields()
+// 	for _, F := range baseFields {
+// 		lsv := NewLsvContext(F)
+// 		if !lsv.algebraSplits() {
+// 			t.Errorf("algebra does not split for %s", F)
+// 		}
+// 	}
+// }

@@ -212,3 +212,69 @@ func TestLsvGeneratingSetSquareFree(t *testing.T) {
 		}
 	}
 }
+
+func TestLog2(t *testing.T) {
+	tests := []struct {
+		in  uint
+		out uint
+	}{
+		{0, 0},
+		{1, 0},
+		{2, 1},
+		{3, 1},
+		{4, 2},
+		{5, 2},
+		{6, 2},
+		{7, 2},
+		{8, 3},
+	}
+	for _, test := range tests {
+		got := log2(test.in)
+		if got != test.out {
+			t.Errorf("log2(%d) got=%d want=%d", test.in, got, test.out)
+		}
+	}
+}
+
+func TestByteFromBinaryString(t *testing.T) {
+	tests := []struct {
+		in  string
+		out byte
+	}{
+		{"0", 0},
+		{"1", 1},
+		{"01", 2},
+		{"11", 3},
+		{"001", 4},
+		{"101", 5},
+		{"011", 6},
+		{"111", 7},
+	}
+	for _, test := range tests {
+		got := byteFromBinaryString(test.in)
+		if got != test.out {
+			t.Errorf("byteFromBinaryString(%s) got=%d want=%d", test.in, got, test.out)
+		}
+	}
+}
+
+func TestNewMatGFFromProjMatF2Poly(t *testing.T) {
+	tests := []struct {
+		lsv *LsvContext
+		in  ProjMatF2Poly
+		out MatGF
+	}{
+		{ NewLsvContext("F4"), ProjMatF2PolyIdentity, *MatGfIdentity},
+		{
+			NewLsvContext("F4"),
+			NewProjMatF2PolyFromString("[11 01 0 0 11 01 01 1 01]"),
+			NewMatGFFromString("[3 2 0 0 3 2 2 1 2]"),
+		},
+	}
+	for i, test := range tests {
+		got := NewMatGFFromProjMatF2Poly(test.lsv, test.in)
+		if !got.Equal(test.lsv, &test.out) {
+			t.Errorf("test %d: got=%v want=%v", i, got, test.out)
+		}
+	}
+}
