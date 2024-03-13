@@ -131,12 +131,24 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 // individual programs and intermediate files at each step.
 // ComputeFirstSystole is useful for small complexes and for testing.
 func ComputeFirstSystole(d1, d2 BinaryMatrix, verbose bool) int {
+	log.Printf("Computing first homology")
 	U, B := UBDecomposition(d1, d2, verbose)
+	U, B = U.Dense(), B.Dense()
+	return SystoleExhaustiveSearch(U, B, verbose)
+}
+
+func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) int {
+	log.Printf("Computing first cohomology")
+	delta0 := d1.Transpose().Dense()
+	delta1 := d2.Transpose().Dense()
+	U, B := UBDecomposition(delta1, delta0, verbose)
+	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
 }
 
 func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B BinaryMatrix) {
 	// here we adapt the recipes from worskets/Makefile to be run
+	dimC0 := d1.NumRows()
 	dimC1 := d1.NumColumns()
 	dimC2 := d2.NumColumns()
 
@@ -147,8 +159,16 @@ func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B BinaryMatrix) {
 	dimB1 := d2rank
 	dimH1 := dimZ1 - dimB1
 	if verbose {
-		log.Printf("dimC1=%d dimC2=%d dimZ1=%d dimB1=%d dimH1=%d", dimC1, dimC2, dimZ1, dimB1, dimH1)
+		log.Printf(
+`
+C_2 ------------> C_1 ------------> C_0
+dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
+                  dim(Z_1)=%-8d
+                  dim(B_1)=%-8d
+                  dim(H_1)=%-8d
+`, dimC2, dimC1, dimC0, dimZ1, dimB1, dimH1)
 	}
+
 
 	Z1 := automorphism(d1colops, dimC1, d1rank, dimC1, verbose)
 

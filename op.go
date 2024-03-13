@@ -261,6 +261,10 @@ func (R *OperationSliceReader) Close() error {
 	return nil
 }
 
+func (R *OperationSliceReader) String() string {
+	return "OperationSliceReader"
+}
+
 type OperationFileReader struct {
 	filename string
 	file *os.File
