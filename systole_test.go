@@ -1,6 +1,7 @@
 package golsv
 
 import (
+	"log"
 	"testing"
 )
 
@@ -85,4 +86,21 @@ func cyclicGraph(n int) (d1, d2 BinaryMatrix) {
 		d1.Set((i+1)%n, i, 1)
 	}
 	return
+}
+
+func TestSystoleTorus(t *testing.T) {
+	// xxx fill-in data 
+	verbose := true
+	T := NewZComplexFromMaximalSimplices([][]int{
+		{0,3,4}, {3,6,7}, {0,6,7},
+		{0,1,4}, {3,4,7}, {0,1,7},
+		{1,4,5}, {4,7,8}, {1,7,8},
+		{1,2,5}, {4,5,8}, {1,2,8},
+		{2,5,3}, {5,6,8}, {2,6,8},
+		{0,2,3}, {3,5,6}, {0,2,6},
+	})
+	D1, D2 := T.D1(), T.D2()
+	systole := ComputeFirstSystole(D1, D2, verbose)
+	cosystole := ComputeFirstCosystole(D1, D2, verbose)
+	log.Printf("systole=%d cosystole=%d", systole, cosystole)
 }

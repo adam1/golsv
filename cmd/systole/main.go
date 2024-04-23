@@ -47,15 +47,15 @@ func main() {
 		log.Printf("done; read %s", D2)
 
 		systole := golsv.ComputeFirstSystole(D1, D2, args.verbose)
+		log.Printf("systole=%d", systole)
 		if args.SystoleFile != "" {
 			writeMinWeight(systole, args.SystoleFile)
 		}
-		log.Printf("systole=%d", systole)
+		cosystole := golsv.ComputeFirstCosystole(D1, D2, args.verbose)
+		log.Printf("cosystole=%d", systole)
 		if args.CosystoleFile != "" {
-			cosystole := golsv.ComputeFirstCosystole(D1, D2, args.verbose)
 			writeMinWeight(cosystole, args.CosystoleFile)
 		}
-		log.Printf("cosystole=%d", systole)
 		return
 	}
 	log.Printf("reading matrix B from %s", args.BFile)
