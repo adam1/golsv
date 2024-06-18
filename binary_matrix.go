@@ -682,6 +682,7 @@ func EnumerateBinaryVectorSpaceList(generators BinaryMatrix) []BinaryVector {
 func EnumerateBinaryVectorSpace(generators BinaryMatrix, F func(BinaryMatrix) (ok bool) ) {
 	n := generators.NumColumns()
 	if n == 0 {
+		F(NewDenseBinaryMatrix(generators.NumRows(), 1))
 		return
 	}
 	// iterate over integers 0 to 2^n - 1 and use the binary

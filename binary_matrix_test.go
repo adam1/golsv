@@ -305,6 +305,13 @@ func TestBinaryMatrix_EnumerateBinaryVectorSpace(t *testing.T) {
 				{0, 0, 0},
 			},
 		},
+		{
+			name:       "Test Zero Generators",
+			generators: NewDenseBinaryMatrix(3, 0),
+			want: []BinaryVector{
+				{0, 0, 0},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

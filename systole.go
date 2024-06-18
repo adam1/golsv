@@ -100,13 +100,6 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 		if a.IsZero() {
 			return true
 		}
-		weight := a.ColumnWeight(0)
-		if weight < minWeight {
-			minWeight = weight
-			if verbose {
-				log.Printf("new min weight: %d", minWeight)
-			}
-		}
 		EnumerateBinaryVectorSpace(B, func(b BinaryMatrix) bool {
 			sum := a.Copy().Dense()
 			sum.AddMatrix(b)
