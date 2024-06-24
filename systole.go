@@ -124,22 +124,26 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 // individual programs and intermediate files at each step.
 // ComputeFirstSystole is useful for small complexes and for testing.
 func ComputeFirstSystole(d1, d2 BinaryMatrix, verbose bool) int {
-	log.Printf("Computing first homology")
-	U, B := UBDecomposition(d1, d2, verbose)
+	if verbose {
+		log.Printf("Computing first homology")
+	}
+	U, B, _ := UBDecomposition(d1, d2, verbose)
 	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
 }
 
-func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) int {
-	log.Printf("Computing first cohomology")
+func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
+	if verbose {
+		log.Printf("Computing first cohomology")
+	}
 	delta0 := d1.Transpose().Dense()
 	delta1 := d2.Transpose().Dense()
-	U, B := UBDecomposition(delta1, delta0, verbose)
+	U, B, _ := UBDecomposition(delta1, delta0, verbose)
 	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
 }
 
-func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B BinaryMatrix) {
+func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B, Z1 BinaryMatrix) {
 	// here we adapt the recipes from worskets/Makefile to be run
 	dimC0 := d1.NumRows()
 	dimC1 := d1.NumColumns()
@@ -163,7 +167,7 @@ dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
 	}
 
 
-	Z1 := automorphism(d1colops, dimC1, d1rank, dimC1, verbose)
+	Z1 = automorphism(d1colops, dimC1, d1rank, dimC1, verbose)
 
 	d2coimage := automorphism(d2colops, dimC2, 0, d2rank, verbose)
 	B1 := d2.MultiplyRight(d2coimage)
@@ -174,7 +178,7 @@ dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
 	P := PT.Transpose()
 
 	U = align(B1smith.Sparse(), P.Dense(), B1colops, Z1.Sparse(), verbose)
-	return U, B1
+	return U, B1, Z1
 }
 
 func smithNormalForm(M BinaryMatrix) (smith BinaryMatrix, rowops, colops []Operation, rank int) {

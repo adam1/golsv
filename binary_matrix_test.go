@@ -1038,3 +1038,52 @@ func TestGenericDenseSubmatrix(t *testing.T) {
 	}
 }
 
+func TestRandomizeHotIndices(t *testing.T) {
+	trials := 10
+	maxSize := 20
+	for i := 0; i < trials; i++ {
+		rows := rand.Intn(maxSize) + 1
+		weight := rand.Intn(rows + 1)
+		got := randomizeHotIndices(rows, weight)
+		// log.Printf("rows=%d weight=%d got=%v", rows, weight, got)
+		if len(got) != weight {
+			t.Errorf("rows=%d weight=%d got=%v", rows, weight, got)
+		}
+	}
+}
+
+func TestGenericRandomizeWithColumnWeight(t *testing.T) {
+	trials := 10
+	maxSize := 20
+	for i := 0; i < trials; i++ {
+		rows := rand.Intn(maxSize) + 1
+		cols := rand.Intn(maxSize) + 1
+		weight := rand.Intn(rows + 1)
+		M := NewSparseBinaryMatrix(rows, cols)
+		genericRandomizeWithColumnWeight(M, weight)
+		for j := 0; j < cols; j++ {
+			got := M.ColumnWeight(j)
+			if got != weight {
+				t.Errorf("col=%d weight=%d expected=%d \n%s", j, got, weight, dumpMatrix(M))
+			}
+		}
+	}
+}
+
+func TestAllBinaryVectors(t *testing.T) {
+	for n := 0; n < 5; n++ {
+		res := AllBinaryVectors(n)
+		if len(res) != 1<<uint(n) {
+			t.Errorf("n=%d got=%d", n, len(res))
+		}
+		seen := make(map[string]bool)
+		for _, v := range res {
+			s := v.String()
+			if seen[s] {
+				t.Errorf("n=%d duplicate %s", n, s)
+			}
+			seen[s] = true
+		}
+	}
+}
+

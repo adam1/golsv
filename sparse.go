@@ -64,6 +64,12 @@ func NewRandomSparseBinaryMatrix(rows, cols int, density float64, secureRandom b
 	return M
 }
 
+func NewRandomSparseBinaryMatrixWithColumnWeight(rows, cols, weight int) *Sparse {
+	M := NewSparseBinaryMatrix(rows, cols)
+	genericRandomizeWithColumnWeight(M, weight)
+	return M
+}
+
 func NewSparseBinaryMatrixIdentity(size int) *Sparse {
 	M := NewSparseBinaryMatrix(size, size)
 	genericSetIdentityDiagonals(M)

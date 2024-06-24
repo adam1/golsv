@@ -15,6 +15,7 @@ build all:
 	go build -o bin/multiply ./cmd/multiply
 	go build -o bin/random-complex ./cmd/random-complex
 	go build -o bin/shorten ./cmd/shorten
+	go build -o bin/simplicial-cosystole ./cmd/simplicial-cosystole
 	go build -o bin/smith ./cmd/smith
 	go build -o bin/systole ./cmd/systole
 	go build -o bin/transpose ./cmd/transpose

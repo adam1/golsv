@@ -6,10 +6,9 @@ import (
 	"log"
 	"sort"
 )
-// this file models a 2-d simplicial complex.
-
-// xxx the following is derived from complex.go; attempting to factor
-// out the common part.
+// this file models a 2-d simplicial complex.  it was originally
+// derived from complex.go in an attempt to factor out the common part
+// in a type-generic way.
 
 type ZVertex[T any] interface {
 	Equal(T) bool
@@ -30,12 +29,10 @@ func NewZEdge[T any](a, b ZVertex[T]) ZEdge[T] {
 	}
 }
 
-// xxx test
 func (E ZEdge[T]) Contains(v ZVertex[T]) bool {
 	return E[0] == v || E[1] == v
 }
 
-// xxx test
 func (E ZEdge[T]) Equal(F ZEdge[T]) bool {
 	return E[0].Equal(F[0].(T)) && E[1].Equal(F[1].(T))
 }
@@ -48,6 +45,13 @@ func (E ZEdge[T]) Less(F ZEdge[T]) bool {
 	} else {
 		return E[1].Less(F[1].(T))
 	}
+}
+
+func (E ZEdge[T]) OtherVertex(v ZVertex[T]) ZVertex[T] {
+	if v.Equal(E[0].(T)) {
+		return E[1]
+	}
+	return E[0]
 }
 
 func (E ZEdge[T]) String() string {
@@ -230,6 +234,22 @@ func (C *ZComplex[T]) EdgesContainingVertex(v ZVertex[T]) []ZEdge[T] {
 	return edges
 }
 
+func (C *ZComplex[T]) HasNeighbor(v, u ZVertex[T]) bool {
+	for _, x := range C.Neighbors(v) {
+		if x.Equal(u.(T)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (C *ZComplex[T]) Neighbors(v ZVertex[T]) (nabes []ZVertex[T]) {
+	for _, e := range C.EdgesContainingVertex(v) {
+		nabes = append(nabes, e.OtherVertex(v))
+	}
+	return
+}
+
 func (C *ZComplex[T]) TrianglesContainingVertex(v ZVertex[T]) []ZTriangle[T] {
 	var triangles []ZTriangle[T]
 	for _, t := range C.triangleBasis {
@@ -256,6 +276,22 @@ func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
 func (C *ZComplex[T]) String() string {
 	return fmt.Sprintf("complex with %v triangles, %v edges, %v vertices",
 		len(C.triangleBasis), len(C.edgeBasis), len(C.vertexBasis))
+}
+
+func (C *ZComplex[T]) DumpBases() (s string) {
+	s += "vertexBasis:\n"
+	for i, v := range C.vertexBasis {
+		s += fmt.Sprintf("  %d: %v\n", i, v)
+	}
+	s += "edgeBasis:\n"
+	for i, e := range C.edgeBasis {
+		s += fmt.Sprintf("  %d: %s\n", i, e)
+	}
+	s += "triangleBasis:\n"
+	for i, t := range C.triangleBasis {
+		s += fmt.Sprintf("  %d: %s\n", i, t)
+	}		
+	return s
 }
 
 func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
@@ -316,6 +352,8 @@ func (Q *ZVertexQueue[T]) Len() int {
 	return len(Q.slice)
 }
 
+// Note: this will only enumerate triangles that are connected to the
+// start vertex.
 func (C *ZComplex[T]) BFTriangleWalk(v ZVertex[T], f func(t ZTriangle[T])) {
 	tVisited := make(map[ZTriangle[T]]struct{})
 	C.BFS(v, func(u ZVertex[T]) {
@@ -323,6 +361,39 @@ func (C *ZComplex[T]) BFTriangleWalk(v ZVertex[T], f func(t ZTriangle[T])) {
 			if _, ok := tVisited[t]; !ok {
 				f(t)
 				tVisited[t] = struct{}{}
+			}
+		}
+	})
+}
+
+// Note: this will only enumerate 3-cliques that are connected to the
+// start vertex.  It will generate each 3-clique exactly once.
+func (C *ZComplex[T]) BFWalk3Cliques(v ZVertex[T], f func(c [3]ZVertex[T])) {
+	// in order to avoid double-counting, we will create a temporary
+	// map to store the 3-cliques we have already seen.  since we need
+	// these keys to be unique, we use a ZTriangle[T] as the key, even
+	// though this is not necessarily a triangle (2-simplex) in the
+	// complex C.
+	seen := make(map[ZTriangle[T]]struct{})
+	C.BFS(v, func(u ZVertex[T]) {
+		// for each neighbor x
+		//     for each other neighbor y
+		//         check whether u-x-y is a 3-clique
+		nabes := C.Neighbors(u)
+		for i, x := range nabes {
+			for j, y := range nabes {
+				if i == j {
+					continue
+				}
+				// we have u-x and u-y.  check for x-y.
+				if C.HasNeighbor(x, y) {
+					t := NewZTriangle[T](u, x, y)
+					if _, ok := seen[t]; ok {
+						continue
+					}
+					f([3]ZVertex[T]{u, x, y})
+					seen[t] = struct{}{}
+				}
 			}
 		}
 	})
@@ -355,303 +426,6 @@ func (Q *ZTriangleQueue[T]) Len() int {
 	return len(Q.slice)
 }
 
-// returns a minimum weight edge cochain that is a cocycle but not a
-// coboundary, i.e. a cochain whose weight is equal to S^1(C).  if B^1
-// = Z^1, or if there are no edges, return an empty cochain.
-//
-// xxx experimental WIP!  incomplete.
-func (C *ZComplex[T]) CosystolicVector() ZPath[T] {
-	// first, prepare a sorted list of triangles (xxx is this
-	// necessary?  could just use the triangleBasis slice.  is this
-	// list topologically sorted?)
-	var triangles []ZTriangle[T]
-	C.BFTriangleWalk(C.vertexBasis[0], func(t ZTriangle[T]) {
-		triangles = append(triangles, t)
-	})
-	// we want to enumerate Z^1 \setminus B^1, i.e. edge sets that
-	// correspond to cocycles but not coboundaries, i.e. cochains that
-	// vanish on B_1 but not on Z_1.  we will do this by choosing an
-	// edge set from each triangle, such that the edge set vanishes on
-	// the boundary of the triangle, which happens precisely when the
-	// edge set contains an even number of edges in the triangle,
-	// i.e. zero or two edges.  since there are in general multiple
-	// choices for each triangle, we build a tree of choices.  there
-	// is one level in the tree for each triangle, plus the root.  the
-	// levels in the tree correspond to the index in the triangles
-	// slice.  each vertex in the tree corresponds to a choice of edge
-	// set for the triangle.  an edge in the tree from a vertex down
-	// to a child vertex corresponds to a choice of edge set for the
-	// child triangle that is compatible with the choices made for the
-	// ancestor triangles in the tree (which in general may have
-	// overlapping edges).  in this way, we are effectively coloring
-	// every edge in the complex with one of three colors:
-	//
-	//   -1 = OFF: the edge IS NOT in the edge set
-	//    0 = OPEN: it is undecided whether the edge is in the edge set
-	//    1 = ON: the edge IS in the edge set
-	//
-	// as we build the tree, the leaf vertices correspond to possible
-	// edge sets decided thus far.  when we reach the end of the
-	// triangles list, all possible edge sets have been decided, and
-	// each leaf vertex corresponds to a possible edge set.  we can
-	// then test each edge set to see if it is a coboundary, i.e. to
-	// see whether it does not vanish on Z_1. taking the minimum
-	// weight edge set of those that are not coboundaries gives us a
-	// cosystolic vector.
-	//
-	// this procedure is likely exponential in the number of edges in
-	// the complex, although it depends on how the possibilities
-	// branch.
-
-	// special case: no triangles.  in this case, every cochain
-	// vacuously vanishes on the boundary, hence is a cocycle.  to be
-	// a coboundary of minimum weight then, we just need to choose a
-	// single edge on a cycle, if there is such an edge.
-	if len(triangles) == 0 {
-		// xxx in order to test whether an edge is a coboundary
-		// (below), we'll need to know generators for the cycles.
-		// pass that in. we'll need to use it here and below.
-		
-		return ZPath[T]{}
-	}
-	root := newNode(nil)
-	leaves := []*node{root}
-	newLeaves := make([]*node, 0)
-	
-	for i, t := range triangles {
-		fmt.Printf("%d: t=%v\n", i, t)
-		// for this triangle, determine the branching at each current
-		// leaf vertex.  the current leaf vertices represent the edge
-		// set choices for the previous triangle.
-		newLeaves = newLeaves[:0]
-		for j, p := range leaves {
-			fmt.Printf("  %d: p=%v\n", j, p)
-			// we need to scan up the tree to find triangle nodes that
-			// have settings for the edges in the current triangle t.
-			c := C.scanUp(triangles, p, i - 1, t)
-
-			switch c {
-			// =================================================
-			// num open is 0
-			case [3]kEdgeColor{kEdgeOff, kEdgeOff, kEdgeOff}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOff, kEdgeOn, kEdgeOn}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOn, kEdgeOff, kEdgeOn}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOn, kEdgeOn, kEdgeOff}:
-				// no-op; triangle is resolved
-			// impossible; check for sanity
-			case [3]kEdgeColor{kEdgeOff, kEdgeOff, kEdgeOn}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOff, kEdgeOn, kEdgeOff}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOn, kEdgeOff, kEdgeOff}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOn, kEdgeOn, kEdgeOn}:
-				panic("contradiction")
-			// =================================================
-			// num open is 1
-			case [3]kEdgeColor{kEdgeOff, kEdgeOff, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOff, kEdgeOpen, kEdgeOff}:
-				q := p.addChild()
-				q.setEdgeColor(1, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOff, kEdgeOff}:
-				q := p.addChild()
-				q.setEdgeColor(0, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			// edge at index 2 open
-			case [3]kEdgeColor{kEdgeOn, kEdgeOff, kEdgeOpen}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOff, kEdgeOn, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(2, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOn, kEdgeOn, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			// edge at index 1 open
-			case [3]kEdgeColor{kEdgeOn, kEdgeOpen, kEdgeOff}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOff, kEdgeOpen, kEdgeOn}:
-				q := p.addChild()
-				q.setEdgeColor(1, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOn, kEdgeOpen, kEdgeOn}:
-				q := p.addChild()
-				q.setEdgeColor(1, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			// edge at index 0 open
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOn, kEdgeOff}:
-				fallthrough
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOff, kEdgeOn}:
-				q := p.addChild()
-				q.setEdgeColor(1, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOn, kEdgeOn}:
-				q := p.addChild()
-				q.setEdgeColor(1, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			// num open is 2
-			case [3]kEdgeColor{kEdgeOff, kEdgeOpen, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(1, kEdgeOff)
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(1, kEdgeOn)
-				q.setEdgeColor(2, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOn, kEdgeOpen, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(1, kEdgeOn)
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(1, kEdgeOff)
-				q.setEdgeColor(2, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOff, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(0, kEdgeOff)
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(0, kEdgeOn)
-				q.setEdgeColor(2, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOn, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(0, kEdgeOn)
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(0, kEdgeOff)
-				q.setEdgeColor(2, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOpen, kEdgeOff}:
-				q := p.addChild()
-				q.setEdgeColor(0, kEdgeOff)
-				q.setEdgeColor(1, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(0, kEdgeOn)
-				q.setEdgeColor(1, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOpen, kEdgeOn}:
-				q := p.addChild()
-				q.setEdgeColor(0, kEdgeOn)
-				q.setEdgeColor(1, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(0, kEdgeOn)
-				q.setEdgeColor(1, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			// num open is 3
-			case [3]kEdgeColor{kEdgeOpen, kEdgeOpen, kEdgeOpen}:
-				q := p.addChild()
-				q.setEdgeColor(0, kEdgeOff)
-				q.setEdgeColor(1, kEdgeOff)
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(0, kEdgeOff)
-				q.setEdgeColor(1, kEdgeOn)
-				q.setEdgeColor(2, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(0, kEdgeOn)
-				q.setEdgeColor(1, kEdgeOff)
-				q.setEdgeColor(2, kEdgeOn)
-				newLeaves = append(newLeaves, q)
-				q = p.addChild()
-				q.setEdgeColor(0, kEdgeOn)
-				q.setEdgeColor(1, kEdgeOn)
-				q.setEdgeColor(2, kEdgeOff)
-				newLeaves = append(newLeaves, q)
-			}
-		}
-		leaves = newLeaves
-	}
-	log.Printf("leaves: %d\n", len(leaves))
-	for i, p := range leaves {
-		log.Printf("leaf %d: %v\n", i, p.edgeColors)
-		// xxx convert to binary vector representing the bra.
-		// xxx evaluate the bra on the basis vectors of Z_1.
-	}
-	// xxx wip
-	return nil
-}
-
-func (C *ZComplex[T]) scanUp(triangles []ZTriangle[T], p *node, level int, t ZTriangle[T]) (colors [3]kEdgeColor) {
-	tEdges := t.Edges()
-	for {
-		if p == nil || level == -1 {
-			break
-		}
-		// let u be the triangle corresponding to the current node.
-		// if u shares an edge with t, copy any colorings (kEdgeOn or
-		// kEdgeOff, but not kEdgeOpen) to the result.
-		uEdges := triangles[level].Edges()
-		match := false
-		for i, e := range tEdges {
-			for j, f := range uEdges {
-				if e.Equal(f) {
-					if p.edgeColors[j] != kEdgeOpen {
-						colors[i] = p.edgeColors[j]
-					}
-					match = true
-					break
-				}
-			}
-			if match {
-				break
-			}
-		}
-		if colors[0] != kEdgeOpen && colors[1] != kEdgeOpen && colors[2] != kEdgeOpen {
-			break
-		}
-		p = p.parent
-		level--
-	}
-	return
-}
-
-type kEdgeColor int8
-
-const (
-	kEdgeOff kEdgeColor = -1
-	kEdgeOpen kEdgeColor = 0
-	kEdgeOn kEdgeColor = 1
-)
-
-type node struct {
-	edgeColors [3]kEdgeColor
-	parent *node
-	children []*node
-}
-
-func newNode(parent *node) *node {
-	return &node{
-		parent: parent,
-		children: make([]*node, 0),
-	}
-}
-
-func (p *node) addChild() *node {
-	q := newNode(p)
-	p.children = append(p.children, q)
-	return q
-}
-
-func (p *node) setEdgeColor(index int, c kEdgeColor) {
-	p.edgeColors[index] = c
-}
 
 type ZPath[T any] []ZEdge[T]
 
@@ -691,6 +465,11 @@ func NewZComplexEmptyTriangle() *ZComplex[ZVertexInt] {
 func NewZComplexFilledTriangle() *ZComplex[ZVertexInt] {
 	return NewZComplexFromMaximalSimplices([][]int{{0,1,2}})
 }
+
+func NewZComplexJoinedFilledTriangles() *ZComplex[ZVertexInt] {
+	return NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {1,2,}})
+}
+
 
 func NewZComplexFromTriangles(S []ZTriangle[ZVertexInt]) *ZComplex[ZVertexInt] {
 	vertices := make(map[ZVertex[ZVertexInt]]bool)
@@ -760,4 +539,72 @@ func NewZComplexFromMaximalSimplices(S [][]int) *ZComplex[ZVertexInt] {
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }
 
+func NewZComplexFromBoundaryMatrices(d_1, d_2 BinaryMatrix) *ZComplex[ZVertexInt] {
+	numVertices := d_1.NumRows()
+	vertexBasis := make([]ZVertex[ZVertexInt], 0, numVertices)
+	for i := 0; i < numVertices; i++ {
+		vertexBasis = append(vertexBasis, ZVertexInt(i))
+	}
+	numEdges := d_1.NumColumns()
+	edgeBasis := make([]ZEdge[ZVertexInt], 0, numEdges)
+	edgeIndex := make(map[ZEdge[ZVertexInt]]int)
+	for j := 0; j < numEdges; j++ {
+		v0 := d_1.ScanDown(0, j)
+		if v0 < 0 {
+			panic("expected vertex")
+		}
+		v1 := d_1.ScanDown(v0+1, j)
+		if v1 < 0 {
+			panic("expected vertex")
+		}
+		if d_1.ScanDown(v1+1, j) >= 0 {
+			panic("too many ones in column")
+		}
+		edge := NewZEdge[ZVertexInt](ZVertexInt(v0), ZVertexInt(v1))
+		edgeBasis = append(edgeBasis, edge)
+		edgeIndex[edge] = j
+	}
+	numTriangles := d_2.NumColumns()
+	triangleBasis := make([]ZTriangle[ZVertexInt], 0, numTriangles)
+	for j := 0; j < numTriangles; j++ {
+		e0 := d_2.ScanDown(0, j)
+		if e0 < 0 {
+			panic("expected edge")
+		}
+		e1 := d_2.ScanDown(e0+1, j)
+		if e1 < 0 {
+			panic("expected edge")
+		}
+		e2 := d_2.ScanDown(e1+1, j)
+		if e2 < 0 {
+			panic("expected edge")
+		}
+		if d_2.ScanDown(e2+1, j) >= 0 {
+			panic("too many ones in column")
+		}
+		v0 := edgeBasis[e0][0]
+		v1 := edgeBasis[e0][1]
+		var v2 ZVertex[ZVertexInt]
+		found := false
+		k := 0
+		if edgeBasis[e1][k] != v0 && edgeBasis[e1][k] != v1 {
+			v2 = edgeBasis[e1][k]
+			found = true
+		}
+		if !found {
+			k = 1
+			if edgeBasis[e1][k] != v0 && edgeBasis[e1][k] != v1 {
+				v2 = edgeBasis[e1][k]
+				found = true
+			}
+		}
+		if !found {
+			panic("expected three vertices in triangle")
+		}
+		triangleBasis = append(triangleBasis, NewZTriangle[ZVertexInt](v0, v1, v2))
+	}
+	sortBases := true
+	verbose := false
+	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
+}
 	

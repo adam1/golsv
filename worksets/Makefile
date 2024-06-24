@@ -269,5 +269,9 @@ U^1.txt: B^1smith.txt P^1.txt B^1colops.txt Z^1.txt
 	align -B1smith B^1smith.txt -P P^1.txt -B1colops B^1colops.txt -Z1 Z^1.txt -out U^1.txt 2>&1 | tee U^1.$(log)
 
 # This target searches for cosystolic vectors in Z^1 \setminus B^1.
-cosystole.txt: U^1.txt
-	systole -trials 1000 -B B^1.txt -U U^1.txt -min cosystole.txt 2>&1 | tee cosystole.$(log)
+cosystoleExhaustive.txt: U^1.txt
+	systole -trials 1000 -B B^1.txt -U U^1.txt -min cosystole.txt 2>&1 | tee cosystoleExhaustive.$(log)
+
+# This target searches for cosystolic vectors in Z^1 \setminus B^1 by the simplicial search algorithm.
+cosystole.txt: d1.txt d2.txt Z1.txt
+	simplicial-cosystole -d1 d1.txt -d2 d2.txt -z1 Z1.txt 2>&1 | tee cosystole.$(log)

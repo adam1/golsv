@@ -419,6 +419,34 @@ func genericRandomizeWithDensity(M BinaryMatrix, density float64) {
 	}
 }
 
+func genericRandomizeWithColumnWeight(M BinaryMatrix, weight int) {
+	rows := M.NumRows()
+	cols := M.NumColumns()
+	for j := 0; j < cols; j++ {
+		hotIndices := randomizeHotIndices(rows, weight)
+		for i := 0; i < rows; i++ {
+			M.Set(i, j, 0)
+		}
+		for _, i := range hotIndices {
+			M.Set(i, j, 1)
+		}
+	}
+}
+
+func randomizeHotIndices(rows, weight int) []int {
+	if weight > rows {
+		panic("weight > rows")
+	}
+	all := make([]int, rows)
+	for i := 0; i < rows; i++ {
+		all[i] = i
+	}
+	rand.Shuffle(rows, func(i, j int) {
+		all[i], all[j] = all[j], all[i]
+	})
+	return all[:weight]
+}
+
 // xxx test
 func genericRowIsZero(M BinaryMatrix, index int) bool {
 	for j := 0; j < M.NumColumns(); j++ {
@@ -603,6 +631,15 @@ func NewBinaryVector(n int) BinaryVector {
 	return make([]uint8, n)
 }
 
+func NewBinaryVectorFromInts(ints []uint8) BinaryVector {
+	cols := len(ints)
+	V := NewBinaryVector(cols)
+	for j := 0; j < cols; j++ {
+		V[j] = ints[j]
+	}
+	return V
+}
+
 func ZeroVector(n int) BinaryVector {
 	return make([]uint8, n)
 }
@@ -664,6 +701,24 @@ func isOrthogonalToSet(vectors [][]int, v []int) bool {
         }
     }
     return true
+}
+
+func AllBinaryVectors(n int) []BinaryVector {
+	m := 1 << uint(n)
+	vectors := make([]BinaryVector, m)
+	for i := 0; i < m; i++ {
+		support := make([]int, 0)
+		for j := 0; j < n; j++ {
+			coefficient := uint8((i >> j) & 1)
+			if coefficient == 1 {
+				support = append(support, j)
+			}
+		}
+		coefficients := NewSparseBinaryMatrix(n, 1)
+		coefficients.SetColumnData(0, support)
+		vectors[i] = coefficients.AsColumnVector()
+	}
+	return vectors
 }
 
 // this is partially a compatibility shim for older code

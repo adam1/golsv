@@ -30,22 +30,19 @@ func NewRandomComplexGenerator(dimC_0 int, verbose bool) *RandomComplexGenerator
 }
 
 func (R *RandomComplexGenerator) RandomComplex() (d_1, d_2 BinaryMatrix, err error) {
-	R.dimC_1, err = randomizeDimC_1(R.dimC_0)
+	R.dimC_1, err = R.randomizeDimC_1(false)
 	if err != nil {
 		return nil, nil, err
 	}
-	R.dimC_2, err = randomizeDimC_2(R.dimC_0, R.dimC_1)
+	R.dimC_2, err = R.randomizeDimC_2()
 	if err != nil {
 		return nil, nil, err
 	}
-	density := 0.1
-
 	var kernelMatrix BinaryMatrix
-	d_1, kernelMatrix = randomize_d_1(R.dimC_0, R.dimC_1, density)
+	d_1, kernelMatrix = R.randomizeGeneral_d_1()
 	if R.verbose {
 		log.Printf("generated d_1: %v\n", d_1)
 	}
-
 	R.dimZ_1 = kernelMatrix.NumColumns()
 	R.dimB_1, err = randomizeDimB_1(R.dimZ_1)
 	if err != nil {
@@ -64,37 +61,49 @@ func (R *RandomComplexGenerator) RandomComplex() (d_1, d_2 BinaryMatrix, err err
 	kernelMatrix.(*Sparse).ShuffleColumns()
 	kernelMatrix = kernelMatrix.DenseSubmatrix(0, kernelMatrix.NumRows(), 0, R.dimB_1)
 
-	if R.verbose {
-		log.Printf("generating d_2")
-	}
-	d_2Sparse := NewSparseBinaryMatrix(R.dimC_1, 0)
-	for i := 0; i < R.dimC_2; i++ {
-		col := RandomLinearCombination(kernelMatrix)
-		d_2Sparse.AppendColumn(col)
-	}
-	if R.verbose {
-		log.Printf("generated d_2: %v\n", d_2Sparse)
-	}
-	return d_1, d_2Sparse, nil
+	d_2 = R.randomizeGeneral_d_2(kernelMatrix)
+	return d_1, d_2, nil
 }
 
-func randomize_d_1(dimC_0 int, dimC_1 int, density float64) (d_1 BinaryMatrix, kernelMatrix BinaryMatrix) {
+func (R *RandomComplexGenerator) RandomSimplicialComplex() (d_1, d_2 BinaryMatrix, err error) {
+	R.dimC_1, err = R.randomizeDimC_1(true)
+	if err != nil {
+		return nil, nil, err
+	}
+	R.dimC_2, err = R.randomizeDimC_2()
+	if err != nil {
+		return nil, nil, err
+	}
+	// remove duplicate columns since we require there be at most one
+	// edge between any two vertices.
+	d_1 = NewRandomSparseBinaryMatrixWithColumnWeight(R.dimC_0, R.dimC_1, 2)
+	d_1 = removeDuplicateColumns(d_1)
+
+	// enumerate 3-cliques and randomly fill them in
+	tmp_d_2 := NewSparseBinaryMatrix(0, 0)
+	graph := NewZComplexFromBoundaryMatrices(d_1, tmp_d_2)
+
+	triangleFillDensity := 0.5
+	triangleBasis := make([]ZTriangle[ZVertexInt], 0)
+	graph.BFWalk3Cliques(graph.VertexBasis()[0], func(c [3]ZVertex[ZVertexInt]) {
+		if randFloat() >= triangleFillDensity {
+			t := NewZTriangle(c[0], c[1], c[2])
+			triangleBasis = append(triangleBasis, t)
+		}
+	})
+	verbose := false
+	C := NewZComplex(graph.VertexBasis(), graph.EdgeBasis(), triangleBasis, true, verbose)
+	return C.D1(), C.D2(), nil
+}
+
+func (R *RandomComplexGenerator) randomizeGeneral_d_1() (d_1 BinaryMatrix, kernelMatrix BinaryMatrix) {
+	density := 0.1
 	for true {
-		d_1 := NewRandomDenseBinaryMatrixWithDensity(dimC_0, dimC_1, density)
-		// to generate d_2:
-		//
-		//   compute a basis for Z_1
-		//
-		//   choose dim B_1 randomly in range 0..dim Z_1,
-		//
-		//   for each column of d_2
-		//
-		//      choose a random linear combination of the columns of Z_1
-		//
+		d_1 = NewRandomDenseBinaryMatrixWithDensity(R.dimC_0, R.dimC_1, density)
 		verbose := false
 		reducer := NewDiagonalReducer(verbose)
-		// xxx the copy here prevents the original d_1 from being modified
-		// which causes a bug for some reason...
+		// xxx the copy here prevents the original d_1 from being
+		// modified which causes a bug for some reason...
 		D, _, _ := reducer.Reduce(d_1.Copy())
 
 		Dsparse := D.Sparse()
@@ -115,12 +124,46 @@ func randomize_d_1(dimC_0 int, dimC_1 int, density float64) (d_1 BinaryMatrix, k
 	return nil, nil
 }
 
-func randomizeDimC_1(dimC_0 int) (int, error) {
-	min := dimC_0 / 2 // minimum number of edges in a connected graph
+func removeDuplicateColumns(M BinaryMatrix) BinaryMatrix {
+	N := NewSparseBinaryMatrix(M.NumRows(), 0)
+	seen := make(map[string]bool)
+	cols := M.Columns()
+	for _, col := range cols {
+		key := col.String()
+		if _, ok := seen[key]; !ok {
+			seen[key] = true
+			N.AppendColumn(col.Matrix())
+		}
+	}
+	return N
+}
+
+func (R *RandomComplexGenerator) randomizeGeneral_d_2(kernelMatrix BinaryMatrix) (d_2 BinaryMatrix) {
+	if R.verbose {
+		log.Printf("generating d_2")
+	}
+	d_2Sparse := NewSparseBinaryMatrix(R.dimC_1, 0)
+	for i := 0; i < R.dimC_2; i++ {
+		col := RandomLinearCombination(kernelMatrix)
+		d_2Sparse.AppendColumn(col)
+	}
+	if R.verbose {
+		log.Printf("generated d_2: %v\n", d_2Sparse)
+	}
+	return d_2Sparse
+}
+
+func (R *RandomComplexGenerator) randomizeDimC_1(simplicial bool) (int, error) {
+	if simplicial {
+		if R.dimC_0 < 2 {
+			return 0, nil
+		}
+	}
+	min := R.dimC_0 / 2 // minimum number of edges in a connected graph
 	if min < 1 {
 		min = 1
 	}
-	max := dimC_0 * (dimC_0 - 1) / 2 // number of edges in a complete graph
+	max := R.dimC_0 * (R.dimC_0 - 1) / 2 // number of edges in a complete graph
 	if max < 1 {
 		max = 1
 	}
@@ -134,12 +177,12 @@ func randomizeDimC_1(dimC_0 int) (int, error) {
 	return min + int(d.Int64()), nil
 }
 
-func randomizeDimC_2(dimC_0, dimC_1 int) (int, error) {
-	min := dimC_1 / 3 // minimum number of triangles such that each edge could be in at least 1 triangle
+func (R *RandomComplexGenerator) randomizeDimC_2() (int, error) {
+	min := R.dimC_1 / 3 // minimum number of triangles such that each edge could be in at least 1 triangle
 	if min < 1 {
 		min = 1
 	}
-	max := dimC_0 * (dimC_0 - 1) * (dimC_0 - 2) / 3 // number of triangles for a clique complex
+	max := R.dimC_0 * (R.dimC_0 - 1) * (R.dimC_0 - 2) / 3 // number of triangles for a clique complex
 	if max <= min {
 		max = min + 1
 	}
@@ -164,4 +207,12 @@ func randomizeDimB_1(dimZ_1 int) (int, error) {
 		return 1, nil
 	}
 	return min + int(d.Int64()), nil
+}
+
+func randFloat() float64 {
+	d, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		panic(err)
+	}
+	return float64(d.Int64()) / 1000000.0
 }
