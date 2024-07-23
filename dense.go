@@ -119,6 +119,11 @@ func NewDenseBinaryMatrixIdentity(n int) BinaryMatrix {
 	return M
 }
 
+func (M *DenseBinaryMatrix) Add(N BinaryMatrix) {
+	// xxx optimize: if N is dense, can use fastxor.Bytes
+	genericAdd(M, N)
+}
+
 func (M *DenseBinaryMatrix) AddColumn(source, target int) {
 	if true && columnFirst {
 		sourceWord, sourceBit := M.index(0, source)
@@ -316,6 +321,10 @@ func (M *DenseBinaryMatrix) NumRows() int {
 func (M *DenseBinaryMatrix) Overwrite(row int, col int, N BinaryMatrix) {
 	// xxx optimize
 	genericOverwrite(M, row, col, N)
+}
+
+func (M *DenseBinaryMatrix) Project(rowPredicate func(int) bool) BinaryMatrix {
+	return genericProject(M, rowPredicate)
 }
 
 func (M *DenseBinaryMatrix) RowIsZero(index int) bool {

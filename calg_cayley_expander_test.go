@@ -81,3 +81,95 @@ func TestCalGCayleyExpanderInverseModf(t *testing.T) {
 		t.Errorf("Inverse path length 2 count not 98: %v", pathLenCounts[2])
 	}
 }
+
+func TestCalGCayleyExpanderComplex(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	maxDepth := 1
+	verbose := false
+	var modulus *F2Polynomial = nil
+	quotient := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil)
+	E.Expand()
+	C := E.Complex()
+	vertices := C.VertexBasis()
+	expectedVertices := 15
+	if len(vertices) != expectedVertices {
+		t.Errorf("Vertices: got=%d expected=%d", len(vertices), expectedVertices)
+	}
+	edges := C.EdgeBasis()
+	expectedEdges := 17
+	if len(edges) != expectedEdges {
+		t.Errorf("Edges: got=%d expected=%d", len(edges), expectedEdges)
+	}
+	triangles := C.TriangleBasis()
+	expectedTriangles := 3
+	if len(triangles) != expectedTriangles {
+		t.Errorf("Triangles: got=%d expected=%d", len(triangles), expectedTriangles)
+	}
+}
+
+func TestCalGCayleyExpanderEdgeOrder(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	maxDepth := 2
+	verbose := false
+	var modulus F2Polynomial = NewF2Polynomial("111")
+	quotient := true
+	var observer CalGObserver
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer)
+	E.Expand()
+	C := E.Complex()
+	edges := C.EdgeBasis()
+
+	for i, e := range edges {
+		if i == len(edges)-1 {
+			break
+		}
+		f := edges[i+1]
+		if !E.edgeLessByVertexAttendance(e, f) {
+			t.Errorf("Edge order failed: e=%v f=%v", e, f)
+		}
+	}
+}
+
+func TestCalGCayleyExpanderTriangleOrder(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	maxDepth := 2
+	verbose := false
+	var modulus F2Polynomial = NewF2Polynomial("111")
+	quotient := true
+	var observer CalGObserver
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer)
+	E.Expand()
+	C := E.Complex()
+	triangles := C.TriangleBasis()
+
+	for i, r := range triangles {
+		if i == len(triangles)-1 {
+			break
+		}
+		s := triangles[i+1]
+		if !E.triangleLessByVertexAttendance(r, s) {
+			t.Errorf("Triangle order failed: r=%v s=%v", r, s)
+		}
+	}
+}
+
+func TestNewEdgeElementCalGFromString(t *testing.T) {
+	tests := []struct {
+		s string
+		want ZEdge[ElementCalG]
+	}{
+		{
+			"[(1,0,0)(1,0,0)(1,0,0) (1,0,0)(1,0,01)(1,0,0)]",
+			NewZEdge(
+				ZVertex[ElementCalG](NewElementCalGFromString("(1,0,0)(1,0,0)(1,0,0)")),
+				ZVertex[ElementCalG](NewElementCalGFromString("(1,0,0)(1,0,01)(1,0,0)"))),
+		},
+	}
+	for i, test := range tests {
+		e := NewEdgeElementCalGFromString(test.s)
+		if !e.Equal(test.want) {
+			t.Errorf("Test %d: got=%v expected=%v", i, e, test.want)
+		}
+	}
+}

@@ -104,3 +104,33 @@ func DisTestSystoleTorus(t *testing.T) {
 	cosystole := ComputeFirstCosystole(D1, D2, verbose)
 	log.Printf("systole=%d cosystole=%d", systole, cosystole)
 }
+
+func TestSystoleKernelBasis(t *testing.T) {
+	tests := []struct {
+		M BinaryMatrix
+		Exp BinaryMatrix
+	}{
+		{
+			NewDenseBinaryMatrixFromString(
+			`1 0 1
+			 0 1 1
+			 0 0 0`),
+			NewDenseBinaryMatrixFromString(
+				`1
+				 1
+				 1`),
+		},
+		{
+			NewDenseBinaryMatrix(3, 0),
+			NewDenseBinaryMatrix(0, 0),
+		},
+	}
+	verbose := false
+	for i, test := range tests {
+		K := kernelBasis(test.M, verbose)
+		if !K.Equal(test.Exp) {
+			t.Errorf("kernel basis [%d] got=%v:\n%swant=%v:\n%s", i, K, dumpMatrix(K), test.Exp, dumpMatrix(test.Exp))
+		}
+	}
+}
+

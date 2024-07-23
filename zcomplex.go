@@ -134,8 +134,8 @@ type ZComplex[T any] struct {
 	triangleBasis []ZTriangle[T]
 	d1            BinaryMatrix
 	d2 		      BinaryMatrix
-	EdgeIndex     map[ZEdge[T]]int   // edge -> index in basis
-	VertexIndex   map[ZVertex[T]]int // vertex -> index in basis
+	edgeIndex     map[ZEdge[T]]int   // edge -> index in basis
+	vertexIndex   map[ZVertex[T]]int // vertex -> index in basis
 	verbose       bool
 }
 
@@ -167,16 +167,16 @@ func NewZComplex[T any](vertexBasis []ZVertex[T], edgeBasis []ZEdge[T], triangle
 }
 
 func (C *ZComplex[T]) computeEdgeIndex() {
-	C.EdgeIndex = make(map[ZEdge[T]]int)
+	C.edgeIndex = make(map[ZEdge[T]]int)
 	for i, edge := range C.edgeBasis {
-		C.EdgeIndex[edge] = i
+		C.edgeIndex[edge] = i
 	}
 }
 
 func (C *ZComplex[T]) computeVertexIndex() {
-	C.VertexIndex = make(map[ZVertex[T]]int)
+	C.vertexIndex = make(map[ZVertex[T]]int)
 	for i, vertex := range C.vertexBasis {
-		C.VertexIndex[vertex] = i
+		C.vertexIndex[vertex] = i
 	}
 }
 
@@ -184,7 +184,7 @@ func (C *ZComplex[T]) computeD1() {
 	C.d1 = NewSparseBinaryMatrix(len(C.vertexBasis), len(C.edgeBasis))
 	for j, edge := range C.edgeBasis {
 		for _, v := range edge {
-			row, ok := C.VertexIndex[v]
+			row, ok := C.vertexIndex[v]
 			if !ok {
 				panic(fmt.Sprintf("vertex %v not in vertex index", v))
 			}
@@ -197,7 +197,7 @@ func (C *ZComplex[T]) computeD2() {
 	C.d2 = NewSparseBinaryMatrix(len(C.edgeBasis), len(C.triangleBasis))
 	for j, t := range C.triangleBasis {
 		for _, e := range t.Edges() {
-			row, ok := C.EdgeIndex[e]
+			row, ok := C.edgeIndex[e]
 			if !ok {
 				panic(fmt.Sprintf("edge %v not in edge index", e))
 			}
@@ -234,6 +234,10 @@ func (C *ZComplex[T]) EdgesContainingVertex(v ZVertex[T]) []ZEdge[T] {
 	return edges
 }
 
+func (C *ZComplex[T]) EdgeIndex() map[ZEdge[T]]int {
+	return C.edgeIndex
+}
+
 func (C *ZComplex[T]) HasNeighbor(v, u ZVertex[T]) bool {
 	for _, x := range C.Neighbors(v) {
 		if x.Equal(u.(T)) {
@@ -264,13 +268,110 @@ func (C *ZComplex[T]) TrianglesContainingVertex(v ZVertex[T]) []ZTriangle[T] {
 func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
 	v := NewBinaryVector(len(C.edgeBasis))
 	for _, e := range path {
-		if i, ok := C.EdgeIndex[e]; ok {
+		if i, ok := C.edgeIndex[e]; ok {
 			v[i] = 1
 		} else {
 			panic(fmt.Sprintf("edge %v not in edge index", e))
 		}
 	}
 	return v
+}
+
+func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) {
+	base := C.vertexBasis[vertexIndex]
+	newVertices := make([]ZVertex[T], len(C.vertexBasis))
+	newVertexIndex := make(map[ZVertex[T]]int)
+	i := 0
+	C.BFS(base, func(v ZVertex[T]) {
+		newVertices[i] = v
+		newVertexIndex[v] = i
+		i++
+	})
+	C.vertexBasis = newVertices
+	C.vertexIndex = newVertexIndex
+	sort.Slice(C.edgeBasis, func(i, j int) bool {
+		a := C.edgeBasis[i]
+		b := C.edgeBasis[j]
+		return nearerEdgeInNewIndex(newVertexIndex, a, b)
+	}) 
+	C.computeEdgeIndex()
+	sort.Slice(C.triangleBasis, func(i, j int) bool {
+		a := C.triangleBasis[i]
+		b := C.triangleBasis[j]
+		return nearerTriangleInNewIndex(newVertexIndex, a, b)
+	}) 
+	C.d1 = nil
+	C.d2 = nil
+}
+
+func nearerEdgeInNewIndex[T any](index map[ZVertex[T]]int, a ZEdge[T], b ZEdge[T]) bool {
+	var m, n, o, p int
+	var ok bool
+	m, ok = index[a[0]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", a[0]))
+	}
+	n, ok = index[a[1]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", a[1]))
+	}
+	if n < m {
+		m = n
+	}
+	o, ok = index[b[0]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", b[0]))
+	}
+	p, ok = index[b[1]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", b[1]))
+	}
+	if p < o {
+		o = p
+	}
+	return m < o
+}
+
+func nearerTriangleInNewIndex[T any](index map[ZVertex[T]]int, a ZTriangle[T], b ZTriangle[T]) bool {
+	var m, n, o, p int
+	var ok bool
+	m, ok = index[a[0]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", a[0]))
+	}
+	n, ok = index[a[1]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", a[1]))
+	}
+	if n < m {
+		m = n
+	}
+	n, ok = index[a[2]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", a[2]))
+	}
+	if n < m {
+		m = n
+	}
+	o, ok = index[b[0]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", b[0]))
+	}
+	p, ok = index[b[1]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", b[1]))
+	}
+	if p < o {
+		o = p
+	}
+	p, ok = index[b[2]]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in new vertex index", b[2]))
+	}
+	if p < o {
+		o = p
+	}
+	return m < o
 }
 
 func (C *ZComplex[T]) String() string {
@@ -292,6 +393,12 @@ func (C *ZComplex[T]) DumpBases() (s string) {
 		s += fmt.Sprintf("  %d: %s\n", i, t)
 	}		
 	return s
+}
+
+// xxx test
+func (C *ZComplex[T]) SubcomplexByTriangles(n int) *ZComplex[T] {
+	truncated := C.TriangleBasis()[:n]
+	return NewZComplexFromTrianglesGeneric(truncated)
 }
 
 func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
@@ -470,7 +577,6 @@ func NewZComplexJoinedFilledTriangles() *ZComplex[ZVertexInt] {
 	return NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {1,2,}})
 }
 
-
 func NewZComplexFromTriangles(S []ZTriangle[ZVertexInt]) *ZComplex[ZVertexInt] {
 	vertices := make(map[ZVertex[ZVertexInt]]bool)
 	edges := make(map[ZEdge[ZVertexInt]]bool)
@@ -491,6 +597,31 @@ func NewZComplexFromTriangles(S []ZTriangle[ZVertexInt]) *ZComplex[ZVertexInt] {
 		edgeBasis = append(edgeBasis, e)
 	}
 	sortBases := true
+	verbose := false
+	return NewZComplex(vertexBasis, edgeBasis, S, sortBases, verbose)
+}
+
+// xxx test
+func NewZComplexFromTrianglesGeneric[T any](S []ZTriangle[T]) *ZComplex[T] {
+	vertices := make(map[ZVertex[T]]bool)
+	edges := make(map[ZEdge[T]]bool)
+	for _, t := range S {
+		vertices[t[0]] = true
+		vertices[t[1]] = true
+		vertices[t[2]] = true
+		edges[NewZEdge(t[0], t[1])] = true
+		edges[NewZEdge(t[1], t[2])] = true
+		edges[NewZEdge(t[2], t[0])] = true
+	}
+	vertexBasis := make([]ZVertex[T], 0, len(vertices))
+	for v := range vertices {
+		vertexBasis = append(vertexBasis, v)
+	}
+	edgeBasis := make([]ZEdge[T], 0, len(edges))
+	for e := range edges {
+		edgeBasis = append(edgeBasis, e)
+	}
+	sortBases := false
 	verbose := false
 	return NewZComplex(vertexBasis, edgeBasis, S, sortBases, verbose)
 }
@@ -603,7 +734,7 @@ func NewZComplexFromBoundaryMatrices(d_1, d_2 BinaryMatrix) *ZComplex[ZVertexInt
 		}
 		triangleBasis = append(triangleBasis, NewZTriangle[ZVertexInt](v0, v1, v2))
 	}
-	sortBases := true
+	sortBases := false
 	verbose := false
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }

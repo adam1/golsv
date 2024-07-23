@@ -24,7 +24,7 @@ func main() {
 	M := golsv.ReadSparseBinaryMatrixFile(args.In).(*golsv.Sparse)
 	log.Printf("done; read %s", M)
 	if args.Dump {
-		log.Printf("M:\n%s", golsv.DumpMatrix(M))
+		log.Printf("matrix:\n%s", golsv.DumpMatrix(M))
 	}
 	dimDomain := M.NumColumns()
 	dimCodomain := M.NumRows()
@@ -65,6 +65,8 @@ func main() {
 		fmt.Printf("%d\n", dimDomain)
 	} else if args.Codomain {
 		fmt.Printf("%d\n", dimCodomain)
+	} else if args.Density {
+		fmt.Printf("%f\n", M.Density(0, 0))
 	}
 }
 
@@ -75,6 +77,7 @@ type Args struct {
 	Domain bool
 	Image bool
 	Kernel bool
+	Density bool
 	Verbose bool
 	Dump bool
 	CheckColsNonzero bool
@@ -92,6 +95,7 @@ func parseFlags() *Args {
 	flag.BoolVar(&args.Image, "image", args.Image, "compute dimension of image")
 	flag.StringVar(&args.In, "in", args.In, "matrix input file (sparse column support txt format)")
 	flag.BoolVar(&args.Dump, "dump", args.Dump, "dump matrix to stderr")
+	flag.BoolVar(&args.Density, "density", args.Density, "print density of matrix")
 	flag.BoolVar(&args.CheckColsNonzero, "check-cols-nonzero", args.CheckColsNonzero, "check that all columns are nonzero")
 	flag.Parse()
 	if args.In == "" {

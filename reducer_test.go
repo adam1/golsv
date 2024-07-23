@@ -19,16 +19,15 @@ func doKernelBasisTest(t *testing.T, A BinaryMatrix, numSamples int) (kernelMatr
 	var reducer Reducer
 	verbose := showSteps
 	reducer = NewDiagonalReducer(verbose)
-	D, _, _ := reducer.Reduce(B)
+	colOpWriter := NewOperationSliceWriter()
+	D := reducer.Reduce(B, NewOperationSliceWriter(), colOpWriter)
 	DSparse := D.Sparse()
 	isSmith, rank := DSparse.IsSmithNormalForm()
 	if !isSmith {
 		t.Errorf("Matrix is not in Smith normal form")
 	}
 	// xxx temp hack until the colOps -> kernelBasis API is fixed
-	reducer.(*DiagonalReducer).computeKernelBasis()
-	kernelMatrix = reducer.(*DiagonalReducer).kernelBasis
-	// xxx get colOps, convert to kernelMatrix
+	kernelMatrix = reducer.(*DiagonalReducer).computeKernelBasis(colOpWriter.Slice())
 	if showSteps {
 		fmt.Printf("kernelMatrix: %v", kernelMatrix)
 	}
@@ -222,7 +221,7 @@ func BenchmarkReducer_Sparse(b *testing.B) {
 func benchmarkReducer(b *testing.B, A BinaryMatrix) {
 	for n := 0; n < b.N; n++ {
 		R := NewDiagonalReducer(false)
-		R.Reduce(A)
+		R.Reduce(A, NewOperationSliceWriter(), NewOperationSliceWriter())
 	}
 }
 
@@ -243,7 +242,7 @@ func TestReducer_SwitchToDense(t *testing.T) {
 			// log.Printf("xxx ==================== Reducer 1:\n")
 			R1 := NewDiagonalReducer(verbose)
 			B1 := A.Copy()
-			D1, _, _ := R1.Reduce(B1)
+			D1 := R1.Reduce(B1, NewOperationSliceWriter(), NewOperationSliceWriter())
 			// log.Printf("xxx D1: %s\n%s", D1, dumpMatrix(D1))
 
 			// log.Printf("xxx ==================== Reducer 2:\n")
@@ -253,12 +252,198 @@ func TestReducer_SwitchToDense(t *testing.T) {
 			}
 			R2.statIntervalSteps = 1
 			B2 := A.Copy()
-			D2, _, _ := R2.Reduce(B2)
+			D2 := R2.Reduce(B2, NewOperationSliceWriter(), NewOperationSliceWriter())
 			// log.Printf("xxx D2: %s\n%s", D2, dumpMatrix(D2))
 
 			if !D1.Equal(D2) {
 				t.Errorf("D1 != D2")
 			}
 		})
+	}
+}
+
+func TestReducerCheckOps(t *testing.T) {
+	trials := 10
+	minSize := 10
+	maxSize := 40
+	verbose := false
+	for n := 0; n < trials; n++ {
+		var m int
+		if minSize < maxSize {
+			m = minSize + rand.Intn(maxSize - minSize) + 1
+		} else {
+			m = minSize
+		}
+		M := NewRandomDenseBinaryMatrix(m, m)
+		R := NewDiagonalReducer(verbose)
+		rowOpWriter, colOpWriter := NewOperationSliceWriter(), NewOperationSliceWriter()
+		D := R.Reduce(M.Copy(), rowOpWriter, colOpWriter)
+		// apply rowOps and colOps to M, verify that it equals D
+		for _, op := range rowOpWriter.Slice() {
+			M.ApplyRowOperation(op)
+		}
+		for _, op := range colOpWriter.Slice() {
+			M.ApplyColumnOperation(op)
+		}
+		if !M.Equal(D) {
+			t.Errorf("M != D")
+		}
+	}
+}
+
+func TestReducerCheckOpsMatrices(t *testing.T) {
+	trials := 10
+	minSize := 10
+	maxSize := 10
+	verbose := false
+	for n := 0; n < trials; n++ {
+		var m int
+		if minSize < maxSize {
+			m = minSize + rand.Intn(maxSize - minSize) + 1
+		} else {
+			m = minSize
+		}
+		M := NewRandomDenseBinaryMatrix(m, m)
+		R := NewDiagonalReducer(verbose)
+		rowOpWriter, colOpWriter := NewOperationSliceWriter(), NewOperationSliceWriter()
+		D := R.Reduce(M.Copy(), rowOpWriter, colOpWriter)
+		// convert rowOps and colOps to matrices, apply to M, verify
+		// that it equals D
+		rowOpsMat := RowOperationsMatrix(rowOpWriter.Slice(), M.NumRows())
+		colOpsMat := ColumnOperationsMatrix(colOpWriter.Slice(), M.NumColumns())
+		P := rowOpsMat.MultiplyRight(M).MultiplyRight(colOpsMat)
+		if !P.Equal(D) {
+			t.Errorf("P != D")
+		}
+	}
+}
+
+func TestReducerCheckOpsMatricesSpecific(t *testing.T) {
+	tests := []struct {
+		M BinaryMatrix
+	}{
+		{NewDenseBinaryMatrixFromString(
+`0 0 0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0 0
+1 0 0 1 0 0 0 0 1 0 0 0 0 1 0 1 1 1 0
+0 0 0 0 0 0 1 0 0 1 1 1 0 1 0 1 1 0 0
+0 1 1 0 1 0 0 0 0 0 1 1 0 0 1 1 1 1 0
+0 0 0 1 1 1 0 0 1 1 1 1 1 1 1 1 1 1 0
+1 1 0 1 0 1 1 1 1 1 0 0 1 0 0 0 1 0 0
+0 0 0 0 1 0 0 0 0 0 0 1 1 0 1 1 1 0 0
+0 1 0 1 1 0 0 0 0 1 0 1 1 0 0 1 1 0 1
+0 1 0 0 0 0 0 1 1 1 0 0 1 1 0 1 1 1 1
+0 0 0 0 1 1 0 0 0 0 1 0 0 1 0 1 1 0 1
+0 1 0 0 0 0 1 1 0 1 1 0 0 1 0 0 0 1 1
+1 1 1 1 1 1 0 1 0 0 1 0 0 1 0 1 0 0 0
+1 0 0 1 0 0 0 1 0 1 0 1 0 0 0 1 0 1 0
+0 0 1 0 1 0 1 0 0 1 0 1 1 1 1 0 0 0 0
+1 0 0 0 1 0 0 0 1 1 1 1 0 0 0 0 1 0 0
+1 1 0 0 0 1 0 1 0 1 1 0 1 1 1 0 1 1 0
+1 0 1 1 0 1 1 0 1 1 1 1 1 0 1 1 1 1 1
+1 0 1 0 0 1 1 1 0 1 1 1 0 1 0 0 1 1 1
+0 0 1 1 0 0 0 0 1 0 1 0 1 0 0 0 0 1 0`),
+		},
+	}
+	for _, test := range tests {
+		R := NewDiagonalReducer(false)
+		rowOpWriter, colOpWriter := NewOperationSliceWriter(), NewOperationSliceWriter()
+		D := R.Reduce(test.M.Copy(), rowOpWriter, colOpWriter)
+		// convert rowOps and colOps to matrices, apply to M, verify
+		// that it equals D
+		rowOpsMat := RowOperationsMatrix(rowOpWriter.Slice(), test.M.NumRows())
+		colOpsMat := ColumnOperationsMatrix(colOpWriter.Slice(), test.M.NumColumns())
+		P := rowOpsMat.MultiplyRight(test.M).MultiplyRight(colOpsMat)
+		if !P.Equal(D) {
+			t.Errorf("P != D")
+		}
+	}
+}
+
+func TestReducerInvertRandom(t *testing.T) {
+	trials := 10
+	minSize := 10
+	maxSize := 10
+	notInv := 0
+	good := 0
+	for n := 0; n < trials; n++ {
+		var m int
+		if minSize < maxSize {
+			m = minSize + rand.Intn(maxSize - minSize) + 1
+		} else {
+			m = minSize
+		}
+		M := NewRandomDenseBinaryMatrix(m, m)
+		MInv, ok := attemptInvert(t, M)
+		if !ok {
+			notInv++
+			continue
+		}
+		P := M.MultiplyRight(MInv)
+		I := NewDenseBinaryMatrixIdentity(m)
+		if P.Equal(I) {
+			good++
+		} else {
+			t.Errorf("M * MInv != I")
+		}
+	}
+}
+
+func attemptInvert(t *testing.T, M BinaryMatrix) (MInv BinaryMatrix, ok bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			if r.(string) == "not invertible" {
+				ok = false
+			} else {
+				t.Errorf("panic: %v", r)
+			}
+		}
+	}()
+	reducer := NewDiagonalReducer(false)
+	MInv = reducer.Invert(M.Copy())
+	return MInv, true
+}
+
+func TestImageBasis(t *testing.T) {
+	tests := []struct {
+		M BinaryMatrix
+		want BinaryMatrix
+	}{
+		{
+			NewDenseBinaryMatrixFromString(
+				`1 0 0
+			     0 1 0
+			     0 0 1`),
+			NewDenseBinaryMatrixFromString(
+				`1 0 0
+				 0 1 0
+				 0 0 1`),
+		},
+		{
+			NewDenseBinaryMatrixFromString(
+				`1 0 1
+			     0 1 1
+			     0 0 0`),
+			NewDenseBinaryMatrixFromString(
+				`1 0
+				 0 1
+				 0 0`),
+		},
+		{
+			NewDenseBinaryMatrixFromString(
+				`0 0 1
+			     0 1 1
+			     0 0 0`),
+			NewDenseBinaryMatrixFromString(
+				`0 1
+				 1 0
+				 0 0`),
+		},
+	}
+	for _, test := range tests {
+		verbose := false
+		got := ImageBasis(test.M, verbose)
+		if !got.Equal(test.want) {
+			t.Errorf("got %v:\n%s\nwant %v:\n%s", got, dumpMatrix(got), test.want, dumpMatrix(test.want))
+		}
 	}
 }

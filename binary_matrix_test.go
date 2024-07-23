@@ -165,8 +165,7 @@ func TestBinaryMatrix_ColumnOperationsMatrix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			M := NewSparseBinaryMatrixIdentity(3)
-			ColumnOperationsMatrix(M, tt.operations, false)
+			M := ColumnOperationsMatrix(tt.operations, 3)
 			if !M.Equal(tt.wantMatrix) {
 				t.Errorf("%s: got:\n%vwant:\n%v", tt.name, M, tt.wantMatrix)
 			}
@@ -470,6 +469,11 @@ func TestBinaryMatrix_IsZero(t *testing.T) {
 				}),
 				want: false,
 			},
+			{
+				name: "Test 3",
+				matrix: NewDenseBinaryMatrix(1, 362881),
+				want: true,
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -520,6 +524,21 @@ func TestBinaryMatrix_MultiplyRight(t *testing.T) {
 					{0, 1, 1},
 					{1, 0, 1},
 					{1, 1, 1},
+				}),
+			},
+			{
+				name: "Test 2",
+				matrix: mType.fromInts([][]uint8{
+					{0, 1},
+					{1, 0},
+				}),
+				other: mType.fromInts([][]uint8{
+					{0, 1},
+					{1, 0},
+				}),
+				want: mType.fromInts([][]uint8{
+					{1, 0},
+					{0, 1},
 				}),
 			},
 		}
@@ -1087,3 +1106,63 @@ func TestAllBinaryVectors(t *testing.T) {
 	}
 }
 
+func TestBinaryVectorAdd(t *testing.T) {
+	tests := []struct {
+		a, b, want BinaryVector
+	}{
+		{a: BinaryVector{0, 0, 0, 0}, b: BinaryVector{0, 0, 0, 0}, want: BinaryVector{0, 0, 0, 0}},
+		{a: BinaryVector{0, 0, 0, 0}, b: BinaryVector{0, 0, 0, 1}, want: BinaryVector{0, 0, 0, 1}},
+		{a: BinaryVector{0, 0, 0, 1}, b: BinaryVector{0, 0, 0, 1}, want: BinaryVector{0, 0, 0, 0}},
+		{a: BinaryVector{0, 0, 0, 1}, b: BinaryVector{1, 0, 0, 1}, want: BinaryVector{1, 0, 0, 0}},
+	}
+	for i, tt := range tests {
+		got := tt.a.Add(tt.b)
+		if !reflect.DeepEqual(tt.want, got) {
+			t.Errorf("%d: got=%v want=%v", i, got, tt.want)
+		}
+	}
+}
+
+func TestBinaryVectorWeight(t *testing.T) {
+	tests := []struct {
+		v    BinaryVector
+		want int
+	}{
+		{v: BinaryVector{0, 0, 0, 0}, want: 0},
+		{v: BinaryVector{0, 0, 0, 1}, want: 1},
+		{v: BinaryVector{0, 0, 1, 1}, want: 2},
+	}
+	for i, tt := range tests {
+		got := tt.v.Weight()
+		if got != tt.want {
+			t.Errorf("%d: got=%d want=%d", i, got, tt.want)
+		}
+	}
+}
+
+func TestBinaryVectorProject(t *testing.T) {
+	tests := []struct {
+		v    BinaryVector
+		proj []int
+		want BinaryVector
+	}{
+		{v: BinaryVector{0, 0, 0, 0}, proj: []int{0, 1, 2}, want: BinaryVector{0, 0, 0}},
+		{v: BinaryVector{0, 0, 0, 1}, proj: []int{0, 1, 2}, want: BinaryVector{0, 0, 0}},
+		{v: BinaryVector{0, 0, 1, 1}, proj: []int{0, 1, 2}, want: BinaryVector{0, 0, 1}},
+		{v: BinaryVector{1, 0, 1, 1}, proj: []int{1, 2}, want: BinaryVector{0, 1}},
+	}
+	for i, tt := range tests {
+		hot := make(map[int]bool)
+		for _, j := range tt.proj {
+			hot[j] = true
+		}
+		predicate := func(i int) bool {
+			_, ok := hot[i]
+			return ok
+		}
+		got := tt.v.Project(len(tt.proj), predicate)
+		if !reflect.DeepEqual(tt.want, got) {
+			t.Errorf("%d: got=%v want=%v", i, got, tt.want)
+		}
+	}
+}

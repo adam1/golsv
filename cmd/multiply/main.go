@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"golsv"
 )
@@ -23,24 +24,40 @@ func main() {
 	A := golsv.ReadSparseBinaryMatrixFile(args.A)
 	log.Printf("done; read %s", A)
 
-	log.Printf("converting A to dense")
-	Adense := A.Dense()
-	log.Printf("done converting A to dense")
-
+	APrime:= A
+	if !args.NoDense {
+		log.Printf("converting A to dense")
+		APrime = A.Dense()
+		log.Printf("done converting A to dense")
+	}
 	log.Printf("reading matrix B from %s", args.B)
 	B := golsv.ReadSparseBinaryMatrixFile(args.B)
 	log.Printf("done; read %s", B)
 
 	log.Printf("computing C = A * B")
-	C := Adense.MultiplyRight(B)
+	C := APrime.MultiplyRight(B)
 	
 	if args.C != "" {
 
 		log.Printf("converting C to sparse")
-		Csparse := C.(*golsv.DenseBinaryMatrix).Sparse()
+		Csparse := C.Sparse()
 
 		log.Printf("writing matrix C to %s", args.C)
 		Csparse.WriteFile(args.C)
+		log.Printf("done; wrote %s", C)
+	}
+	if args.IntHack {
+		var s string
+		for i := 0; i < A.NumRows(); i++ {
+			row := A.RowVector(i)
+			for j := 0; j < B.NumColumns(); j++ {
+				col := B.ColumnVector(j)
+				m := row.IntegerDotProduct(col)
+				s += fmt.Sprintf("%d ", m)
+			}
+			s += "\n"
+		}
+		log.Printf("integer product:\n%s", s)
 	}
 	log.Printf("done")
 }
@@ -50,7 +67,9 @@ type Args struct {
 	A string
 	B string
 	C string
+	NoDense bool
 	Verbose bool
+	IntHack bool
 }
 
 func parseFlags() *Args {
@@ -62,6 +81,8 @@ func parseFlags() *Args {
 	flag.StringVar(&args.A, "A", args.A, "matrix A input file (sparse column support txt format)")
 	flag.StringVar(&args.B, "B", args.B, "matrix B input file")
 	flag.StringVar(&args.C, "C", args.C, "matrix C output file")
+	flag.BoolVar(&args.NoDense, "no-dense", args.NoDense, "do not convert A to dense")
+	flag.BoolVar(&args.IntHack, "int-hack", args.IntHack, "use int instead of bool for matrix entries")
 	flag.Parse()
 	if args.A == "" {
 		flag.Usage()

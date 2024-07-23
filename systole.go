@@ -96,11 +96,11 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 		return 0
 	}
 	minWeight = math.MaxInt
-	EnumerateBinaryVectorSpace(U, func(a BinaryMatrix) bool {
+	EnumerateBinaryVectorSpace(U, func(a BinaryMatrix, indexU int) bool {
 		if a.IsZero() {
 			return true
 		}
-		EnumerateBinaryVectorSpace(B, func(b BinaryMatrix) bool {
+		EnumerateBinaryVectorSpace(B, func(b BinaryMatrix, indexB int) bool {
 			sum := a.Copy().Dense()
 			sum.AddMatrix(b)
 			weight := sum.ColumnWeight(0)
@@ -108,6 +108,7 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 				minWeight = weight
 				if verbose {
 					log.Printf("new min weight: %d", minWeight)
+					log.Printf("xxx c: %s", sum.ColumnVector(0).SupportString())
 				}
 			}
 			return true
@@ -141,72 +142,4 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	U, B, _ := UBDecomposition(delta1, delta0, verbose)
 	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
-}
-
-func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B, Z1 BinaryMatrix) {
-	// here we adapt the recipes from worskets/Makefile to be run
-	dimC0 := d1.NumRows()
-	dimC1 := d1.NumColumns()
-	dimC2 := d2.NumColumns()
-
-	_, _, d1colops, d1rank := smithNormalForm(d1)
-	dimZ1 := d1.NumColumns() - d1rank
-
-	_, _, d2colops, d2rank := smithNormalForm(d2)
-	dimB1 := d2rank
-	dimH1 := dimZ1 - dimB1
-	if verbose {
-		log.Printf(
-`
-C_2 ------------> C_1 ------------> C_0
-dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
-                  dim(Z_1)=%-8d
-                  dim(B_1)=%-8d
-                  dim(H_1)=%-8d
-`, dimC2, dimC1, dimC0, dimZ1, dimB1, dimH1)
-	}
-
-
-	Z1 = automorphism(d1colops, dimC1, d1rank, dimC1, verbose)
-
-	d2coimage := automorphism(d2colops, dimC2, 0, d2rank, verbose)
-	B1 := d2.MultiplyRight(d2coimage)
-
-	B1smith, B1rowops, B1colops, _ := smithNormalForm(B1)
-
-	PT := automorphism(B1rowops, dimC1, 0, dimC1, verbose)
-	P := PT.Transpose()
-
-	U = align(B1smith.Sparse(), P.Dense(), B1colops, Z1.Sparse(), verbose)
-	return U, B1, Z1
-}
-
-func smithNormalForm(M BinaryMatrix) (smith BinaryMatrix, rowops, colops []Operation, rank int) {
-	verbose := false
-	R := NewDiagonalReducer(verbose)
-	D, rowOps, colOps := R.Reduce(M.Copy())
-	isSmith, rank := D.Sparse().IsSmithNormalForm()
-	if !isSmith {
-		panic("smith normal form not reached")
-	}
-	return D, rowOps, colOps, rank
-}
-
-func automorphism(ops []Operation, dim, cropStart, cropEnd int, verbose bool) BinaryMatrix {
-  	M := NewDenseBinaryMatrixIdentity(dim)
-	reader := NewOperationSliceReader(ops)
-	streamer := NewOpsFileMatrixStreamer(reader, M, verbose)
- 	streamer.Stream()
-	if cropStart > 0 || cropEnd < dim {
-		if verbose {
-			log.Printf("cropping to columns %d-%d", cropStart, cropEnd)
-		}
-		M = M.Submatrix(0, M.NumRows(), cropStart, cropEnd)
-	}
-	return M
-}
-
-func align(B1smith *Sparse, P *DenseBinaryMatrix, B1colops []Operation, Z1 *Sparse, verbose bool) *DenseBinaryMatrix {
-	aligner := NewAligner(B1smith, P, B1colops, Z1, verbose)
-	return aligner.Align().Dense()
 }

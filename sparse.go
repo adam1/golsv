@@ -85,6 +85,10 @@ func NewSparseBinaryMatrixDiagonal(rows, cols, rank int) *Sparse {
 	return M
 }
 
+func (S *Sparse) Add(M BinaryMatrix) {
+	genericAdd(S, M)
+}
+
 func (S *Sparse) AddColumn(source, target int) {
 	S.ColData[target].MergeDrop(&S.ColData[source])
 }
@@ -139,6 +143,18 @@ func (S *Sparse) AppendColumn(v BinaryMatrix) {
 	}
 }
 
+// xxx test
+func (S *Sparse) AppendColumns(M BinaryMatrix) {
+	if M.NumRows() != S.NumRows() {
+		panic("AppendColumns: M must have the same number of rows as S")
+	}
+	Msparse := M.Sparse()
+	for j := 0; j < Msparse.NumColumns(); j++ {
+		S.ColData = append(S.ColData, Msparse.ColData[j])
+	}
+	S.Cols += Msparse.NumColumns()
+}
+
 func (S *Sparse) AsColumnVector() BinaryVector {
 	return genericAsColumnVector(S)
 }
@@ -156,7 +172,11 @@ func (S *Sparse) Columns() []BinaryVector {
 }
 
 func (S *Sparse) ColumnVector(index int) BinaryVector {
-	return genericColumnVector(S, index)
+	v := NewBinaryVector(S.Rows)
+	for _, i := range S.ColData[index] {
+		v[i] = 1
+	}
+	return v
 }
 
 func (S *Sparse) ColumnWeight(index int) int {
@@ -164,8 +184,15 @@ func (S *Sparse) ColumnWeight(index int) int {
 }
 
 func (S *Sparse) Copy() BinaryMatrix {
-	N := NewSparseBinaryMatrix(S.Rows, S.Cols)
-	genericCopy(S, N)
+	N := &Sparse{
+		Rows: S.Rows,
+		Cols: S.Cols,
+		ColData: make([]orderedIntSet, S.Cols),
+	}
+	for j := 0; j < S.Cols; j++ {
+		N.ColData[j] = make(orderedIntSet, len(S.ColData[j]))
+		copy(N.ColData[j], S.ColData[j])
+	}
 	return N
 }
 
@@ -318,6 +345,10 @@ func (S *Sparse) Overwrite(row int, col int, N BinaryMatrix) {
 	genericOverwrite(S, row, col, N)
 }
 
+func (S *Sparse) Project(rowPredicate func(int) bool) BinaryMatrix {
+	return genericProject(S, rowPredicate)
+}
+
 func (S *Sparse) RowIsZero(index int) bool {
 	return genericRowIsZero(S, index)
 }
@@ -344,6 +375,16 @@ func (S *Sparse) Set(i, j int, b uint8) {
 		S.ColData[j].Unset(i)
 	} else {
 		S.ColData[j].Set(i)
+	}
+}
+
+// xxx test
+func (S *Sparse) SetColumn(col int, v BinaryVector) {
+	if len(v) != S.Rows {
+		panic("invalid length")
+	}
+	for i := 0; i < len(v); i++ {
+		S.Set(i, col, v[i])
 	}
 }
 

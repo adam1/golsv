@@ -1,7 +1,7 @@
 all: dim-H1.txt
 
-log=$(shell logser)
-$(info log is $(log))
+log=$(shell date '+%s').log
+$(info log suffix is $(log))
 $(shell touch $(log))
 
 # We currently have two "Cayley expanders", programs that generate a
@@ -64,10 +64,15 @@ pgl-cayley-F16:
 #
 # We are focusing on the second tool at present, hence this target
 # rule is designated as producing the basis and boundary files.
+#
+# This target, using the -systolic-candidates flag is a bit klunky in
+# that it first partially computes the infinite complex up the
+# configured max-depth, then computes the full finite quotient
+# complex.
 calg-cayley d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt:
 	calg-cayley -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
-		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee S.$(log)
+		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee S-all.$(log)
 
 # This target computes a Smith normal form for the matrix d_1.
 d1smith.txt d1colops.txt: d1.txt
@@ -113,20 +118,20 @@ B1.txt: d2coimage.txt
 
 # This target computes a Smith normal form for the matrix B_1 (whose
 # columns are a basis for B_1).
-B1smith.txt B1rowops.txt B1colops: B1.txt
+B1smith.txt B1rowops.txt B1colops.txt: B1.txt
 	smith -in B1.txt -smith B1smith.txt -rowops B1rowops.txt -colops B1colops.txt 2>&1 | tee B1smith.$(log)
 
 # The next three targets are used to compute an aligned basis for B_1
-# inside of Z_1.  The resulting basis is stored as columns of matrix U
-# in U.txt.
-PT.txt: B1rowops.txt d1.txt
-	automorphism -in B1rowops.txt -dim `dim -in d1.txt -domain` -out PT.txt 2>&1 | tee PT.$(log)
+# inside of Z_1.  The resulting basis is stored as columns of matrix
+# in U1.txt
+P1T.txt: B1rowops.txt d1.txt
+	automorphism -in B1rowops.txt -dim `dim -in d1.txt -domain` -out P1T.txt 2>&1 | tee P1T.$(log)
 
-P.txt: PT.txt
-	transpose -in PT.txt -out P.txt 2>&1 | tee P.$(log)
+P1.txt: P1T.txt
+	transpose -in P1T.txt -out P1.txt 2>&1 | tee P1.$(log)
 
-U.txt: B1smith.txt P.txt B1colops.txt Z1.txt
-	align -B1smith B1smith.txt -P P.txt -B1colops B1colops.txt -Z1 Z1.txt -out U.txt 2>&1 | tee U.$(log)
+U1.txt: B1smith.txt P1.txt B1colops.txt Z1.txt
+	align -B1smith B1smith.txt -P P1.txt -B1colops B1colops.txt -Z1 Z1.txt -out U1.txt 2>&1 | tee U1.$(log)
 
 # The following targets check that the basis for B_1 we found is
 # actually contained in the image of d_2.
@@ -150,19 +155,19 @@ d2T.txt: d2.txt
 
 # This target checks that the basis for U we found is actually
 # contained in the kernel of d_1.
-check-U: d1U.txt KU.txt
-	rank=$$(dim -in d1U.txt -image) && if [[ $$rank -eq '0' ]]; then echo "U is contained in ker d1"; else echo "U is NOT contained in ker d1!"; false; fi
-	dim -in KU.txt -check-cols-nonzero
+check-U: d1U1.txt KU1.txt
+	rank=$$(dim -in d1U1.txt -image) && if [[ $$rank -eq '0' ]]; then echo "U1 is contained in ker d1"; else echo "U1 is NOT contained in ker d1!"; false; fi
+	dim -in KU1.txt -check-cols-nonzero
 
-d1U.txt: d1.txt U.txt
-	multiply -A d1.txt -B U.txt -C d1U.txt 2>&1 | tee d1U.$(log)
+d1U1.txt: d1.txt U1.txt
+	multiply -A d1.txt -B U1.txt -C d1U1.txt 2>&1 | tee d1U1.$(log)
 
-KU.txt: K.txt U.txt
-	multiply -A K.txt -B U.txt -C KU.txt 2>&1 | tee KU.$(log)
+KU1.txt: K.txt U1.txt
+	multiply -A K.txt -B U1.txt -C KU1.txt 2>&1 | tee KU1.$(log)
 
 # This target searches for systolic vectors in Z_1 \setminus B_1.
-systole.txt: U.txt B1.txt
-	systole -trials 1000 -B B1.txt -U U.txt -min systole.txt 2>&1 | tee systole.$(log)
+systole.txt: U1.txt B1.txt
+	systole -trials 1000 -B B1.txt -U U1.txt -min systole.txt 2>&1 | tee systole.$(log)
 
 # Multiplying K by S gives a matrix in which each column corresponds
 # to a systolic candidate and each coordinate within the column gives
@@ -187,7 +192,7 @@ check-d1S: d1S.txt
 	rank=$$(dim -in d1S.txt -image) && if [[ $$rank -eq '0' ]]; then echo "candidates S are contained in ker d1"; else echo "candidates S are NOT contained in ker d1!"; false; fi
 
 really-clean:
-	rm -f d1smith.txt d1colops.txt d2smith.txt d2colops.txt dim-Z1.txt dim-B1.txt dim-H1.txt Z1.txt d2coimage.txt B1.txt B1smith.txt B1colops.txt Q.txt U.txt KB1.txt K.txt KT.txt d2Tsmith.txt d2Tcolops.txt d2T.txt d1U.txt KU.txt *.log*
+	rm -f d1smith.txt d1colops.txt d2smith.txt d2colops.txt dim-Z1.txt dim-B1.txt dim-H1.txt Z1.txt d2coimage.txt B1.txt B1smith.txt B1colops.txt Q.txt U1.txt KB1.txt K.txt KT.txt d2Tsmith.txt d2Tcolops.txt d2T.txt d1U1.txt KU1.txt *.log*
 
 # cochain complex / cosystole targets
 #
@@ -253,12 +258,14 @@ B^1.txt: d^0coimage.txt
 
 # This target computes a Smith normal form for the matrix B^1 (whose
 # columns are a basis for B^1).
-B^1smith.txt B^1rowops.txt B^1colops: B^1.txt
+B^1smith.txt B^1rowops.txt B^1colops.txt: B^1.txt
 	smith -in B^1.txt -smith B^1smith.txt -rowops B^1rowops.txt -colops B^1colops.txt 2>&1 | tee B^1smith.$(log)
 
 # The next three targets are used to compute an aligned basis for B^1
-# inside of Z^1.  The resulting basis is stored as columns of matrix U^1
-# in U^1.txt.
+# inside of Z^1.  The resulting basis is stored as columns in
+# U^1T.txt.  Note that we call this U^1T because the bras are stored
+# as columns, whereas it is more natural to think of them as rows.  We
+# later create a file U^1.txt that is the transpose of U^1T.txt.
 P^1T.txt: B^1rowops.txt d^1.txt
 	automorphism -in B^1rowops.txt -dim `dim -in d^1.txt -domain` -out P^1T.txt 2>&1 | tee P^1T.$(log)
 
@@ -268,6 +275,12 @@ P^1.txt: P^1T.txt
 U^1.txt: B^1smith.txt P^1.txt B^1colops.txt Z^1.txt
 	align -B1smith B^1smith.txt -P P^1.txt -B1colops B^1colops.txt -Z1 Z^1.txt -out U^1.txt 2>&1 | tee U^1.$(log)
 
+check-U^1: d^1U^1.txt
+	rank=$$(dim -in d^1U^1.txt -image) && if [[ $$rank -eq '0' ]]; then echo "U^1 is contained in ker d^1"; else echo "U^1 is NOT contained in ker d^1!"; false; fi
+
+d^1U^1.txt: d^1.txt U^1.txt
+	multiply -A d^1.txt -B U^1.txt -C d^1U^1.txt 2>&1 | tee d^1U^1.$(log)
+
 # This target searches for cosystolic vectors in Z^1 \setminus B^1.
 cosystoleExhaustive.txt: U^1.txt
 	systole -trials 1000 -B B^1.txt -U U^1.txt -min cosystole.txt 2>&1 | tee cosystoleExhaustive.$(log)
@@ -275,3 +288,57 @@ cosystoleExhaustive.txt: U^1.txt
 # This target searches for cosystolic vectors in Z^1 \setminus B^1 by the simplicial search algorithm.
 cosystole.txt: d1.txt d2.txt Z1.txt
 	simplicial-cosystole -d1 d1.txt -d2 d2.txt -z1 Z1.txt 2>&1 | tee cosystole.$(log)
+
+# This target computes the M matrix, which is each cohomology
+# generator \bra{\beta}_i evaluated on each homology generator
+# \ket{\alpha}_j as the entries of matrix M = (m_{ij}).
+M.txt: U^1T.txt U1.txt
+	multiply -A U^1T.txt -B U1.txt -C M.txt 2>&1 | tee M.$(log)
+
+U^1T.txt: U^1.txt
+	transpose -in U^1.txt -out U^1T.txt 2>&1 | tee U^1T.$(log)
+
+# Smith reduce the M matrix and produce row operations and column
+# operations matrices R and C, respectively.  We should have:
+#   R M C = I (identity).
+Msmith.txt Mrowops.txt Mcolops.txt: M.txt
+	smith -in M.txt -smith Msmith.txt -rowops Mrowops.txt -colops Mcolops.txt 2>&1 | tee Msmith.$(log)
+
+R.txt: Mrowops.txt
+	automorphism -in Mrowops.txt -transpose -dim `dim -in M.txt -domain` -out R.txt 2>&1 | tee R.$(log)
+
+C.txt: Mcolops.txt
+	automorphism -in Mcolops.txt -dim `dim -in M.txt -domain` -out C.txt 2>&1 | tee C.$(log)
+
+# Verify that (R U^1T) (U1 C) = I.
+#               F       G
+F.txt: R.txt U^1T.txt
+	multiply -A R.txt -B U^1T.txt -C F.txt 2>&1 | tee F.$(log)
+
+G.txt: U1.txt C.txt
+	multiply -A U1.txt -B C.txt -C G.txt 2>&1 | tee G.$(log)
+
+FG.txt: F.txt G.txt
+	multiply -A F.txt -B G.txt -C FG.txt 2>&1 | tee FG.$(log)
+
+check-FG: FG.txt
+	rank=$$(dim -in FG.txt -image) && if [[ $$rank -eq `dim -in M.txt -domain` ]]; then echo "FG=I"; else echo "FG does not equal I!"; false; fi
+
+# F should be "reduced" cohomology generators, in that each row of F
+# is a cohomology generator that is supported on a single homology
+# generator from the G matrix.
+
+# wip targets
+simp-cosys: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
+	simplicial-cosystole -verbose -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys.$(log)
+
+simp-cosys-prune: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
+	simplicial-cosystole -verbose -prune-by-cohomology-projection -initial-support -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys-prune.$(log)
+
+simp-cosys-dim-ucd-seq: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
+	simplicial-cosystole -verbose -dim-ucd-seq -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys-dim-ucd-seq.$(log)
+
+simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edge-basis.txt triangle-basis.txt modulus.txt
+	simplicial-cosystole -cohomology-orbits -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B1 B1.txt -U^1 U^1.txt \
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
+		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)

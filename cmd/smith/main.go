@@ -58,8 +58,19 @@ func main() {
 // 	log.Printf("xxx done converting to dense matrix: %v", M)
 
 	R := golsv.NewDiagonalReducer(args.Verbose)
-	D, rowOps, colOps := R.Reduce(M)
 
+	var rowOpWriter, colOpWriter golsv.OperationWriter
+	if args.RowOps != "" {
+		rowOpWriter = golsv.OpenOperationFileWriter(args.RowOps)
+	} else {
+		rowOpWriter = golsv.NewOperationNilWriter()
+	}
+	if args.ColOps != "" {
+		colOpWriter = golsv.OpenOperationFileWriter(args.ColOps)
+	} else {
+		colOpWriter = golsv.NewOperationNilWriter()
+	}
+	D := R.Reduce(M, rowOpWriter, colOpWriter)
 	D = D.Sparse() // in case we started dense above
 
 	if args.D != "" {
@@ -68,11 +79,15 @@ func main() {
 	}
 	if args.RowOps != "" {
 		log.Printf("writing rowops to %s", args.RowOps)
-		golsv.WriteOperationsFile(args.RowOps, rowOps)
+		if err := rowOpWriter.Close(); err != nil {
+			log.Fatalf("error closing rowops file: %v", err)
+		}
 	}
 	if args.ColOps != "" {
 		log.Printf("writing colops to %s", args.ColOps)
-		golsv.WriteOperationsFile(args.ColOps, colOps)
+		if err := colOpWriter.Close(); err != nil {
+			log.Fatalf("error closing colops file: %v", err)
+		}
 	}
 	log.Printf("done!")
 }

@@ -40,21 +40,22 @@ func randomOperations(n, dim int) []Operation {
 	return ops
 }
 
-func TestColumnOperationsMatrixParallel(t *testing.T) {
-	dim := 10
-	numOps := 100
-	ops := randomOperations(numOps, dim)
-	verbose := false
-	A := NewSparseBinaryMatrixIdentity(dim)
-	B := A.Copy()
+// xxx deprecated
+// func TestColumnOperationsMatrixParallel(t *testing.T) {
+// 	dim := 10
+// 	numOps := 100
+// 	ops := randomOperations(numOps, dim)
+// 	verbose := false
+// 	A := NewSparseBinaryMatrixIdentity(dim)
+// 	B := A.Copy()
 
-	ColumnOperationsMatrix(A, ops, verbose)
-	ColumnOperationsMatrixParallel(B, ops, verbose)
+// 	ColumnOperationsMatrix(A, ops, verbose)
+// 	ColumnOperationsMatrixParallel(B, ops, verbose)
 
-	if !A.Equal(B) {
-		t.Errorf("A != B")
-	}
-}
+// 	if !A.Equal(B) {
+// 		t.Errorf("A != B")
+// 	}
+// }
 
 func Benchmark_OperationFromString(b *testing.B) {
 	dim := 1000*1000
@@ -79,8 +80,7 @@ func TestReadOpsToColumnMatrix(t *testing.T) {
 		ops := randomOperations(numOps, dim)
 		WriteOperationsFile(filename, ops)
 		ops = ReadOperationsFile(filename)
-		M := NewSparseBinaryMatrixIdentity(dim)
-		ColumnOperationsMatrixParallel(M, ops, false)
+		M := ColumnOperationsMatrix(ops, dim)
 		// log.Printf("xxx M: %s\n%s", M, dumpMatrix(M))
 
 		N := NewDenseBinaryMatrixIdentity(dim)

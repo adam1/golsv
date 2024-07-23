@@ -58,8 +58,9 @@ func (R *RandomComplexGenerator) RandomComplex() (d_1, d_2 BinaryMatrix, err err
 	if R.verbose {
 		log.Printf("shuffling columns of kernel matrix")
 	}
-	kernelMatrix.(*Sparse).ShuffleColumns()
-	kernelMatrix = kernelMatrix.DenseSubmatrix(0, kernelMatrix.NumRows(), 0, R.dimB_1)
+	shuffled := kernelMatrix.Sparse()
+	shuffled.ShuffleColumns()
+	kernelMatrix = shuffled.DenseSubmatrix(0, shuffled.NumRows(), 0, R.dimB_1)
 
 	d_2 = R.randomizeGeneral_d_2(kernelMatrix)
 	return d_1, d_2, nil
@@ -102,17 +103,17 @@ func (R *RandomComplexGenerator) randomizeGeneral_d_1() (d_1 BinaryMatrix, kerne
 		d_1 = NewRandomDenseBinaryMatrixWithDensity(R.dimC_0, R.dimC_1, density)
 		verbose := false
 		reducer := NewDiagonalReducer(verbose)
-		// xxx the copy here prevents the original d_1 from being
-		// modified which causes a bug for some reason...
-		D, _, _ := reducer.Reduce(d_1.Copy())
+		// the copy here prevents the original d_1 from being modified
+		// which causes a bug for some reason...
+		rowOpWriter, colOpWriter := NewOperationSliceWriter(), NewOperationSliceWriter()
+		D := reducer.Reduce(d_1.Copy(), rowOpWriter, colOpWriter)
 
 		Dsparse := D.Sparse()
 		smithNormal, _ := Dsparse.IsSmithNormalForm()
 		if !smithNormal {
 			panic(fmt.Errorf("D is not in Smith normal form"))
 		}
-		reducer.computeKernelBasis()
-		kernelMatrix := reducer.kernelBasis
+		kernelMatrix := reducer.computeKernelBasis(colOpWriter.Slice())
 		dimZ_1 := kernelMatrix.NumColumns()
 		if dimZ_1 > 0 {
 			return d_1, kernelMatrix

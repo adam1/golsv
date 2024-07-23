@@ -5,21 +5,25 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
 	"golsv"
 )
 
 // Usage:
 //
-//   weight -min -in U.txt
+//   weight -in U.txt -col
 //
 // The program reads BinaryMatrix U from U.txt in sparse column
-// support format, and computes the minimum weight of a nonzero vector
-// in the column space of U.
+// support format, computes the weight of each column, and the minimum
+// weight of all columns.
 //
-// xxx Problem? a linear combination of columns of U is not
-// necessarily outside of B_1.  For example, add a vector to itself.
-// If that is correct, delete this file.
+
+type Args struct {
+	golsv.ProfileArgs
+	in string
+	row bool
+	col bool 
+	verbose bool
+}
 
 func main() {
 	args := parseFlags()
@@ -31,38 +35,29 @@ func main() {
 	U = golsv.ReadSparseBinaryMatrixFile(args.in)
 	log.Printf("done; read %s", U)
 
-	log.Printf("computing dense form of U")
-	Udense := U.DenseSubmatrix(0, U.NumRows(), 0, U.NumColumns())
-	log.Printf("done; dense form of U is %s", Udense)
-
-	if args.min {
-		log.Printf("computing minimum nonzero weight")
-		minWeight := math.MaxInt
-		golsv.EnumerateBinaryVectorSpace(Udense, func(v golsv.BinaryMatrix) bool {
-			weight := v.(*golsv.DenseBinaryMatrix).ColumnWeight(0)
-			if weight > 0 && weight < minWeight {
-				minWeight = weight
-				log.Printf("new min weight: %d", minWeight)
-			}
-			return true
-		})
-		log.Printf("done; min weight is %d", minWeight)
-		if args.out != "" {
-			log.Printf("writing min weight to %s", args.out)
-			err := os.WriteFile(args.out, []byte(fmt.Sprintf("%d\n", minWeight)), 0644)
-			if err != nil {
-				panic(err)
+	minWeight := math.MaxInt64
+	if args.row {
+		log.Printf("computing row weights")
+		UT := U.Transpose()
+		for i := 0; i < UT.NumColumns(); i++ {
+			w := UT.ColumnWeight(i)
+			fmt.Printf("row %d weight %d\n", i, w)
+			if w < minWeight {
+				minWeight = w
 			}
 		}
+		log.Printf("min row weight: %d", minWeight)
+	} else {
+		log.Printf("computing column weights")
+		for j := 0; j < U.NumColumns(); j++ {
+			w := U.ColumnWeight(j)
+			fmt.Printf("column %d weight %d\n", j, w)
+			if w < minWeight {
+				minWeight = w
+			}
+		}
+		log.Printf("min column weight: %d", minWeight)
 	}
-}
-
-type Args struct {
-	golsv.ProfileArgs
-	in string
-	out string
-	min bool
-	verbose bool
 }
 
 func parseFlags() *Args {
@@ -71,17 +66,21 @@ func parseFlags() *Args {
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.BoolVar(&args.verbose, "verbose", args.verbose, "verbose logging")
-	flag.BoolVar(&args.min, "min", args.min, "compute minimum weight")
 	flag.StringVar(&args.in, "in", args.in, "matrix input file (sparse column support txt format)")
-	flag.StringVar(&args.out, "out", args.out, "minimum weight output file (text)")
+	flag.BoolVar(&args.row, "row", args.row, "compute row weight")
+	flag.BoolVar(&args.col, "col", args.row, "compute col weight")
 	flag.Parse()
 	if args.in == "" {
 		flag.Usage()
 		log.Fatal("missing required -in flag")
 	}
-	if !args.min {
+	if args.row && args.col {
 		flag.Usage()
-		log.Fatal("only -min is supported")
+		log.Fatal("cannot specify both -row and -col")
+	}
+	if !args.row && !args.col {
+		flag.Usage()
+		log.Fatal("must specify either -row or -col")
 	}
 	return &args
 }

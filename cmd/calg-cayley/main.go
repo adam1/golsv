@@ -33,7 +33,7 @@ func main() {
 	E.Expand()
 
 	log.Printf("computing complex")
-	complex := E.Complex(args.SortBases)
+	complex := E.Complex()
 
 	writeComplexFiles(complex, args)
 	log.Printf("done")
@@ -77,9 +77,8 @@ func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomia
 	// log.Printf("xxx candidatePaths=%v", candidatePaths)
 
 	// convert candidates to column vectors in the edge basis.
-	sortBases := true
 	log.Printf("computing complex")
-	complex := E.Complex(sortBases)
+	complex := E.Complex()
 	writeComplexFiles(complex, args)
 
 	log.Printf("converting candidates to edge vectors and deduping")
@@ -163,7 +162,6 @@ type CalGCayleyExpanderArgs struct {
 	MeshFile           string
 	Modulus            string
 	Quotient           bool
-	SortBases          bool
 	SystolicCandidatesFile string
 	TriangleBasisFile  string
 	TruncateGenerators int
@@ -178,7 +176,6 @@ func parseFlags() *CalGCayleyExpanderArgs {
 		TruncateGenerators: 0,
 		Verbose: true,
 		Modulus: "111",
-		SortBases: true,
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 output file (sparse column support txt format)")
@@ -188,7 +185,6 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	flag.StringVar(&args.MeshFile, "mesh", args.MeshFile, "mesh output file (OFF Object File Format text)")
 	flag.StringVar(&args.Modulus, "modulus", args.Modulus, "modulus corresponding to a principle congruence subgroup")
 	flag.BoolVar(&args.Quotient, "quotient", args.Quotient, "construct finite quotient complex by first reducing generators modulo the given modulus")
-	flag.BoolVar(&args.SortBases, "sort-bases", args.SortBases, "sort bases")
 	flag.StringVar(&args.SystolicCandidatesFile, "systolic-candidates", args.SystolicCandidatesFile, "systolic candidates output file (text)")
 	flag.StringVar(&args.TriangleBasisFile, "triangle-basis", args.TriangleBasisFile, "triangle basis output file (text)")
 	flag.IntVar(&args.TruncateGenerators, "truncate-generators", args.TruncateGenerators, "truncate generators")

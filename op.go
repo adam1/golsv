@@ -42,51 +42,6 @@ func (op AddOp) String() string {
 	return fmt.Sprintf("A %d %d", op.Source, op.Target)
 }
 
-// xxx deprecate
-func OperationFromStringOld(op string) Operation {
-	tokenizer := bufio.NewScanner(strings.NewReader(op))
-	tokenizer.Split(bufio.ScanWords)
-	tokens := make([]string, 0)
-	for tokenizer.Scan() {
-		tokens = append(tokens, tokenizer.Text())
-	}
-	if err := tokenizer.Err(); err != nil {
-		panic(err)
-	}
-	if len(tokens) == 0 {
-		panic("empty operation")
-	}
-	switch tokens[0] {
-	case "S":
-		if len(tokens) != 3 {
-			panic("bad swap operation")
-		}
-		i, err := strconv.Atoi(tokens[1])
-		if err != nil {
-			panic(err)
-		}
-		j, err := strconv.Atoi(tokens[2])
-		if err != nil {
-			panic(err)
-		}
-		return SwapOp{i, j}
-	case "A":
-		if len(tokens) != 3 {
-			panic("bad add operation")
-		}
-		source, err := strconv.Atoi(tokens[1])
-		if err != nil {
-			panic(err)
-		}
-		target, err := strconv.Atoi(tokens[2])
-		if err != nil {
-			panic(err)
-		}
-		return AddOp{source, target}
-	}
-	panic("unknown operation")
-}
-
 func OperationFromString(s string) Operation {
 	tokenizer := bufio.NewScanner(strings.NewReader(s))
 	tokenizer.Split(bufio.ScanWords)
@@ -141,11 +96,11 @@ func RowOperationMatrix(op Operation, n int) BinaryMatrix {
 }
 
 func RowOperationsMatrix(ops []Operation, n int) BinaryMatrix {
-	matrix := NewDenseBinaryMatrixIdentity(n)
+	M := NewDenseBinaryMatrixIdentity(n)
 	for _, op := range ops {
-		matrix.ApplyRowOperation(op)
+		M.ApplyRowOperation(op)
 	}
-	return matrix
+	return M
 }
 
 func ColumnOperationMatrix(op Operation, n int) BinaryMatrix {
@@ -161,23 +116,15 @@ func ColumnOperationMatrix(op Operation, n int) BinaryMatrix {
 	return matrix
 }
 
-func ColumnOperationsMatrix(M BinaryMatrix, ops []Operation, verbose bool) {
-    statInterval := 1000
-	lastStatTime := time.Now()
-	for i, op := range ops {
-		if i % statInterval == 0 && i > 0 && verbose {
-			now := time.Now()
-			elapsed := now.Sub(lastStatTime)
-			rate := float64(statInterval) / elapsed.Seconds()
-			log.Printf("column ops per second: %f", rate)
-			lastStatTime = now
-		}
+func ColumnOperationsMatrix(ops []Operation, n int) BinaryMatrix {
+	M := NewDenseBinaryMatrixIdentity(n)
+	for _, op := range ops {
 		M.ApplyColumnOperation(op)
 	}
-	return
+	return M
 }
 
-// xxx new streamer
+// new streamer
 
 type OpsFileMatrixStreamer struct {
 	reader OperationReader
@@ -206,9 +153,7 @@ func (S *OpsFileMatrixStreamer) Stream() {
 	startTime := statLastTime
 	i := 0
 	for {
-		// log.Printf("xxx streamer reading batch")
 		batch, err := batcher.Read()
-		// log.Printf("xxx streamer got batch of %d ops", len(batch))
 		colWorkGroup.ProcessBatch(batch)
 		statOps += len(batch)
 		if i % statInterval == 0 && i > 0 && S.verbose {
@@ -338,7 +283,7 @@ func (R *OperationFileReader) Close() error {
 	return err
 }
 
-// xxx basic version for testing
+// basic version for testing
 type OperationFileSimpleReverseReader struct {
 	filename string
 	file *os.File
@@ -395,7 +340,7 @@ func (R *OperationFileSimpleReverseReader) Close() error {
 }
 
 // -----------------------------------------------------------------------
-// xxx fancy reverse reader
+// fancy reverse reader
 
 type OperationFileReverseReader struct {
 	filename string
@@ -420,12 +365,10 @@ func OpenOperationFileReverse(filename string) *OperationFileReverseReader {
 }
 
 func (R *OperationFileReverseReader) Read() (Operation, error) {
-	// log.Printf("xxx Read")
 	var op Operation
 	for {
 		line, err := R.readLine()
 		if line != "" {
-			// log.Printf("xxx got line: %s", line)
 			op = OperationFromString(line)
 		}
 		if err != nil {
@@ -442,10 +385,8 @@ func (R *OperationFileReverseReader) Read() (Operation, error) {
 }
 
 func (R *OperationFileReverseReader) readLine() (string, error) {
-	// log.Printf("xxx readLine index=%d", R.index)
 	buf := make([]byte, 0)
 	for {
-		// log.Printf("xxx readLine loop index=%d", R.index)
 		c := R.mmap.At(R.index)
 		R.index--
 		if c == '\n' {
@@ -501,21 +442,15 @@ func (B *OpsBatchReader) Read() ([]Work, error) {
 		return batch, io.EOF
 	}
 	batchReady := false
-	// log.Printf("xxx entering read loop")
 	for !batchReady {
-		// log.Printf("xxx reading op")
 		op, err := B.opsReader.Read()
 		if op != nil {
-			// log.Printf("xxx read op: %s", op)
 			if len(batch) == 0 {
-				// log.Printf("xxx setting first op in batch: %s", op)
 				batch = append(batch, &OpsWork{op, B.matrix})
 			} else {
 				if B.safelyConcurrent(batch[0].(*OpsWork).op, op) {
-					// log.Printf("xxx adding to batch: %s", op)
 					batch = append(batch, &OpsWork{op, B.matrix})
 				} else {
-					// log.Printf("xxx batch ready; setting remainder: %s", op)
 					batchReady = true
 					B.remainder = op
 				}
@@ -523,14 +458,12 @@ func (B *OpsBatchReader) Read() ([]Work, error) {
 		}
 		if err != nil {
 			if err == io.EOF {
-				// log.Printf("xxx underlying EOF")
 				B.underlyingEof = true
 				break
 			}
 			panic(err)
 		}
 	}
-	// log.Printf("xxx exiting read loop: batch: %d", len(batch))
 	return batch, nil
 }
 
@@ -541,44 +474,6 @@ func (B *OpsBatchReader) safelyConcurrent(u, v Operation) bool {
 		}
 	}
 	return false
-}
-
-// xxx old; deprecate in favor of streaming  =================================================
-func ColumnOperationsMatrixParallel(M BinaryMatrix, ops []Operation, verbose bool) {
-	colWorkGroup := NewWorkGroup(verbose)
-	statInterval := 1000
-	statOps := 0
-	statLastTime := time.Now()
-	startTime := statLastTime
-	i := 0
-	// log.Printf("xxx ColumnOperationsMatrixParallel %d ops", len(ops))
-	// log.Printf("xxx ops: %v", ops)
-	batcher := NewOpsBatcher(M, ops)
-	for {
-		batch := batcher.Next()
-		if batch == nil {
-			break
-		}
-		colWorkGroup.ProcessBatch(batch)
-		statOps += len(batch)
-		if i % statInterval == 0 && i > 0 && verbose {
-			now := time.Now()
-			elapsed := now.Sub(statLastTime)
-			rate := float64(statOps) / elapsed.Seconds()
-			totalRate := float64(i) / now.Sub(startTime).Seconds()
-			log.Printf("crate=%1.1f trate=%1.1f", rate, totalRate)
-			log.Printf("completed %d/%d ops (%1.0f%%)", i, len(ops), 100.0 * float64(i) / float64(len(ops)))
-			statLastTime = now
-			statOps = 0
-			if elapsed.Seconds() < 1 {
-				// scale back the stat interval to prevent logging
-				// from becoming too verbose and possibly a
-				// bottleneck.
-				statInterval *= 10
-			}
-		}
-		i += len(batch)
-	}
 }
 
 // OpsBatcher groups operations into batches that can be safely
@@ -627,12 +522,8 @@ type OpsWork struct {
 }
 
 func (W *OpsWork) Do() {
-	// log.Printf("xxx applying %s to %s", W.op, W.M)
 	W.M.ApplyColumnOperation(W.op)
 }
-
-// xxx =================================================
-
 
 // WriteOperationsFile writes a text file in the following format:
 //
@@ -658,36 +549,6 @@ func WriteOperationsFile(filename string, ops []Operation) {
 			panic(err)
 		}
 	}
-}
-
-// xxx deprecate
-func ReadOperationsFileOld(filename string) []Operation {
-	f, err := os.Open(filename)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-	ops := make([]Operation, 0, 100)
-	scanner := bufio.NewScanner(f)
-	lines := 0
-	statInterval := 10*1000
-	for scanner.Scan() {
-		line := scanner.Text()
-		ops = append(ops, OperationFromString(line))
-		lines++
-		if lines % statInterval == 0 {
-			log.Printf("read %d lines", lines)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		panic(err)
-	}
-	return ops
 }
 
 func ReadOperationsFile(filename string) []Operation {
@@ -733,4 +594,96 @@ func ReadOperationsFile(filename string) []Operation {
 	return ops
 }
 
+type OperationWriter interface {
+	Write(op Operation) error
+	Close() error
+	Count() int
+}
 
+type OperationSliceWriter struct {
+	ops []Operation
+}
+
+func NewOperationSliceWriter() *OperationSliceWriter {
+	return &OperationSliceWriter{make([]Operation, 0)}
+}
+
+func (W *OperationSliceWriter) Write(op Operation) error {
+	W.ops = append(W.ops, op)
+	return nil
+}
+
+func (W *OperationSliceWriter) Close() error {
+	return nil
+}
+
+func (W *OperationSliceWriter) Count() int {
+	return len(W.ops)
+}
+
+func (W *OperationSliceWriter) Slice() []Operation {
+	return W.ops
+}
+
+
+type OperationFileWriter struct {
+	filename string
+	file *os.File
+	writer *bufio.Writer
+	count int
+}
+
+func OpenOperationFileWriter(filename string) *OperationFileWriter {
+	file, err := os.Create(filename)
+	if err != nil {
+		panic(err)
+	}
+	return &OperationFileWriter{filename, file, bufio.NewWriter(file), 0}
+}
+
+func (W *OperationFileWriter) Write(op Operation) error {
+	_, err := W.writer.WriteString(op.String() + "\n")
+	if err != nil {
+		return err
+	}
+	W.count++
+	return nil
+}
+
+func (W *OperationFileWriter) Close() error {
+	err := W.writer.Flush()
+	if err != nil {
+		return err
+	}
+	err = W.file.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (W *OperationFileWriter) Count() int {
+	return W.count
+}
+
+
+type OperationNilWriter struct {
+	count int
+}
+
+func NewOperationNilWriter() *OperationNilWriter {
+	return &OperationNilWriter{0}
+}
+
+func (W *OperationNilWriter) Write(op Operation) error {
+	W.count++
+	return nil
+}
+
+func (W *OperationNilWriter) Close() error {
+	return nil
+}
+
+func (W *OperationNilWriter) Count() int {
+	return W.count
+}

@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
 	github.com/stretchr/testify v1.8.2 // indirect

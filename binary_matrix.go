@@ -13,6 +13,7 @@ import (
 // with entries in the field F_2.
 
 type BinaryMatrix interface {
+	Add(N BinaryMatrix)
 	AddColumn(source, target int)
 	AddRow(source, target int)
 	ApplyColumnOperation(op Operation)
@@ -37,6 +38,7 @@ type BinaryMatrix interface {
 	NumColumns() int
 	NumRows() int
 	Overwrite(row int, col int, M BinaryMatrix)
+	Project(func(int) bool) BinaryMatrix
 	RowIsZero(index int) bool
 	GetRows() []BinaryVector
 	RowVector(index int) BinaryVector
@@ -51,6 +53,18 @@ type BinaryMatrix interface {
 	SwapColumns(i, j int)
 	SwapRows(i, j int)
 	Transpose() BinaryMatrix
+}
+
+// xxx test
+func genericAdd(M, N BinaryMatrix) {
+	if M.NumRows() != N.NumRows() || M.NumColumns() != N.NumColumns() {
+		panic("mismatched dimensions")
+	}
+	for i := 0; i < M.NumRows(); i++ {
+		for j := 0; j < M.NumColumns(); j++ {
+			M.Set(i, j, M.Get(i, j) ^ N.Get(i, j))
+		}
+	}
 }
 
 // xxx test
@@ -265,6 +279,27 @@ func genericOverwrite(M BinaryMatrix, row int, col int, N BinaryMatrix) {
 			M.Set(i + row, j + col, N.Get(i, j))
 		}
 	}
+}
+
+// xxx test
+func genericProject(M BinaryMatrix, rowPredicate func(int) bool) BinaryMatrix {
+	var numRows int
+	for i := 0; i < M.NumRows(); i++ {
+		if rowPredicate(i) {
+			numRows++
+		}
+	}
+	N := NewSparseBinaryMatrix(numRows, M.NumColumns())
+	row := 0
+	for i := 0; i < M.NumRows(); i++ {
+		if rowPredicate(i) {
+			for j := 0; j < M.NumColumns(); j++ {
+				N.Set(row, j, M.Get(i, j))
+			}
+			row++
+		}
+	}
+	return N
 }
 
 func genericSparse(M BinaryMatrix) *Sparse {
@@ -644,6 +679,25 @@ func ZeroVector(n int) BinaryVector {
 	return make([]uint8, n)
 }
 
+// xxx test
+func (V BinaryVector) Add(U BinaryVector) BinaryVector {
+	W := NewBinaryVector(len(V))
+	for i := 0; i < len(V); i++ {
+		W[i] = V[i] ^ U[i]
+	}
+	return W
+}
+
+// xxx
+func (V BinaryVector) IntegerDotProduct(U BinaryVector) int {
+	d := 0
+	for i := 0; i < len(V); i++ {
+		d += int(V[i]) * int(U[i])
+	}
+	return d
+}
+
+// xxx rename to DenseBinaryMatrix
 func (V BinaryVector) Matrix() *DenseBinaryMatrix {
 	rows := len(V)
 	M := NewDenseBinaryMatrix(rows, 1)
@@ -662,6 +716,28 @@ func (V BinaryVector) IsZero() bool {
 	return true
 }
 
+func (V BinaryVector) Project(n int, predicate func (i int) bool) BinaryVector {
+	pV := NewBinaryVector(n)
+	j := 0
+	for i, b := range V {
+		if predicate(i) {
+			pV[j] = b
+			j++
+		}
+	}
+	return pV
+}
+
+// xxx test
+func (V BinaryVector) SparseBinaryMatrix() *Sparse {
+	rows := len(V)
+	M := NewSparseBinaryMatrix(rows, 1)
+	for i := 0; i < rows; i++ {
+		M.Set(i, 0, V[i])
+	}
+	return M
+}
+
 func (V BinaryVector) String() string {
 	var buf bytes.Buffer
 	for _, b := range V {
@@ -672,6 +748,33 @@ func (V BinaryVector) String() string {
 		}
 	}
 	return buf.String()
+}
+
+func (V BinaryVector) SupportString() string {
+	var buf bytes.Buffer
+	first := true
+	buf.WriteString("[+")
+	for i, b := range V {
+		if b == 1 {
+			if !first {
+				buf.WriteString(",")
+			}
+			buf.WriteString(fmt.Sprintf("%d", i))
+			first = false
+		}
+	}
+	buf.WriteString("]")
+	return buf.String()
+}
+
+func (V BinaryVector) Weight() int {
+	weight := 0
+	for _, b := range V {
+		if b == 1 {
+			weight++
+		}
+	}
+	return weight
 }
 
 func vectorsToMatrix(vectors [][]int) [][]int {
@@ -686,21 +789,13 @@ func vectorsToMatrix(vectors [][]int) [][]int {
     return matrix
 }
 
+// xxx move to BinaryVector
 func dotProduct(v1, v2 []int) int {
     product := 0
     for i := 0; i < len(v1); i++ {
         product += v1[i] * v2[i]
     }
     return product % 2
-}
-
-func isOrthogonalToSet(vectors [][]int, v []int) bool {
-    for _, vec := range vectors {
-        if dotProduct(vec, v) != 0 {
-            return false
-        }
-    }
-    return true
 }
 
 func AllBinaryVectors(n int) []BinaryVector {
@@ -725,7 +820,7 @@ func AllBinaryVectors(n int) []BinaryVector {
 // that still uses the BinaryVector type.
 func EnumerateBinaryVectorSpaceList(generators BinaryMatrix) []BinaryVector {
 	results := make([]BinaryVector, 0)
-	EnumerateBinaryVectorSpace(generators, func(v BinaryMatrix) (ok bool) {
+	EnumerateBinaryVectorSpace(generators, func(v BinaryMatrix, index int) (ok bool) {
 		results = append(results, v.AsColumnVector())
 		return true
 	})
@@ -734,10 +829,10 @@ func EnumerateBinaryVectorSpaceList(generators BinaryMatrix) []BinaryVector {
 
 // note: will generate duplicate vectors if the generators are not
 // linearly independent.
-func EnumerateBinaryVectorSpace(generators BinaryMatrix, F func(BinaryMatrix) (ok bool) ) {
+func EnumerateBinaryVectorSpace(generators BinaryMatrix, F func(v BinaryMatrix, index int) (ok bool) ) {
 	n := generators.NumColumns()
 	if n == 0 {
-		F(NewDenseBinaryMatrix(generators.NumRows(), 1))
+		F(NewDenseBinaryMatrix(generators.NumRows(), 1), 0)
 		return
 	}
 	// iterate over integers 0 to 2^n - 1 and use the binary
@@ -756,7 +851,7 @@ func EnumerateBinaryVectorSpace(generators BinaryMatrix, F func(BinaryMatrix) (o
 		coefficients := NewSparseBinaryMatrix(n, 1)
 		coefficients.SetColumnData(0, support)
 		vector := LinearCombination(generators, coefficients)
-		if !F(vector) {
+		if !F(vector, i) {
 			break
 		}
 	}

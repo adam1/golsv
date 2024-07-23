@@ -20,22 +20,37 @@ import (
 //   D is a diagonal matrix, and
 //   Q is an automorphism of the domain of M.
 //
-// The row and column operations performed are returned.  The row
-// operations can be turned into an invertible matrix operating on the
-// codomain of the original matrix.  The column operations can be
-// turned into an invertible matrix operating on the domain of the
-// original matrix.  These conversions are not automatically done here
-// since they can be expensive. The matrix M may be modified in place,
-// but is not guaranteed to be equal to D.
+// The reduction is performed by a sequence of row and column
+// operations.  The row and column operations performed are returned
+// as slices of Operation objects. They can subsequently be converted
+// into invertible matrices by the automorphism command.  (This is
+// done as a separate step to separate the expense of conversion from
+// the expense of reduction; both can be very large.)
+//
+// Row operations are equivalent to left-multiplying the matrix by an
+// invertible operation matrix.  Column operations are equivalent to
+// right-multiplying the matrix by an invertible operation matrix.
+// Hence, the reduction can be thought of as computing
+//
+//     P^{-1} M Q^{-1} = D
+//
+// where P^{-1} is the product of the row operations and Q^{-1} is the
+// product of the column operations.
+//
+// CAUTION. The matrix M may be modified in place, but is not
+// guaranteed to be equal to D.
 type Reducer interface {
-	Reduce(M BinaryMatrix) (D BinaryMatrix, rowOps, colOps []Operation)
+	Reduce(M BinaryMatrix, rowOpWriter, colOpWriter OperationWriter) (D BinaryMatrix)
 }
 
 type DiagonalReducer struct {
 	matrix  BinaryMatrix
 	numWorkers int
-	colOps  []Operation
-	rowOps  []Operation
+	// xxx working to reduce memory usage by streaming colops and
+	// rowops to disk rather than keeping them in memory
+	colOpWriter OperationWriter
+	//rowOps []Operation
+	rowOpWriter OperationWriter
 	colOpsMatrix BinaryMatrix
 	coimageBasis BinaryMatrix
 	kernelBasis BinaryMatrix
@@ -54,7 +69,6 @@ type DiagonalReducer struct {
 
 func NewDiagonalReducer(verbose bool) *DiagonalReducer {
 	R := &DiagonalReducer{
-		colOps: make([]Operation, 0),
 		reduced: false,
 		statIntervalSteps: 1000,
 		switchToDensePredicate: defaultSwitchToDensePredicate,
@@ -65,9 +79,13 @@ func NewDiagonalReducer(verbose bool) *DiagonalReducer {
 	return R
 }
 
-func (R *DiagonalReducer) Reduce(M BinaryMatrix) (D BinaryMatrix, rowOps, colOps []Operation) {
+// CAUTION. The matrix M may be modified in place, but is not
+// guaranteed to be equal to D.
+func (R *DiagonalReducer) Reduce(M BinaryMatrix, rowOpWriter, colOpWriter OperationWriter) (D BinaryMatrix) {
 	showSteps := false
 	R.matrix = M
+	R.rowOpWriter = rowOpWriter
+	R.colOpWriter = colOpWriter
 	rows := M.NumRows()
 	cols := M.NumColumns()
 	d := rows
@@ -111,7 +129,7 @@ func (R *DiagonalReducer) Reduce(M BinaryMatrix) (D BinaryMatrix, rowOps, colOps
 				totalElapsed := now.Sub(startTime)
 				totalRate := float64(i) / totalElapsed.Seconds()
 				msg := fmt.Sprintf("reducing; i=%d coladd=%d trowop=%d tcolop=%d rate=%1.3f trate=%1.3f ehr=%1.2f",
-					i, R.statColumnAdds, len(R.rowOps), len(R.colOps), rate, totalRate, estimatedHoursRemaining)
+					i, R.statColumnAdds, R.rowOpWriter.Count(), R.colOpWriter.Count(), rate, totalRate, estimatedHoursRemaining)
 				if subdensity >=0 {
 					msg += fmt.Sprintf(" subden=%1.8f", subdensity)
 				}
@@ -131,9 +149,27 @@ func (R *DiagonalReducer) Reduce(M BinaryMatrix) (D BinaryMatrix, rowOps, colOps
 	}
 	R.reduced = true
 	if R.verbose {
-		log.Printf("done reducing; trowop=%d tcolop=%d", len(R.rowOps), len(R.colOps))
+		log.Printf("done reducing; trowop=%d tcolop=%d", R.rowOpWriter.Count(), R.colOpWriter.Count())
 	}
-	return R.matrix, R.rowOps, R.colOps
+	return R.matrix
+}
+
+// CAUTION. The matrix M may be modified in place.
+func (R *DiagonalReducer) Invert(M BinaryMatrix) BinaryMatrix {
+	m := M.NumRows()
+	n := M.NumColumns()
+	if n != m {
+		panic("not square")
+	}
+	rowOpWriter, colOpWriter := NewOperationSliceWriter(), NewOperationSliceWriter()
+	D := R.Reduce(M, rowOpWriter, colOpWriter)
+	id := NewSparseBinaryMatrixIdentity(n)
+	if !D.Equal(id) {
+		panic("not invertible")
+	}
+	QInv := ColumnOperationsMatrix(colOpWriter.Slice(), n)
+	RInv := RowOperationsMatrix(rowOpWriter.Slice(), n)
+	return QInv.MultiplyRight(RInv)
 }
 
 func (R *DiagonalReducer) clearColumnAfterRow(d int) {
@@ -151,7 +187,9 @@ func (R *DiagonalReducer) clearColumnAfterRow(d int) {
 			break
 		}
 		R.matrix.Set(k, d, 0)
-		R.rowOps = append(R.rowOps, AddOp{d, k})
+		if err := R.rowOpWriter.Write(AddOp{d, k}); err != nil {
+			panic(err)
+		}
 		k++
 	}
 }
@@ -162,13 +200,11 @@ func defaultSwitchToDensePredicate(remaining int, subdensity float64) bool {
 	return subdensity >= 0.003 && remaining >= 10000
 }
 
-// xxx deprecate
-func (R *DiagonalReducer) computeKernelBasis() {
+// xxx deprecate/refactor?  this is redundant with part of the
+// automorphism method below, which might be better.
+func (R *DiagonalReducer) computeKernelBasis(colOps []Operation) (kernelBasis BinaryMatrix) {
 	cols := R.matrix.NumColumns()
-
-	M := NewSparseBinaryMatrixIdentity(cols)
-	ColumnOperationsMatrix(M, R.colOps, R.verbose)
-	R.colOpsMatrix = M
+	R.colOpsMatrix = ColumnOperationsMatrix(colOps, cols)
 	splitCol := firstZeroCol(R.matrix)
 	if R.verbose {
 		log.Printf("splitting column ops matrix at column %d", splitCol)
@@ -178,7 +214,7 @@ func (R *DiagonalReducer) computeKernelBasis() {
 	if R.verbose {
 		log.Printf("done computing kernel basis")
 	}
-	return
+	return R.kernelBasis
 }
 
 func (R *DiagonalReducer) CoimageBasis() BinaryMatrix {
@@ -192,7 +228,7 @@ func (R *DiagonalReducer) reduceDenseSubmatrix(index int) {
 	if R.verbose {
 		log.Printf("switching to dense at diagonal %d", index)
 	}
-	Rd := NewDiagonalReducer(R.verbose)
+	subreducer := NewDiagonalReducer(R.verbose)
 	if R.verbose {
 		log.Printf("computing dense submatrix")
 	}
@@ -200,7 +236,8 @@ func (R *DiagonalReducer) reduceDenseSubmatrix(index int) {
 	if R.verbose {
 		log.Printf("reducing dense submatrix=%v", submatrix)
 	}
-	Rd.Reduce(submatrix)
+	subRowOpWriter, subColOpWriter := NewOperationSliceWriter(), NewOperationSliceWriter()
+	subreducer.Reduce(submatrix, subRowOpWriter, subColOpWriter)
 	subrank := firstZeroCol(submatrix)
 	if R.verbose {
 		log.Printf("finished reducing dense submatrix; submatrix=%v subrank=%d", submatrix, subrank)
@@ -212,13 +249,17 @@ func (R *DiagonalReducer) reduceDenseSubmatrix(index int) {
 // 	}
 	R.matrix = NewSparseBinaryMatrixDiagonal(
 		R.matrix.NumRows(), R.matrix.NumColumns(), index + subrank)
-	for _, op := range Rd.colOps {
+	for _, op := range subColOpWriter.Slice() {
 		op = op.Shift(index)
-		R.colOps = append(R.colOps, op)
+		if err := R.colOpWriter.Write(op); err != nil {
+			panic(err)
+		}
 	}
-	for _, op := range Rd.rowOps {
+	for _, op := range subRowOpWriter.Slice() {
 		op = op.Shift(index)
-		R.rowOps = append(R.rowOps, op)
+		if err := R.rowOpWriter.Write(op); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -318,7 +359,9 @@ func (R *DiagonalReducer) setupWorkers() {
 
 func (R *DiagonalReducer) applyColumnOp(op Operation) {
 	R.matrix.ApplyColumnOperation(op)
-	R.colOps = append(R.colOps, op)
+	if err := R.colOpWriter.Write(op); err != nil {
+		panic(err)
+	}
 }
 
 func (R *DiagonalReducer) applyRowOp(op Operation) {
@@ -326,7 +369,9 @@ func (R *DiagonalReducer) applyRowOp(op Operation) {
 // 		log.Printf("xxx applyRowOp: op=%v", op)
 // 	}
 	R.matrix.ApplyRowOperation(op)
-	R.rowOps = append(R.rowOps, op)
+	if err := R.rowOpWriter.Write(op); err != nil {
+		panic(err)
+	}
 // 	if R.verbose {
 // 		log.Printf("xxx applyRowOp done")
 // 	}
@@ -363,22 +408,14 @@ func (R *DiagonalReducer) clearRowParallel(d int) {
 		// is there a guard that ensures that after this "waiting" that
 		// the columns are actually done?
 		colOps := R.workers[w].waitResult()
-		R.colOps = append(R.colOps, colOps...)
-		R.statColumnAdds += len(colOps)
+		for _, op := range colOps {
+			if err := R.colOpWriter.Write(op); err != nil {
+				panic(err)
+			}
+			R.statColumnAdds++
+		}
 	}
 }
-
-// xxx deprecated
-// func (R *DiagonalReducer) writeColOpsFile() {
-// 	defer func() {
-// 		if r := recover(); r != nil {
-// 			log.Printf("caught and resuming from panic: %v", r)
-// 		}
-// 	}()
-// 	log.Printf("writing colOps.gob")
-// 	WriteGobFile("colOps.gob", R.colOps)
-// 	log.Printf("done writing colOps.gob")
-// }
 
 func firstZeroCol(M BinaryMatrix) int {
 	cols := M.NumColumns()
@@ -391,4 +428,86 @@ func firstZeroCol(M BinaryMatrix) int {
 		}
 	}
 	return zeroCol
+}
+
+func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B, Z1 BinaryMatrix) {
+	// here we adapt the recipes from worskets/Makefile to be run
+	dimC0 := d1.NumRows()
+	dimC1 := d1.NumColumns()
+	dimC2 := d2.NumColumns()
+
+	_, _, d1colops, d1rank := smithNormalForm(d1, verbose)
+	dimZ1 := d1.NumColumns() - d1rank
+
+	_, _, d2colops, d2rank := smithNormalForm(d2, verbose)
+	dimB1 := d2rank
+	dimH1 := dimZ1 - dimB1
+	if verbose {
+		log.Printf(
+`
+C_2 ------------> C_1 ------------> C_0
+dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
+                  dim(Z_1)=%-8d
+                  dim(B_1)=%-8d
+                  dim(H_1)=%-8d
+`, dimC2, dimC1, dimC0, dimZ1, dimB1, dimH1)
+	}
+
+
+	Z1 = automorphism(d1colops, dimC1, d1rank, dimC1, verbose)
+
+	d2coimage := automorphism(d2colops, dimC2, 0, d2rank, verbose)
+	B1 := d2.MultiplyRight(d2coimage)
+
+	B1smith, B1rowops, B1colops, _ := smithNormalForm(B1, verbose)
+
+	PT := automorphism(B1rowops, dimC1, 0, dimC1, verbose)
+	P := PT.Transpose()
+
+	U = align(B1smith.Sparse(), P.Dense(), B1colops, Z1.Sparse(), verbose)
+	return U, B1, Z1
+}
+
+func smithNormalForm(M BinaryMatrix, verbose bool) (smith BinaryMatrix, rowops, colops []Operation, rank int) {
+	R := NewDiagonalReducer(verbose)
+	rowOpWriter, colOpWriter := NewOperationSliceWriter(), NewOperationSliceWriter()
+	D := R.Reduce(M.Copy(), rowOpWriter, colOpWriter)
+	isSmith, rank := D.Sparse().IsSmithNormalForm()
+	if !isSmith {
+		panic("smith normal form not reached")
+	}
+	return D, rowOpWriter.Slice(), colOpWriter.Slice(), rank
+}
+
+func automorphism(ops []Operation, dim, cropStart, cropEnd int, verbose bool) BinaryMatrix {
+  	M := NewDenseBinaryMatrixIdentity(dim)
+	reader := NewOperationSliceReader(ops)
+	streamer := NewOpsFileMatrixStreamer(reader, M, verbose)
+ 	streamer.Stream()
+	if cropStart > 0 || cropEnd < dim {
+		if verbose {
+			log.Printf("cropping to columns %d-%d", cropStart, cropEnd)
+		}
+		M = M.Submatrix(0, M.NumRows(), cropStart, cropEnd)
+	}
+	return M
+}
+
+func align(B1smith *Sparse, P *DenseBinaryMatrix, B1colops []Operation, Z1 *Sparse, verbose bool) *DenseBinaryMatrix {
+	aligner := NewAligner(B1smith, P, B1colops, Z1, verbose)
+	return aligner.Align().Dense()
+}
+
+func kernelBasis(M BinaryMatrix, verbose bool) BinaryMatrix {
+	_, _, colops, rank := smithNormalForm(M, verbose)
+	K := automorphism(colops, M.NumColumns(), rank, M.NumColumns(), verbose)
+	return K
+}
+
+// xxx test
+// aka IndependentColumns
+func ImageBasis(M BinaryMatrix, verbose bool) BinaryMatrix {
+	_, _, colops, rank := smithNormalForm(M, verbose)
+	coimageBasis := automorphism(colops, M.NumColumns(), 0, rank, verbose)
+	return M.MultiplyRight(coimageBasis)
 }

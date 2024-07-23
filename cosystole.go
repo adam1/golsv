@@ -4,43 +4,57 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sort"
 )
 
-type CosystoleSearch[T any] struct {
-	C *ZComplex[T]
-	triangles []ZTriangle[T]
-	edgeMask map[ZEdge[T]]struct{}
-	verbose bool
+type CosystoleSearchParams struct {
+	PruneByCohomologyProjection bool // require incremental cocycles to be projections of global non-coboundary cocycles
+	PruneByGroupAction          bool // incrementally prune all but one representative from each orbit of a group action
+	// xxx possibly store a reference to the group/action here in appropriate form
+	InitialSupport              bool // require cocycles to be supported on first triangle
+	Verbose                     bool
 }
 
-func NewCosystoleSearch[T any](C *ZComplex[T], verbose bool) *CosystoleSearch[T] {
+type CosystoleSearch[T any] struct {
+	C *ZComplex[T] // xxx rename to X
+	params CosystoleSearchParams
+	triangles []ZTriangle[T]
+	Z_1 BinaryMatrix
+	Zu1 BinaryMatrix // aka Z^1 aka "Z upper 1"
+	Bu1 BinaryMatrix // aka B^1 aka "B upper 1"
+	edgesMd map[int]struct{}
+	edgePredicateMd func(row int) bool
+	templateF *Sparse
+	template_rdZu1 *Sparse // the r_d projection of Z^1 with an extra blank column
+
+	// xxx deprecated
+// 	Bcd BinaryMatrix // B^d
+// 	Ucd BinaryMatrix // U^d
+}
+
+func NewCosystoleSearch[T any](C *ZComplex[T], Z_1 BinaryMatrix, Zu1 BinaryMatrix, Bu1 BinaryMatrix, params CosystoleSearchParams) *CosystoleSearch[T] {
 	return &CosystoleSearch[T]{
 		C: C,
+		Z_1: Z_1,
+		Zu1: Zu1,
+		Bu1: Bu1,
 		triangles: make([]ZTriangle[T], 0),
-		verbose: verbose,
+		edgesMd: make(map[int]struct{}),
+		params: params,
 	}
 }
 
 func (S *CosystoleSearch[T]) prepare() {
-	// in principle, our cosystole search algorithm could work with
-	// any ordering of the triangles in the complex.  however, for
-	// ease of interaction with the boundary matrices, which refer to
-	// a specific triangle ordering (basis), we currently use the
-	// triangle basis as our ordering.
-	if len(S.triangles) == 0 {
-		S.triangles = S.C.TriangleBasis()
-		// default edge mask - all edge on
-		S.edgeMask = make(map[ZEdge[T]]struct{})
-		for _, e := range S.C.EdgeBasis() {
-			S.edgeMask[e] = struct{}{}
-		}
+	if S.params.Verbose {
+		log.Printf("preparing triangle list")
 	}
+	S.triangles = S.C.TriangleBasis()
 }
 
 // returns the minimum weight of a cochain that is a cocycle but not a
 // coboundary, i.e. the value S^1(C).  if B^1 = Z^1, or if there are
 // no edges, returns zero.
-func (S *CosystoleSearch[T]) Cosystole(Z_1 BinaryMatrix) int {
+func (S *CosystoleSearch[T]) Cosystole() int {
 	// we want to enumerate Z^1 \setminus B^1, i.e. edge sets that
 	// correspond to cocycles that are not coboundaries, i.e. cochains
 	// that vanish on B_1 but not on Z_1.  we will do this by choosing
@@ -87,11 +101,10 @@ func (S *CosystoleSearch[T]) Cosystole(Z_1 BinaryMatrix) int {
 	// this procedure is likely exponential in the number of edges in
 	// the complex, although it depends on how the possibilities
 	// branch.
-
 	cocycles := S.Cocycles()
-	if S.verbose {
+	if S.params.Verbose {
 		log.Printf("cocycles: %v\n", len(cocycles))
-		log.Printf("Z_1: %v\n%s", Z_1, dumpMatrix(Z_1))
+		// log.Printf("Z_1: %v\n%s", S.Z_1, dumpMatrix(S.Z_1))
 	}
 	minWeight := -1
 	for _, c := range cocycles {
@@ -105,8 +118,8 @@ func (S *CosystoleSearch[T]) Cosystole(Z_1 BinaryMatrix) int {
 			// *and* there exists an edge that is not part of any
 			// triangle.
 			d_2 := S.C.D2()
-			for j := 0; j < Z_1.NumRows(); j++ {
-				if Z_1.RowIsZero(j) {
+			for j := 0; j < S.Z_1.NumRows(); j++ {
+				if S.Z_1.RowIsZero(j) {
 					continue
 				}
 				if !d_2.RowIsZero(j) {
@@ -116,54 +129,59 @@ func (S *CosystoleSearch[T]) Cosystole(Z_1 BinaryMatrix) int {
 			}
 			continue
 		}
-
-
-		// determine whether this cocycle is a coboundary,
-		// i.e. whether it vanishes on Z_1.  do this by the matrix
-		// multiplication
-		//
-		//   c^T * Z_1
-		//
-		// where c is the cocycle, and Z_1 is the matrix of basis
-		// vectors of Z_1. if the result is not zero, then c is a
-		// cosystolic candidate.  record the minimum weight of such
-		// candidates.
+		// if c is not a coboundary, then it is a cosystolic
+		// candidate.  record the minimum weight of such candidates.
 		cMatrix := c.Matrix()
-		cT := cMatrix.Transpose()
-		result := cT.MultiplyRight(Z_1)
-// 		log.Printf("cT: %v:\n%s\nr: %v:\n%s\n",
-// 			cT, dumpMatrix(cT), result, dumpMatrix(result))
-		if !result.IsZero() {
+		if !isCoboundary(cMatrix, S.Z_1) {
 			weight := cMatrix.ColumnWeight(0)
 			if minWeight < 0 || weight < minWeight {
 				minWeight = weight
-				if S.verbose {
-					log.Printf("new min weight: %d\n", minWeight)
+				if S.params.Verbose {
+					log.Printf("new min weight of noncoboundary cocycle: %d\n", minWeight)
+					// log.Printf("xxx c: %s", c.SupportString())
 				}
-			}
-		}
-		// sanity check: verify that c vanishes on B_1
-		sanityCheck := false
-		if sanityCheck {
-			W := cT.MultiplyRight(S.C.D2())
-			if !W.IsZero() {
-				log.Printf("W: %v:\n%s\n", W, dumpMatrix(W))
-				panic("cocycle does not vanish on B_1")
 			}
 		}
 	}
 	if minWeight < 0 {
 		minWeight = 0
 	}
-	if S.verbose {
+	if S.params.Verbose {
 		log.Printf("cosystole: %d\n", minWeight)
 	}
 	return minWeight
 }
 
+func isCoboundary(c, Z1 BinaryMatrix) bool {
+	// determine whether this cochain is a coboundary, i.e. whether it
+	// vanishes on Z_1.  do this by the matrix multiplication
+	//
+	//   c^T * Z_1
+	//
+	// where c is the cocycle, and Z_1 is the matrix of basis vectors
+	// of Z_1.
+	cT := c.Transpose()
+	dense := cT.Dense()
+	result := dense.MultiplyRight(Z1)
+// 	log.Printf("xxx result: %s w(result): %v isZero=%v", result,
+// 		result.Transpose().ColumnWeight(0), result.IsZero())
+	return result.IsZero()
+}
+
+func isCoboundary2(c *Sparse, Z_1T *DenseBinaryMatrix) bool {
+	return Z_1T.MultiplyRight(c).IsZero()
+}
+
+func isCocycle(c, B1 BinaryMatrix) bool {
+	cT := c.Transpose()
+	dense := cT.Dense()
+	result := dense.MultiplyRight(B1)
+	return result.IsZero()
+}
+
 func (S *CosystoleSearch[T]) Cocycles() (cocycles []BinaryVector) {
 	S.prepare()
-	if S.verbose {
+	if S.params.Verbose {
 		log.Printf("begin cocycle enumeration; triangles: %v", len(S.triangles))
 	}
 	// special case: no triangles.  in this case, every cochain
@@ -175,7 +193,7 @@ func (S *CosystoleSearch[T]) Cocycles() (cocycles []BinaryVector) {
 	leaves := []*StateNode{root}
 	
 	for level, t := range S.triangles {
-		if S.verbose {
+		if S.params.Verbose {
 			log.Printf("begin processing level %d: t=%v leaves=%d\n", level, t, len(leaves))
 			// log.Printf(" t edges: %v\n", t.Edges())
 		}
@@ -186,8 +204,7 @@ func (S *CosystoleSearch[T]) Cocycles() (cocycles []BinaryVector) {
 		for _, leaf := range leaves {
 			var newStates [][3]bool
 			edgeStates := edgeStateForTriangle(S.triangles, leaf, level)
-			edgeStates = applyEdgeMask(S.triangles[level].Edges(), edgeStates, S.edgeMask)
-			// 			if S.verbose {
+			// 			if S.params.Verbose {
 			// 				log.Printf("  leaf %d.%d [%v]: edgeStates: %v", level, j, leaf, edgeStates)
 			// 			}
 			_, _, undecided := numPerState(edgeStates)
@@ -227,7 +244,7 @@ func (S *CosystoleSearch[T]) Cocycles() (cocycles []BinaryVector) {
 					}
 				}
 				q := leaf.addChild(n)
-// 				if S.verbose {
+// 				if S.params.Verbose {
 // 					log.Printf("    new leaf: [%v]\n", q)
 // 				}
 				newLeaves = append(newLeaves, q)
@@ -238,7 +255,9 @@ func (S *CosystoleSearch[T]) Cocycles() (cocycles []BinaryVector) {
 					// the triangles handled up to this level.  do
 					// this by truncating d2.
 					truncatedD2 := S.C.D2().Submatrix(0, S.C.D2().NumRows(), 0, level+1)
-					cT := S.leafToVector(q, level).Matrix().Transpose()
+					c := NewBinaryVector(len(S.C.EdgeBasis()))
+					S.leafToVector(q, level, c)
+					cT := c.Matrix().Transpose()
 					W := cT.MultiplyRight(truncatedD2)
 					if !W.IsZero() {
 						log.Printf("cT: %v:\n%s", cT, dumpMatrix(cT))
@@ -250,15 +269,210 @@ func (S *CosystoleSearch[T]) Cocycles() (cocycles []BinaryVector) {
 				}
 			}
 		}
+		if S.params.PruneByCohomologyProjection {
+			if S.params.Verbose {
+				log.Printf("pruning by cohomology projection")
+			}
+			S.incrementMd(level)
+			// xxx disabled since it doesn't prune anything
+			if false {
+				leavesSansPruned := make([]*StateNode, 0)
+				for _, leaf := range newLeaves {
+					if S.leafIsProjectionOfNonzeroCohomologyClass(leaf, level) {
+						// retain
+						leavesSansPruned = append(leavesSansPruned, leaf)
+					} else {
+						// prune
+					}
+				}
+				if S.params.Verbose {
+					log.Printf("pruned %d leaves", len(newLeaves) - len(leavesSansPruned))
+				}
+				newLeaves = leavesSansPruned
+			}
+		}
+		// xxx test; on small Cayley graph
+		if level == 0 && S.params.InitialSupport {
+			log.Printf("Pruning to require support on first triangle")
+			leavesWithInitialSupport := make([]*StateNode, 0)
+			for _, leaf := range newLeaves {
+				c := NewBinaryVector(len(S.C.EdgeBasis()))
+				S.leafToVector(leaf, level, c)
+				if c.Weight() > 0 {
+					leavesWithInitialSupport = append(leavesWithInitialSupport, leaf)
+				}
+			}
+			if S.params.Verbose {
+				log.Printf("pruned %d leaves", len(newLeaves) - len(leavesWithInitialSupport))
+			}
+			newLeaves = leavesWithInitialSupport
+		}
+		if (S.params.PruneByGroupAction) {
+			newLeaves = S.pruneByGroupAction(newLeaves, level)
+		}
+		if len(newLeaves) == 0 {
+			panic("All leaves were pruned!")
+		}
 		leaves = newLeaves
-	}
-	if S.verbose {
-		log.Printf("leaves: %d\n", len(leaves))
+		weightDist, _, _ := S.weightDistribution(leaves, level)
+		if S.params.Verbose {
+			log.Printf("level %d weight distribution: %v", level, weightDist)
+		}
+		S.reviewWeightDistribution(weightDist, level)
 	}
 	for _, p := range leaves {
-		cocycles = append(cocycles, S.leafToVector(p, len(S.triangles)-1))
+		c := NewBinaryVector(len(S.C.EdgeBasis()))
+		S.leafToVector(p, len(S.triangles)-1, c)
+		cocycles = append(cocycles, c)
 	}
 	return
+}
+
+func (S *CosystoleSearch[T]) pruneByGroupAction(leaves []*StateNode, level int) []*StateNode {
+	newLeaves := make([]*StateNode, 0)
+	// idea: iterate over the leaves, building a list of archetypes,
+	// meaning a representative from each triangle orbit with specific
+	// edge colorings. retain only the archetypes.
+
+	// xxx tbd
+
+
+	return newLeaves
+}
+
+func (S *CosystoleSearch[T]) reviewWeightDistribution(dist []weightSample, level int) {
+	// xxx idea: forward-scan the lowest weight cochains in hopes of pruning them
+}
+
+type weightSample struct {
+	weight int
+	count int
+}
+
+func (S *CosystoleSearch[T]) weightDistribution(leaves []*StateNode, level int) (dist []weightSample, min int, max int) {
+	weights := make(map[int]int)
+	min = math.MaxInt64
+	max = 0
+	for _, p := range leaves {
+		c := NewBinaryVector(len(S.C.EdgeBasis()))
+		S.leafToVector(p, level, c)
+		w := c.Weight()
+		weights[w]++
+		if w < min {
+			min = w
+		}
+		if w > max {
+			max = w
+		}
+	}
+	for w, count := range weights {
+		dist = append(dist, weightSample{w, count})
+	}
+	sort.Slice(dist, func(i, j int) bool {
+		return dist[i].weight < dist[j].weight
+	})
+	return
+}
+
+func (S *CosystoleSearch[T]) leafIsProjectionOfNonzeroCohomologyClass(leaf *StateNode, level int) bool {
+	c := NewBinaryVector(S.Z_1.NumRows())
+	S.leafToVector(leaf, level, c)
+
+	// let F = r^{-1}(\overline{c}}) where r is the restriction map
+	// from C^1(X) to C^1(M_d), \bra{c} is the cocycle of M_d
+	// corresponding to the leaf, and \overline{c} is the subspace
+	// generated by \bra{c}.
+
+	// first, do a quick check: whether \overline{c} \cap r(Z^1(X)) is
+	// zero.  
+// 	if S.params.Verbose {
+// 		log.Printf("Checking E := \\overline{c} \\cap r(Z^1(X))")
+// 	}
+	cd := S.projectCochainToMd(c)
+// 	if S.params.Verbose {
+// 		log.Printf("xxx leaf: %v cd: %s", leaf, cd)
+// 	}
+
+	E := S.template_rdZu1.Copy().Sparse()
+	m := E.NumColumns()
+	E.SetColumn(m - 1, cd)
+	// log.Printf("xxx E: %s\n%s", E, dumpMatrix(E))
+	verbose := false
+	_, _, _, rank := smithNormalForm(E, verbose)
+	// E is full rank if and only if dim ker E = 0
+	// if and only if \overline{c} \cap r(Z^1(X)) = 0.
+// 	log.Printf("xxx rank=%d m=%d", rank, m)
+	if rank == m {
+		return false
+	}
+
+	// xxx --- below is temporarily disabled
+	return true
+
+	// second, compute basis for F = r^{-1}(\overline{c}}) where r
+	// is the restriction map from C^1(X) to C^1(M_d), \bra{c} is
+	// the cocycle of M_d corresponding to the leaf, and \overline{c}
+	// is the subspace generated by \bra{c}.
+
+	// the matrix F is identical for all leaves at this level, except
+	// in the final column.  hence for performance, once per level we
+	// prepare a template for F, and then overwrite the final column
+	// here once per leaf.
+	if S.params.Verbose {
+		log.Printf("Preparing F")
+	}
+	k := S.templateF.NumColumns()
+	S.templateF.SetColumn(k - 1, c)
+	if S.params.Verbose {
+		log.Printf("F: %v", S.templateF)
+	}
+	// compute the dimension of intersection of F with Z^1(X) by
+	// forming the matrix G = (F | Z^1) and computing the dimension of its
+	// kernel.
+	if S.params.Verbose {
+		log.Printf("Preparing G")
+	}
+	G := S.templateF.Copy().Sparse()
+	G.AppendColumns(S.Zu1)
+	if S.params.Verbose {
+		log.Printf("Computing kernel of G: %v", G)
+	}
+	// xxx optimization below: we don't actually need to compute the
+	// kernelBasis, only its length, which can be determined from
+	// smithNormalForm.  this saves computing an automorphism which is
+	// very costly.
+	
+	K := kernelBasis(G, S.params.Verbose)
+	dimK := K.NumColumns()
+	if S.params.Verbose {
+		log.Printf("dimK: %d", dimK)
+	}
+	if dimK == 0 {
+		return false
+	}
+	// also compute the dimension of the intersection of F with
+	// B^1(X).
+	if S.params.Verbose {
+		log.Printf("Preparing J")
+	}
+	J := S.templateF.Copy().Sparse()
+	J.AppendColumns(S.Bu1)
+	if S.params.Verbose {
+		log.Printf("Computing kernel of J: %v", J)
+	}
+	L := kernelBasis(J, S.params.Verbose)
+	dimL := L.NumColumns()
+	if S.params.Verbose {
+		log.Printf("dimL: %d", dimL)
+	}
+	if dimL == dimK {
+		return false
+	}
+	return true
+}
+
+func (S *CosystoleSearch[T]) projectCochainToMd(c BinaryVector) BinaryVector {
+	return c.Project(len(S.edgesMd), S.edgePredicateMd)
 }
 
 func (S *CosystoleSearch[T]) dumpBranch(node *StateNode, level int) {
@@ -270,24 +484,33 @@ func (S *CosystoleSearch[T]) dumpBranch(node *StateNode, level int) {
 	}
 }
 
-func (S *CosystoleSearch[T]) leafToVector(leaf *StateNode, level int) BinaryVector {
-// 	if S.verbose {
-// 		log.Printf("--> leafToVector: %v level=%d", leaf, level)
-// 	}
-	v := NewBinaryVector(len(S.C.edgeBasis))
+func (S *CosystoleSearch[T]) leafToVector(leaf *StateNode, level int, v BinaryVector) {
+	debug := false
+	if debug && S.params.Verbose {
+		log.Printf("--> leafToVector: %v level=%d", leaf, level)
+	}
 	// walk branch of the tree from leaf to root
 	p := leaf
 	for level >= 0 {
 		t := S.triangles[level]
-// 		if S.verbose {
-// 			log.Printf("  level=%d p=%v t=%v", level, p, t)
-// 		}
+		if debug && S.params.Verbose {
+			log.Printf("  level=%d p=%v t=%v", level, p, t)
+		}
 		edges := t.Edges()
 		for i, e := range edges {
-			// log.Printf("    edge %v: %v", i, e)
+			if debug && S.params.Verbose {
+				log.Printf("    edge %v: %v", i, e)
+			}
 			if p.edgeStates[i] {
-				if j, ok := S.C.EdgeIndex[e]; ok {
-					// log.Printf("      edge is on; j=%d", j)
+				if j, ok := S.C.edgeIndex[e]; ok {
+					if debug && S.params.Verbose {
+						log.Printf("      edge is on; j=%d", j)
+					}
+					// xxx issue: the edge basis may have edges from
+					// different triangles interleaved, e.g. the first
+					// three edges in the edge basis do not
+					// necessarily correspond to the first three edges
+					// of the first triangle.
 					v[j] = 1
 				} else {
 					panic(fmt.Sprintf("edge %v not in edge index", e))
@@ -297,10 +520,9 @@ func (S *CosystoleSearch[T]) leafToVector(leaf *StateNode, level int) BinaryVect
 		p = p.parent
 		level--
 	}
-// 	if S.verbose {
-// 		log.Printf("<-- leafToVector: leaf=%v vector=%v\n", leaf, v)
-// 	}
-	return v
+	if debug && S.params.Verbose {
+		log.Printf("<-- leafToVector: leaf=%v vector=%v\n", leaf, v)
+	}
 }
 
 func edgeStateForTriangle[T any](triangles []ZTriangle[T], leaf *StateNode, level int) (states [3]kEdgeState) {
@@ -355,77 +577,83 @@ func edgeStateForTriangle[T any](triangles []ZTriangle[T], leaf *StateNode, leve
 	return
 }
 
-func applyEdgeMask[T any](edges [3]ZEdge[T], states [3]kEdgeState, edgeMask map[ZEdge[T]]struct{}) [3]kEdgeState {
-	// apply edgeMask here to potentially force some edges to be off
-	for i, e := range edges {
-		_, ok := edgeMask[e]
-		if !ok {
-			states[i] = kEdgeOff
+func (S *CosystoleSearch[T]) incrementMd(level int) {
+	t := S.triangles[level]
+	for _, e := range t.Edges() {
+		if k, ok := S.C.edgeIndex[e]; ok {
+			S.edgesMd[k] = struct{}{}
+		} else {
+			panic(fmt.Sprintf("edge %v not in edge index", e))
 		}
 	}
-	return states
+	S.edgePredicateMd = func(i int) bool {
+		_, ok := S.edgesMd[i]
+		return ok
+	}
+	nd := len(S.edgesMd)
+	k := S.Z_1.NumRows() - nd
+	if S.params.Verbose {
+		log.Printf("xxx incrementMd: level=%d edgesMd=%d", level, nd)
+	}
+
+	// update templateF templateF has one row for each edge in the
+	// complex X (the columns are 1-cochains of X).  let k be the
+	// number of edges in the complex X that are not in Md.  the first
+	// k columns of templateF are the standard basis vectors
+	// corresponding to the edges in X that are not in Md.  and there
+	// is one additional column, that is blank (it is filled-in later
+	S.templateF = NewSparseBinaryMatrix(S.Z_1.NumRows(), k + 1)
+	j := 0
+	for i := 0; i < S.templateF.NumRows() - 1; i++ {
+		if _, ok := S.edgesMd[i]; ok {
+			continue
+		}
+		S.templateF.Set(i, j, 1)
+		j++
+	}
+	// log.Printf("xxx incrementMd: templateF=%v", S.templateF)
+	verbose := false
+	S.template_rdZu1 = ImageBasis(S.Zu1.Project(S.edgePredicateMd).Sparse(), verbose).Sparse()
+	S.template_rdZu1.AppendColumn(NewSparseBinaryMatrix(S.template_rdZu1.NumRows(), 1))
 }
 
-// xxx not tested yet; experimental
-func (S *CosystoleSearch[T]) Prefilter(U BinaryMatrix) {
-	S.prepare()
-	log.Printf("Prefilter: %d triangles\n", len(S.triangles))
-	// prepare list of triangle edge indices (in the edge basis)
-	var triangleEdgeIndices [][3]int = make([][3]int, len(S.triangles))
-	for i, t := range S.triangles {
-		for j, e := range t.Edges() {
-			if k, ok := S.C.EdgeIndex[e]; ok {
-				triangleEdgeIndices[i][j] = k
-			} else {
-				panic(fmt.Sprintf("edge %v not in edge index", e))
-			}
-		}
-	}
-	// each column of U represents a cochain (a set of edges).
-	minTris := math.MaxInt
-	minTrisIndex := -1
-	for j := 0; j < U.NumColumns(); j++ {
-		log.Printf("column %d weight: %d", j, U.ColumnWeight(j))
-		// determine the number of triangles that contain an edge on
-		// which this column cochain is supported (i.e., has a 1).
-		n := 0
-		for _, inds := range triangleEdgeIndices {
-			for _, k := range inds {
-				if U.Get(k, j) == 1 {
-					n++
-					break
-				}
-			}
-		}
-		// keep track of the column with the fewest (distinct) triangles.
-		log.Printf("column %d: %d triangles", j, n)
-		if n < minTris {
-			minTris = n
-			minTrisIndex = j
-		}
-
-		// also find the max support index in this column
-		m := -1
-		for i := 0; i < U.NumRows(); i++ {
-			if U.Get(i, j) == 1 {
-				m = i
-			}
-		}
-		log.Printf("column %d max support index: %d", j, m)
-	}
-	log.Printf("minTris=%d minTrisIndex=%d\n", minTris, minTrisIndex)
-
-	S.edgeMask = make(map[ZEdge[T]]struct{})
-	edgeBasis := S.C.EdgeBasis()
-	m := 0
-	for i := 0; i < U.NumRows(); i++ {
-		if U.Get(i, minTrisIndex) == 1 {
-			S.edgeMask[edgeBasis[i]] = struct{}{}
-			m++
-		}
-	}
-	log.Printf("Edges after filtering: %d", m)
-}
+// xxx deprecated
+// func (S *CosystoleSearch[T]) incrementUcd(level int) {
+// 	t := S.triangles[level]
+// 	for _, e := range t.Edges() {
+// 		if k, ok := S.C.edgeIndex[e]; ok {
+// 			S.edgesUd[k] = struct{}{}
+// 		} else {
+// 			panic(fmt.Sprintf("edge %v not in edge index", e))
+// 		}
+// 	}
+// 	S.edgePredicateMd = func(i int) bool {
+// 		_, ok := S.edgesUd[i]
+// 		return ok
+// 	}
+// 	{
+// 		var s string
+// 		for i := 0; i < S.Uu1.NumRows(); i++ {
+// 			if S.edgePredicateMd(i) {
+// 				s += fmt.Sprintf("* %d\n", i)
+// 			} else {
+// 				s += fmt.Sprintf("  %d\n", i)
+// 			}
+// 		}
+// 		// log.Printf("xxx projected rows:\n%s", s)
+// 	}
+// 	// xxx tbd
+// // 	S.Ucd = S.Uu1.Project(S.edgePredicateMd).IndependentColumns()
+// // 	S.Bcd = S.Bu1.Project(S.edgePredicateMd).IndependentColumns()
+// 	S.Ucd = S.Uu1.Project(S.edgePredicateMd)
+// 	S.Bcd = S.Bu1.Project(S.edgePredicateMd)
+// // 	log.Printf("xxx Ucd: %v\n%s", S.Ucd, dumpMatrix(S.Ucd))
+// // 	log.Printf("xxx Bcd: %v\n%s", S.Bcd, dumpMatrix(S.Bcd))
+// 	if S.params.Verbose {
+// 		log.Printf("xxx Ucd: %v", S.Ucd)
+// 		log.Printf("xxx Bcd: %v", S.Bcd)
+// 	}
+// }
 
 func numPerState(states [3]kEdgeState) (off, on, undecided int) {
 	for _, c := range states {
