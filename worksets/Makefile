@@ -342,3 +342,7 @@ simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edg
 	simplicial-cosystole -cohomology-orbits -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B1 B1.txt -U^1 U^1.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
 		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)
+
+sample-coboundary-decoder: d1.txt d2.txt
+	coboundary-decoder -d1 d1.txt -d2 d2.txt -samples-per-weight 1 -min-error-weight 100 -verbose 2>&1 | tee sample-coboundary-decoder.$(log)
+

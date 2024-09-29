@@ -2,6 +2,7 @@ package golsv
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -446,4 +447,71 @@ func TestImageBasis(t *testing.T) {
 			t.Errorf("got %v:\n%s\nwant %v:\n%s", got, dumpMatrix(got), test.want, dumpMatrix(test.want))
 		}
 	}
+}
+
+func TestShor9qubit(t *testing.T) {
+	d_1 := NewDenseBinaryMatrixFromString(
+		`1 1 0 0 0 0 0 0 0
+		 0 1 1 0 0 0 0 0 0
+		 0 0 0 1 1 0 0 0 0
+		 0 0 0 0 1 1 0 0 0
+		 0 0 0 0 0 0 1 1 0
+		 0 0 0 0 0 0 0 1 1`)
+	d_2 := NewDenseBinaryMatrixFromString(
+		`1 0
+		 1 0
+		 1 0
+	 	 1 1
+		 1 1
+	 	 1 1
+  		 0 1
+		 0 1
+		 0 1`)
+
+	P := d_1.MultiplyRight(d_2)
+	if !P.IsZero() {
+		t.Errorf("d_1 * d_2 != 0")
+	}
+	verbose := false
+	U_1, B_1, Z_1 := UBDecomposition(d_1, d_2, verbose)
+	dimH_1 := U_1.NumColumns()
+	if dimH_1 != 1 {
+		t.Errorf("dim(H_1) = %d, want 1", dimH_1)
+	}
+	if verbose {
+		log.Printf("Z_1: %s\n%s", Z_1, DumpMatrix(Z_1))
+		log.Printf("B_1: %s\n%s", B_1, DumpMatrix(B_1))
+	}
+	S_1 := SystoleExhaustiveSearch(U_1, B_1, verbose)
+	if S_1 != 3 {
+		t.Errorf("S_1 = %d, want 3", S_1)
+	}
+	Su1 := ComputeFirstSystole(d_1, d_2, verbose)
+	if Su1 != 3 {
+		t.Errorf("Su1 = %d, want 3", Su1)
+	}
+
+// 	// xxx experimental; considering the effect of an automorphism
+// 	f := NewDenseBinaryMatrixFromString(
+// 		`1 0 0 0 0 0 0 0 0
+// 		 1 1 0 0 0 0 0 0 0
+// 		 0 0 1 0 0 0 0 0 0
+// 		 0 0 0 1 0 0 0 0 0
+// 		 0 0 0 0 1 0 0 0 0
+// 		 0 0 0 0 0 1 0 0 0
+// 		 0 0 0 0 0 0 1 0 0
+// 		 0 0 0 0 0 0 0 1 0
+// 		 0 0 0 0 0 0 0 0 1`)
+// 	fZ_1 := f.MultiplyRight(Z_1)
+// 	log.Printf("fZ_1: %s\n%s", fZ_1, DumpMatrix(fZ_1))
+
+// 	fB_1 := f.MultiplyRight(B_1)
+// 	log.Printf("fB_1: %s\n%s", fB_1, DumpMatrix(fB_1))
+
+// 	d_1Uy := f.MultiplyRight(d_1).MultiplyRight(f) // note: f = f^-1
+// 	d_2Uy := f.MultiplyRight(d_2).MultiplyRight(f)
+
+// 	log.Printf("d_1Uy: %s\n%s", d_1Uy, DumpMatrix(d_1Uy))
+// 	log.Printf("d_2Uy: %s\n%s", d_2Uy, DumpMatrix(d_2Uy))
+	
 }

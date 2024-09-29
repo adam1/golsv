@@ -119,6 +119,38 @@ func TestZTriangleSetEqual(t *testing.T) {
 	}
 }
 
+func TestZComplexEdgeToTriangleIncidenceMap(t *testing.T) {
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		Expected map[int][]int
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			map[int][]int{
+				0: {0},
+				1: {0},
+				2: {0},
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}}),
+			map[int][]int{
+				0: {0, 1},
+				1: {0},
+				2: {1},
+				3: {0},
+				4: {1},
+			},
+		},
+	}
+	for n, test := range tests {
+		got := test.C.EdgeToTriangleIncidenceMap()
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
 func TestZComplexHasNeighbor(t *testing.T) {
 	tests := []struct {
 		C *ZComplex[ZVertexInt]
@@ -456,3 +488,24 @@ func TestZComplexSortBasesByDistance(t *testing.T) {
 	}
 }
 
+func TestZComplexVertexToEdgeIncidenceMap(t *testing.T) {
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		Expected map[int][]int
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			map[int][]int{
+				0: {0, 1},
+				1: {0, 2},
+				2: {1, 2},
+			},
+		},
+	}
+	for n, test := range tests {
+		got := test.C.VertexToEdgeIncidenceMap()
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}

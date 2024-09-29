@@ -238,6 +238,24 @@ func (C *ZComplex[T]) EdgeIndex() map[ZEdge[T]]int {
 	return C.edgeIndex
 }
 
+// maps edge index to list of triangle indices
+func (C *ZComplex[T]) EdgeToTriangleIncidenceMap() map[int][]int {
+	d := C.D2()
+	m := make(map[int][]int)
+	for j := 0; j < d.NumColumns(); j++ {
+		if d.ColumnWeight(j) != 3 {
+			panic("expected 3 ones in column")
+		}
+		a := d.ScanDown(0, j)
+		b := d.ScanDown(a+1, j)
+		c := d.ScanDown(b+1, j)
+		m[a] = append(m[a], j)
+		m[b] = append(m[b], j)
+		m[c] = append(m[c], j)
+	}
+	return m
+}
+
 func (C *ZComplex[T]) HasNeighbor(v, u ZVertex[T]) bool {
 	for _, x := range C.Neighbors(v) {
 		if x.Equal(u.(T)) {
@@ -252,6 +270,21 @@ func (C *ZComplex[T]) Neighbors(v ZVertex[T]) (nabes []ZVertex[T]) {
 		nabes = append(nabes, e.OtherVertex(v))
 	}
 	return
+}
+
+// xxx test
+func (C *ZComplex[T]) NumEdges() int {
+	return len(C.edgeBasis)
+}
+
+// xxx test
+func (C *ZComplex[T]) NumTriangles() int {
+	return len(C.triangleBasis)
+}
+
+// xxx test
+func (C *ZComplex[T]) NumVertices() int {
+	return len(C.vertexBasis)
 }
 
 func (C *ZComplex[T]) TrianglesContainingVertex(v ZVertex[T]) []ZTriangle[T] {
@@ -407,6 +440,34 @@ func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 
 func (C *ZComplex[T]) VertexBasis() []ZVertex[T] {
 	return C.vertexBasis
+}
+
+// xxx test
+func (C *ZComplex[T]) VertexToSparse(v ZVertex[T]) *Sparse {
+	row, ok := C.vertexIndex[v]
+	if !ok {
+		panic(fmt.Sprintf("vertex %v not in vertex index", v))
+	}
+	M := NewSparseBinaryMatrix(len(C.vertexBasis), 1)
+	M.Set(row, 0, 1)
+	return M
+}
+
+// the resulting map has keys that are vertex indices and values that
+// are lists of edge indices.
+func (C *ZComplex[T]) VertexToEdgeIncidenceMap() map[int][]int {
+	d := C.D1()
+	m := make(map[int][]int)
+	for j := 0; j < d.NumColumns(); j++ {
+		if d.ColumnWeight(j) != 2 {
+			panic("expected 2 ones in column")
+		}
+		a := d.ScanDown(0, j)
+		b := d.ScanDown(a+1, j)
+		m[a] = append(m[a], j)
+		m[b] = append(m[b], j)
+	}
+	return m
 }
 
 func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T])) {
