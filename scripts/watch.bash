@@ -8,4 +8,4 @@ if [ $# -gt 0 ]; then
 fi
 
 fswatch -l 0.2 -e '\.git' -e '#' -e '~' -e '/bin/' -e worksets -e log . | xargs -n1 sh -c \
-    "echo  && echo =======\> EXEC; $cmd && echo && date && echo =======\> RESULT \$?"
+    "echo  && echo =======\> EXEC; date && $cmd && echo && date && echo =======\> RESULT \$?"

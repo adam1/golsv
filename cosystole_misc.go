@@ -71,10 +71,10 @@ func ComputeCohomologyOrbits(complex *ZComplex[ElementCalG], Uu1 BinaryMatrix, Z
 
 // xxx test
 func groupActionOnCochainSpace (complex *ZComplex[ElementCalG], g ElementCalG, modulus F2Polynomial, u BinaryVector) BinaryVector {
-	v := NewBinaryVector(len(u))
+	v := NewBinaryVector(u.Length())
 	edgeBasis := complex.EdgeBasis()
-	for i := 0; i < len(u); i++ {
-		if u[i] == 0 {
+	for i := 0; i < u.Length(); i++ {
+		if u.Get(i) == 0 {
 			continue
 		}
 		e := edgeBasis[i]
@@ -84,7 +84,7 @@ func groupActionOnCochainSpace (complex *ZComplex[ElementCalG], g ElementCalG, m
 			panic(fmt.Sprintf("edge %v not in edge index", f))
 		}
 		// log.Printf("edge %d -> %d", i, k)
-		v[k] = 1
+		v.Set(k, 1)
 	}
 	return v
 }

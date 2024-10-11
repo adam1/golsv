@@ -57,7 +57,7 @@ func NewDenseBinaryMatrixFromRowInts(ints [][]uint8) *DenseBinaryMatrix {
 
 func NewDenseBinaryMatrixFromRowVectors(rowData []BinaryVector) *DenseBinaryMatrix {
 	rows := len(rowData)
-	cols := len(rowData[0])
+	cols := rowData[0].Length()
 	M := NewDenseBinaryMatrix(rows, cols)
 	genericSetFromRowVectors(M, rowData)
 	return M

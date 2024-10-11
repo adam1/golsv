@@ -2,122 +2,153 @@ package golsv
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
+	"github.com/lukechampine/fastxor"
 )
 
-// xxx densify?
-type BinaryVector []uint8
+type BinaryVector struct {
+	length int
+	data []byte
+}
 
 func NewBinaryVector(n int) BinaryVector {
-	return make([]uint8, n)
+	return BinaryVector{
+		n, 
+		make([]byte, words(n)),
+	}
+}
+
+func words(n int) int {
+	return (n + 7) / 8
 }
 
 func NewBinaryVectorFromInts(ints []uint8) BinaryVector {
-	cols := len(ints)
-	V := NewBinaryVector(cols)
-	for j := 0; j < cols; j++ {
-		V[j] = ints[j]
+	rows := len(ints)
+	v := NewBinaryVector(rows)
+	for i, b := range ints {
+		if b != 0 {
+			v.Set(i, 1)
+		}
 	}
-	return V
+	return v
+}
+
+func NewBinaryVectorFromString(s string) BinaryVector {
+	v := NewBinaryVector(len(s))
+	for i, c := range s {
+		if c == '1' {
+			v.Set(i, 1)
+		}
+	}
+	return v
 }
 
 func ZeroVector(n int) BinaryVector {
-	return make([]uint8, n)
+	return NewBinaryVector(n)
 }
 
 // xxx test
-func (V BinaryVector) Add(U BinaryVector) BinaryVector {
-	W := NewBinaryVector(len(V))
-	for i := 0; i < len(V); i++ {
-		W[i] = V[i] ^ U[i]
-	}
-	return W
+func (v BinaryVector) Add(u BinaryVector) BinaryVector {
+	w := NewBinaryVector(v.Length())
+	fastxor.Bytes(w.data, v.data, u.data)
+	return w
 }
 
 // xxx test
-func (V BinaryVector) Equal(U BinaryVector) bool {
-	if len(V) != len(U) {
-		return false
-	}
-	for i := 0; i < len(V); i++ {
-		if V[i] != U[i] {
-			return false
-		}
-	}
-	return true
+func (v BinaryVector) AddInPlace(u BinaryVector) {
+	fastxor.Bytes(v.data, v.data, u.data)
+}
+
+// xxx test
+func (v BinaryVector) Equal(u BinaryVector) bool {
+	return v.length == u.length && bytes.Equal(v.data, u.data)
+}
+
+// xxx test
+func (v BinaryVector) Get(i int) uint8 {
+	return (v.data[i/8] >> uint(i%8)) & 1
 }
 
 // xxx experimental
-func (V BinaryVector) IntegerDotProduct(U BinaryVector) int {
+func (v BinaryVector) IntegerDotProduct(u BinaryVector) int {
 	d := 0
-	for i := 0; i < len(V); i++ {
-		d += int(V[i]) * int(U[i])
+	for i := 0; i < v.Length(); i++ {
+		d += int(v.Get(i)) * int(u.Get(i))
 	}
 	return d
 }
 
 // xxx test
-func (V BinaryVector) Length() int {
-	return len(V)
+func (v BinaryVector) Length() int {
+	return v.length
 }
 
-// xxx rename to DenseBinaryMatrix
-func (V BinaryVector) Matrix() *DenseBinaryMatrix {
-	rows := len(V)
-	M := NewDenseBinaryMatrix(rows, 1)
-	for i := 0; i < rows; i++ {
-		M.Set(i, 0, V[i])
-	}
+// xxx rename to DenseBinaryMatrix?
+func (v BinaryVector) Matrix() *DenseBinaryMatrix {
+	M := NewDenseBinaryMatrix(v.Length(), 1)
+	copy(M.Data, v.data)
 	return M
 }
 
-func (V BinaryVector) IsZero() bool {
-	for _, elem := range V {
-		if elem != 0 {
+func (v BinaryVector) IsZero() bool {
+	for _, d := range v.data {
+		if d != 0 {
 			return false
 		}
 	}
 	return true
 }
 
-func (V BinaryVector) Project(n int, predicate func (i int) bool) BinaryVector {
-	pV := NewBinaryVector(n)
+func (v BinaryVector) Project(n int, predicate func (i int) bool) BinaryVector {
+	pv := NewBinaryVector(n)
 	j := 0
-	for i, b := range V {
+	for i := 0; i < v.Length(); i++ {
 		if predicate(i) {
-			pV[j] = b
+			pv.Set(j, v.Get(i))
 			j++
 		}
 	}
-	return pV
+	return pv
 }
 
 // xxx test
-func (V BinaryVector) RandomizeWithWeight(weight int) {
-	n := len(V)
+func (v BinaryVector) RandomizeWithWeight(weight int) {
+	n := v.Length()
 	for i := 0; i < n; i++ {
-		V[i] = 0
+		v.Set(i, 0)
 	}
 	for i := 0; i < weight; i++ {
-		V[rand.Intn(n)] = 1
+		v.Set(mathrand.Intn(n), 1)
 	}
 }
 
 // xxx test
-func (V BinaryVector) SparseBinaryMatrix() *Sparse {
-	rows := len(V)
+func (v BinaryVector) Set(i int, b uint8) {
+	if b == 0 {
+		v.data[i/8] &= ^(1 << uint(i%8))
+	} else {
+		v.data[i/8] |= 1 << uint(i%8)
+	}
+}
+
+// xxx test
+func (v BinaryVector) SparseBinaryMatrix() *Sparse {
+	rows := v.Length()
 	M := NewSparseBinaryMatrix(rows, 1)
 	for i := 0; i < rows; i++ {
-		M.Set(i, 0, V[i])
+		if v.Get(i) == 1 {
+			M.Set(i, 0, 1)
+		}
 	}
 	return M
 }
 
-func (V BinaryVector) String() string {
+func (v BinaryVector) String() string {
 	var buf bytes.Buffer
-	for _, b := range V {
-		if b == 0 {
+	for i := 0; i < v.Length(); i++ {
+		if v.Get(i) == 0 {
 			buf.WriteString("0")
 		} else {
 			buf.WriteString("1")
@@ -126,12 +157,12 @@ func (V BinaryVector) String() string {
 	return buf.String()
 }
 
-func (V BinaryVector) SupportString() string {
+func (v BinaryVector) SupportString() string {
 	var buf bytes.Buffer
 	first := true
 	buf.WriteString("[+")
-	for i, b := range V {
-		if b == 1 {
+	for i := 0; i < v.Length(); i++ {
+		if v.Get(i) == 1 {
 			if !first {
 				buf.WriteString(",")
 			}
@@ -143,10 +174,10 @@ func (V BinaryVector) SupportString() string {
 	return buf.String()
 }
 
-func (V BinaryVector) Weight() int {
+func (v BinaryVector) Weight() int {
 	weight := 0
-	for _, b := range V {
-		if b == 1 {
+	for i := 0; i < v.Length(); i++ {
+		if v.Get(i) == 1 {
 			weight++
 		}
 	}
@@ -154,11 +185,12 @@ func (V BinaryVector) Weight() int {
 }
 
 func randomBitVector(length int) BinaryVector {
-	vector := make([]uint8, length)
-	for i := 0; i < length; i++ {
-		vector[i] = uint8(rand.Intn(2))
+	v := NewBinaryVector(length)
+	_, err := rand.Read(v.data)
+	if err != nil {
+		panic(err)
 	}
-	return vector
+	return v
 }
 
 // xxx move to BinaryVector

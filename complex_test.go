@@ -718,7 +718,7 @@ func TestComplexPathToEdgeVector(t *testing.T) {
 		NewEdge(MatGF{1, 0, 0, 0, 1, 0, 0, 0, 1}, MatGF{1, 10, 10, 5, 2, 0, 10, 0, 13,}),
 		NewEdge(MatGF{1, 5, 14, 11, 10, 2, 14, 9, 6,}, MatGF{1, 10, 10, 5, 2, 0, 10, 0, 13,}),
 	})
-	want := BinaryVector{0, 1, 1}
+	want := NewBinaryVectorFromInts([]uint8{0, 1, 1})
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got:\n%v\nwant:\n%v\n", got, want)
 	}

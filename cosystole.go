@@ -511,7 +511,7 @@ func (S *CosystoleSearch[T]) leafToVector(leaf *StateNode, level int, v BinaryVe
 					// three edges in the edge basis do not
 					// necessarily correspond to the first three edges
 					// of the first triangle.
-					v[j] = 1
+					v.Set(j, 1)
 				} else {
 					panic(fmt.Sprintf("edge %v not in edge index", e))
 				}

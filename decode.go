@@ -163,7 +163,7 @@ func (D *CoboundaryDecoder[T]) Decode(syndrome BinaryVector) (error BinaryVector
 func setMapToVector(m map[int]any, length int) BinaryVector {
 	v := NewBinaryVector(length)
 	for k := range m {
-		v[k] = 1
+		v.Set(k, 1)
 	}
 	return v
 }
@@ -203,8 +203,8 @@ func symmetricDifference(a, b map[int]any) map[int]any {
 // returns a map of triangle indices; xxx move to ZComplex? xxx test
 func syndromeToSetMap(syndrome BinaryVector) map[int]any {
 	res := make(map[int]any)
-	for i, v := range syndrome {
-		if v == 1 {
+	for i := 0; i < syndrome.Length(); i++ {
+		if syndrome.Get(i) == 1 {
 			res[i] = struct{}{}
 		}
 	}

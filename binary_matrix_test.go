@@ -461,7 +461,7 @@ func TestBinaryMatrix_ColumnVector(t *testing.T) {
 					{1, 1, 0, 1},
 				}),
 				column: 2,
-				want: BinaryVector{1, 1, 0},
+				want: NewBinaryVectorFromInts([]uint8{1, 1, 0}),
 			},
 		}
 		for _, tt := range tests {
@@ -490,10 +490,10 @@ func TestBinaryMatrix_Columns(t *testing.T) {
 					{1, 1, 0, 1},
 				}),
 				want: []BinaryVector{
-					{1, 0, 1},
-					{0, 1, 1},
-					{1, 1, 0},
-					{0, 0, 1},
+					NewBinaryVectorFromInts([]uint8{1, 0, 1}),
+					NewBinaryVectorFromInts([]uint8{0, 1, 1}),
+					NewBinaryVectorFromInts([]uint8{1, 1, 0}),
+					NewBinaryVectorFromInts([]uint8{0, 0, 1}),
 				},
 			},
 		}

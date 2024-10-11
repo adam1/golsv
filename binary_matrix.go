@@ -149,9 +149,11 @@ func genericColumns(M BinaryMatrix) []BinaryVector {
 // xxx test
 func genericColumnVector(M BinaryMatrix, index int) BinaryVector {
 	rows := M.NumRows()
-	vector := make([]uint8, rows)
+	vector := NewBinaryVector(rows)
 	for i := 0; i < rows; i++ {
-		vector[i] = M.Get(i,index)
+		if M.Get(i, index) != 0 {
+			vector.Set(i, 1)
+		}
 	}
 	return vector
 }
@@ -424,7 +426,7 @@ func genericRandomize(M BinaryMatrix) {
 	for i := 0; i < rows; i++ {
 		vector := randomBitVector(cols)
 		for j := 0; j < cols; j++ {
-			M.Set(i, j, vector[j])
+			M.Set(i, j, vector.Get(j))
 		}
 	}
 }
@@ -439,7 +441,7 @@ func genericRandomizeWithDensity(M BinaryMatrix, density float64) {
 		vector := randomBitVector(cols)
 		for j := 0; j < cols; j++ {
 			if rand.Float64() < density {
-				M.Set(i, j, vector[j])
+				M.Set(i, j, vector.Get(j))
 			}
 		}
 	}
@@ -496,9 +498,11 @@ func genericGetRows(M BinaryMatrix) []BinaryVector {
 // xxx test
 func genericRowVector(M BinaryMatrix, index int) BinaryVector {
 	cols := M.NumColumns()
-	vector := make([]uint8, cols)
+	vector := NewBinaryVector(cols)
 	for j := 0; j < cols; j++ {
-		vector[j] = M.Get(index, j)
+		if M.Get(index, j) != 0 {
+			vector.Set(j, 1)
+		}
 	}
 	return vector
 }
@@ -574,13 +578,15 @@ func genericSetFromString(M BinaryMatrix, s string) {
 func genericSetFromRowVectors(M BinaryMatrix, rowData []BinaryVector) {
 	rows := M.NumRows()
 	cols := M.NumColumns()
-	if (len(rowData) != rows) || (len(rowData[0]) != cols) {
+	if (len(rowData) != rows) || (rowData[0].Length() != cols) {
 		panic(fmt.Sprintf("matrix shape not compatible: (%dx%d) != (%dx%d)",
-			rows, cols, len(rowData), len(rowData[0])))
+			rows, cols, len(rowData), rowData[0].Length()))
 	}
 	for i := 0; i < rows; i++ {
 		for j := 0; j < cols; j++ {
-			M.Set(i, j, rowData[i][j])
+			if rowData[i].Get(j) != 0 {
+				M.Set(i, j, 1)
+			}
 		}
 	}	
 }

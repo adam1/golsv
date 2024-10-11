@@ -13,7 +13,7 @@ func TestBinaryMatrix_BinaryVectorToMatrix(t *testing.T) {
 	}{
 		{
 			name: "Test 1",
-			v:    BinaryVector{1, 0, 1},
+			v:    NewBinaryVectorFromString("101"),
 			want: NewDenseBinaryMatrixFromRowInts([][]uint8{
 				{1},
 				{0},
@@ -22,7 +22,7 @@ func TestBinaryMatrix_BinaryVectorToMatrix(t *testing.T) {
 		},
 		{
 			name: "Test 2",
-			v:    BinaryVector{1, 0, 1, 0},
+			v:    NewBinaryVectorFromString("1010"),
 			want: NewDenseBinaryMatrixFromRowInts([][]uint8{
 				{1},
 				{0},
@@ -111,10 +111,10 @@ func TestBinaryMatrix_EnumerateBinaryVectorSpace(t *testing.T) {
 				{1, 0},
 			}),
 			want: []BinaryVector{
-				{0, 0, 0},
-				{1, 0, 1},
-				{0, 1, 0},
-				{1, 1, 1},
+				NewBinaryVectorFromString("000"),
+				NewBinaryVectorFromString("101"),
+				NewBinaryVectorFromString("010"),
+				NewBinaryVectorFromString("111"),
 			},
 		},
 		{
@@ -125,22 +125,22 @@ func TestBinaryMatrix_EnumerateBinaryVectorSpace(t *testing.T) {
 				{1, 0, 1},
 			}),
 			want: []BinaryVector{
-				{0, 0, 0},
-				{1, 0, 1},
-				{0, 1, 0},
-				{1, 1, 1},
+				NewBinaryVectorFromString("000"),
+				NewBinaryVectorFromString("101"),
+				NewBinaryVectorFromString("010"),
+				NewBinaryVectorFromString("111"),
 				// note redundancy, which is fine for now
-				{1, 1, 1},
-				{0, 1, 0},
-				{1, 0, 1},
-				{0, 0, 0},
+				NewBinaryVectorFromString("111"),
+				NewBinaryVectorFromString("010"),
+				NewBinaryVectorFromString("101"),
+				NewBinaryVectorFromString("000"),
 			},
 		},
 		{
 			name:       "Test Zero Generators",
 			generators: NewDenseBinaryMatrix(3, 0),
 			want: []BinaryVector{
-				{0, 0, 0},
+				NewBinaryVectorFromString("000"),
 			},
 		},
 	}
@@ -176,10 +176,10 @@ func TestBinaryVectorAdd(t *testing.T) {
 	tests := []struct {
 		a, b, want BinaryVector
 	}{
-		{a: BinaryVector{0, 0, 0, 0}, b: BinaryVector{0, 0, 0, 0}, want: BinaryVector{0, 0, 0, 0}},
-		{a: BinaryVector{0, 0, 0, 0}, b: BinaryVector{0, 0, 0, 1}, want: BinaryVector{0, 0, 0, 1}},
-		{a: BinaryVector{0, 0, 0, 1}, b: BinaryVector{0, 0, 0, 1}, want: BinaryVector{0, 0, 0, 0}},
-		{a: BinaryVector{0, 0, 0, 1}, b: BinaryVector{1, 0, 0, 1}, want: BinaryVector{1, 0, 0, 0}},
+		{a: NewBinaryVectorFromString("0000"), b: NewBinaryVectorFromString("0000"), want: NewBinaryVectorFromString("0000")},
+		{a: NewBinaryVectorFromString("0000"), b: NewBinaryVectorFromString("0001"), want: NewBinaryVectorFromString("0001")},
+		{a: NewBinaryVectorFromString("0001"), b: NewBinaryVectorFromString("0001"), want: NewBinaryVectorFromString("0000")},
+		{a: NewBinaryVectorFromString("0001"), b: NewBinaryVectorFromString("1001"), want: NewBinaryVectorFromString("1000")},
 	}
 	for i, tt := range tests {
 		got := tt.a.Add(tt.b)
@@ -189,14 +189,14 @@ func TestBinaryVectorAdd(t *testing.T) {
 	}
 }
 
-func TestBinaryVectorWeight(t *testing.T) {
+func NewTestBinaryVectorWeightFromInts(t *testing.T) {
 	tests := []struct {
 		v    BinaryVector
 		want int
 	}{
-		{v: BinaryVector{0, 0, 0, 0}, want: 0},
-		{v: BinaryVector{0, 0, 0, 1}, want: 1},
-		{v: BinaryVector{0, 0, 1, 1}, want: 2},
+		{v: NewBinaryVectorFromString("0000"), want: 0},
+		{v: NewBinaryVectorFromString("0001"), want: 1},
+		{v: NewBinaryVectorFromString("0011"), want: 2},
 	}
 	for i, tt := range tests {
 		got := tt.v.Weight()
@@ -212,10 +212,10 @@ func TestBinaryVectorProject(t *testing.T) {
 		proj []int
 		want BinaryVector
 	}{
-		{v: BinaryVector{0, 0, 0, 0}, proj: []int{0, 1, 2}, want: BinaryVector{0, 0, 0}},
-		{v: BinaryVector{0, 0, 0, 1}, proj: []int{0, 1, 2}, want: BinaryVector{0, 0, 0}},
-		{v: BinaryVector{0, 0, 1, 1}, proj: []int{0, 1, 2}, want: BinaryVector{0, 0, 1}},
-		{v: BinaryVector{1, 0, 1, 1}, proj: []int{1, 2}, want: BinaryVector{0, 1}},
+		{v: NewBinaryVectorFromString("0000"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("000")},
+		{v: NewBinaryVectorFromString("0001"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("000")},
+		{v: NewBinaryVectorFromString("0011"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("001")},
+		{v: NewBinaryVectorFromString("1011"), proj: []int{1, 2}, want: NewBinaryVectorFromString("01")},
 	}
 	for i, tt := range tests {
 		hot := make(map[int]bool)

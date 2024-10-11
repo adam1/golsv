@@ -302,7 +302,7 @@ func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
 	v := NewBinaryVector(len(C.edgeBasis))
 	for _, e := range path {
 		if i, ok := C.edgeIndex[e]; ok {
-			v[i] = 1
+			v.Set(i, 1)
 		} else {
 			panic(fmt.Sprintf("edge %v not in edge index", e))
 		}

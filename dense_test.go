@@ -16,9 +16,9 @@ func TestDenseBinaryMatrix_FromRows(t *testing.T) {
 		{
 			name: "Test 1",
 			rows: []BinaryVector{
-				{1, 0, 1, 0},
-				{0, 1, 1, 0},
-				{1, 1, 0, 1},
+				NewBinaryVectorFromString("1010"),
+				NewBinaryVectorFromString("0110"),
+				NewBinaryVectorFromString("1101"),
 			},
 			want: NewDenseBinaryMatrixFromRowInts([][]uint8{
 				{1, 0, 1, 0},
@@ -29,9 +29,9 @@ func TestDenseBinaryMatrix_FromRows(t *testing.T) {
 		{
 			name: "Test 2",
 			rows: []BinaryVector{
-				{0, 0, 0},
-				{1, 1, 1},
-				{1, 1, 0},
+				NewBinaryVectorFromString("000"),
+				NewBinaryVectorFromString("111"),
+				NewBinaryVectorFromString("110"),
 			},
 			want: NewDenseBinaryMatrixFromRowInts([][]uint8{
 				{0, 0, 0},
@@ -42,10 +42,10 @@ func TestDenseBinaryMatrix_FromRows(t *testing.T) {
 		{
 			name: "Test 3",
 			rows: []BinaryVector{
-				{0, 0, 1, 0},
-				{0, 0, 0, 0},
-				{0, 0, 0, 0},
-				{0, 0, 0, 1},
+				NewBinaryVectorFromString("0010"),
+				NewBinaryVectorFromString("0000"),
+				NewBinaryVectorFromString("0000"),
+				NewBinaryVectorFromString("0001"),
 			},
 			want: NewDenseBinaryMatrixFromRowInts([][]uint8{
 				{0, 0, 1, 0},

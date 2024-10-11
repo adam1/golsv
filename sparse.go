@@ -174,7 +174,7 @@ func (S *Sparse) Columns() []BinaryVector {
 func (S *Sparse) ColumnVector(index int) BinaryVector {
 	v := NewBinaryVector(S.Rows)
 	for _, i := range S.ColData[index] {
-		v[i] = 1
+		v.Set(i, 1)
 	}
 	return v
 }
@@ -380,11 +380,13 @@ func (S *Sparse) Set(i, j int, b uint8) {
 
 // xxx test
 func (S *Sparse) SetColumn(col int, v BinaryVector) {
-	if len(v) != S.Rows {
+	if v.Length() != S.Rows {
 		panic("invalid length")
 	}
-	for i := 0; i < len(v); i++ {
-		S.Set(i, col, v[i])
+	for i := 0; i < v.Length(); i++ {
+		if v.Get(i) == 1 {
+			S.Set(i, col, 1)
+		}
 	}
 }
 
