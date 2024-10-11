@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	mathrand "math/rand"
+	"math/big"
+	"math/bits"
 	"github.com/lukechampine/fastxor"
 )
 
@@ -56,9 +57,21 @@ func (v BinaryVector) Add(u BinaryVector) BinaryVector {
 	return w
 }
 
+// xxx test; deprecated
+// func (v BinaryVector) AddInPlace(u BinaryVector) {
+// 	fastxor.Bytes(v.data, v.data, u.data)
+// }
+
 // xxx test
-func (v BinaryVector) AddInPlace(u BinaryVector) {
-	fastxor.Bytes(v.data, v.data, u.data)
+func (v BinaryVector) Clear() {
+	clear(v.data)
+}
+
+// xxx test
+func (v BinaryVector) Clone() BinaryVector {
+	w := NewBinaryVector(v.Length())
+	copy(w.data, v.data)
+	return w
 }
 
 // xxx test
@@ -113,14 +126,21 @@ func (v BinaryVector) Project(n int, predicate func (i int) bool) BinaryVector {
 	return pv
 }
 
-// xxx test
 func (v BinaryVector) RandomizeWithWeight(weight int) {
 	n := v.Length()
-	for i := 0; i < n; i++ {
-		v.Set(i, 0)
-	}
+	v.Clear()
 	for i := 0; i < weight; i++ {
-		v.Set(mathrand.Intn(n), 1)
+		for {
+            index, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
+            if err != nil {
+                panic(err)
+            }
+            idx := int(index.Int64())
+            if v.Get(idx) == 0 {
+                v.Set(idx, 1)
+                break
+            }
+        }
 	}
 }
 
@@ -157,6 +177,13 @@ func (v BinaryVector) String() string {
 	return buf.String()
 }
 
+// sets v to the sum of a and b
+// xxx test
+func (v BinaryVector) Sum(a, b BinaryVector) {
+	fastxor.Bytes(v.data, a.data, b.data)
+// 	log.Printf("xxx Sum: %v + %v = %v", a, b, v)
+}
+
 func (v BinaryVector) SupportString() string {
 	var buf bytes.Buffer
 	first := true
@@ -174,12 +201,16 @@ func (v BinaryVector) SupportString() string {
 	return buf.String()
 }
 
+// xxx test
+func (v BinaryVector) Toggle(i int) {
+	v.Set(i, 1-v.Get(i))
+}
+
+// xxx test
 func (v BinaryVector) Weight() int {
 	weight := 0
-	for i := 0; i < v.Length(); i++ {
-		if v.Get(i) == 1 {
-			weight++
-		}
+	for _, b := range v.data {
+		weight += bits.OnesCount8(b)
 	}
 	return weight
 }
@@ -218,6 +249,21 @@ func AllBinaryVectors(n int) []BinaryVector {
 		vectors[i] = coefficients.AsColumnVector()
 	}
 	return vectors
+}
+
+func EnumerateBinaryVectors(n int, v BinaryVector, F func() (continue_ bool) ) {
+	if n > 63 {
+		panic("EnumerateBinaryVectors: n > 63 not supported")
+	}
+	m := uint(1) << uint(n)
+	for i := uint(0); i < m; i++ {
+		for j := 0; j < n; j++ {
+			v.Set(j, uint8((i >> j) & 1))
+		}
+		if !F() {
+			break
+		}
+	}
 }
 
 // this is partially a compatibility shim for older code
@@ -296,4 +342,3 @@ func pow(base, exp int) int {
 	}
 	return result
 }
-

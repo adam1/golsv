@@ -1,11 +1,29 @@
 package golsv
 
 import (
+	"math/rand"
 	"reflect"
 	"testing"
 )
 
-func TestBinaryMatrix_BinaryVectorToMatrix(t *testing.T) {
+func TestBinaryVectorAdd(t *testing.T) {
+	tests := []struct {
+		a, b, want BinaryVector
+	}{
+		{a: NewBinaryVectorFromString("0000"), b: NewBinaryVectorFromString("0000"), want: NewBinaryVectorFromString("0000")},
+		{a: NewBinaryVectorFromString("0000"), b: NewBinaryVectorFromString("0001"), want: NewBinaryVectorFromString("0001")},
+		{a: NewBinaryVectorFromString("0001"), b: NewBinaryVectorFromString("0001"), want: NewBinaryVectorFromString("0000")},
+		{a: NewBinaryVectorFromString("0001"), b: NewBinaryVectorFromString("1001"), want: NewBinaryVectorFromString("1000")},
+	}
+	for i, tt := range tests {
+		got := tt.a.Add(tt.b)
+		if !reflect.DeepEqual(tt.want, got) {
+			t.Errorf("%d: got=%v want=%v", i, got, tt.want)
+		}
+	}
+}
+
+func TestBinaryVectorMatrix(t *testing.T) {
 	tests := []struct {
 		name string
 		v    BinaryVector
@@ -40,6 +58,63 @@ func TestBinaryMatrix_BinaryVectorToMatrix(t *testing.T) {
 				t.Errorf("got:\n%vwant:\n%v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBinaryVectorProject(t *testing.T) {
+	tests := []struct {
+		v    BinaryVector
+		proj []int
+		want BinaryVector
+	}{
+		{v: NewBinaryVectorFromString("0000"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("000")},
+		{v: NewBinaryVectorFromString("0001"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("000")},
+		{v: NewBinaryVectorFromString("0011"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("001")},
+		{v: NewBinaryVectorFromString("1011"), proj: []int{1, 2}, want: NewBinaryVectorFromString("01")},
+	}
+	for i, tt := range tests {
+		hot := make(map[int]bool)
+		for _, j := range tt.proj {
+			hot[j] = true
+		}
+		predicate := func(i int) bool {
+			_, ok := hot[i]
+			return ok
+		}
+		got := tt.v.Project(len(tt.proj), predicate)
+		if !reflect.DeepEqual(tt.want, got) {
+			t.Errorf("%d: got=%v want=%v", i, got, tt.want)
+		}
+	}
+}
+
+func TestBinaryVectorRandomizeWithWeight(t *testing.T) {
+	trials := 10
+	for i := 0; i < trials; i++ {
+		n := 100
+		w := rand.Intn(n)
+		v := NewBinaryVector(n)
+		v.RandomizeWithWeight(w)
+		if v.Weight() != w {
+			t.Errorf("got=%d want=%d", v.Weight(), w)
+		}
+	}
+}
+
+func TestBinaryVectorWeight(t *testing.T) {
+	tests := []struct {
+		v    BinaryVector
+		want int
+	}{
+		{v: NewBinaryVectorFromString("0000"), want: 0},
+		{v: NewBinaryVectorFromString("0001"), want: 1},
+		{v: NewBinaryVectorFromString("0011"), want: 2},
+	}
+	for i, tt := range tests {
+		got := tt.v.Weight()
+		if got != tt.want {
+			t.Errorf("%d: got=%d want=%d", i, got, tt.want)
+		}
 	}
 }
 
@@ -172,63 +247,26 @@ func TestAllBinaryVectors(t *testing.T) {
 	}
 }
 
-func TestBinaryVectorAdd(t *testing.T) {
-	tests := []struct {
-		a, b, want BinaryVector
-	}{
-		{a: NewBinaryVectorFromString("0000"), b: NewBinaryVectorFromString("0000"), want: NewBinaryVectorFromString("0000")},
-		{a: NewBinaryVectorFromString("0000"), b: NewBinaryVectorFromString("0001"), want: NewBinaryVectorFromString("0001")},
-		{a: NewBinaryVectorFromString("0001"), b: NewBinaryVectorFromString("0001"), want: NewBinaryVectorFromString("0000")},
-		{a: NewBinaryVectorFromString("0001"), b: NewBinaryVectorFromString("1001"), want: NewBinaryVectorFromString("1000")},
+func TestEnumerateBinaryVectors(t *testing.T) {
+	n := 3
+	res := make([]BinaryVector, 0)
+	buf := NewBinaryVector(n)
+	EnumerateBinaryVectors(n, buf, func() (continue_ bool) {
+		res = append(res, buf.Clone())
+		return true
+	})
+	expected := []BinaryVector{
+		NewBinaryVectorFromString("000"),
+		NewBinaryVectorFromString("100"),
+		NewBinaryVectorFromString("010"),
+		NewBinaryVectorFromString("110"),
+		NewBinaryVectorFromString("001"),
+		NewBinaryVectorFromString("101"),
+		NewBinaryVectorFromString("011"),
+		NewBinaryVectorFromString("111"),
 	}
-	for i, tt := range tests {
-		got := tt.a.Add(tt.b)
-		if !reflect.DeepEqual(tt.want, got) {
-			t.Errorf("%d: got=%v want=%v", i, got, tt.want)
-		}
-	}
-}
-
-func NewTestBinaryVectorWeightFromInts(t *testing.T) {
-	tests := []struct {
-		v    BinaryVector
-		want int
-	}{
-		{v: NewBinaryVectorFromString("0000"), want: 0},
-		{v: NewBinaryVectorFromString("0001"), want: 1},
-		{v: NewBinaryVectorFromString("0011"), want: 2},
-	}
-	for i, tt := range tests {
-		got := tt.v.Weight()
-		if got != tt.want {
-			t.Errorf("%d: got=%d want=%d", i, got, tt.want)
-		}
+	if !reflect.DeepEqual(res, expected) {
+		t.Errorf("got=%v want=%v", res, expected)
 	}
 }
 
-func TestBinaryVectorProject(t *testing.T) {
-	tests := []struct {
-		v    BinaryVector
-		proj []int
-		want BinaryVector
-	}{
-		{v: NewBinaryVectorFromString("0000"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("000")},
-		{v: NewBinaryVectorFromString("0001"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("000")},
-		{v: NewBinaryVectorFromString("0011"), proj: []int{0, 1, 2}, want: NewBinaryVectorFromString("001")},
-		{v: NewBinaryVectorFromString("1011"), proj: []int{1, 2}, want: NewBinaryVectorFromString("01")},
-	}
-	for i, tt := range tests {
-		hot := make(map[int]bool)
-		for _, j := range tt.proj {
-			hot[j] = true
-		}
-		predicate := func(i int) bool {
-			_, ok := hot[i]
-			return ok
-		}
-		got := tt.v.Project(len(tt.proj), predicate)
-		if !reflect.DeepEqual(tt.want, got) {
-			t.Errorf("%d: got=%v want=%v", i, got, tt.want)
-		}
-	}
-}

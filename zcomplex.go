@@ -442,6 +442,10 @@ func (C *ZComplex[T]) VertexBasis() []ZVertex[T] {
 	return C.vertexBasis
 }
 
+func (C *ZComplex[T]) VertexIndex() map[ZVertex[T]]int {
+	return C.vertexIndex
+}
+
 // xxx test
 func (C *ZComplex[T]) VertexToSparse(v ZVertex[T]) *Sparse {
 	row, ok := C.vertexIndex[v]
