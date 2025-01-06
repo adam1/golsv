@@ -8,8 +8,7 @@ import (
 
 // Usage:
 //
-//   calg-cayley -truncate-generators=0 -max-depth=0 -modulus=111 -quotient
-//
+//	calg-cayley -truncate-generators=0 -max-depth=0 -modulus=111 -quotient
 func main() {
 	args := parseFlags()
 	args.ProfileArgs.Start()
@@ -64,7 +63,7 @@ func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomia
 	maxDepth = 0
 	E = golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil)
 	E.Expand()
-	
+
 	// now, project the candidates to the quotient complex, i.e. take
 	// each vertex mod f. by construction, this ought to be a no-op
 	// except for the last vertex, but let's verify that to be
@@ -81,6 +80,7 @@ func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomia
 	complex := E.Complex()
 	writeComplexFiles(complex, args)
 
+	// xxx despite the comment, this doesn't appear to be de-duping
 	log.Printf("converting candidates to edge vectors and deduping")
 	vecs := make(map[string]golsv.BinaryVector)
 	for _, path := range candidatePaths {
@@ -155,27 +155,27 @@ func dumpElements(els []golsv.ElementCalG) string {
 }
 
 type CalGCayleyExpanderArgs struct {
-	D1File             string
-	D2File             string
-	EdgeBasisFile      string
-    MaxDepth           int
-	MeshFile           string
-	Modulus            string
-	Quotient           bool
+	D1File                 string
+	D2File                 string
+	EdgeBasisFile          string
+	MaxDepth               int
+	MeshFile               string
+	Modulus                string
+	Quotient               bool
 	SystolicCandidatesFile string
-	TriangleBasisFile  string
-	TruncateGenerators int
-	Verbose            bool
-	VertexBasisFile    string
+	TriangleBasisFile      string
+	TruncateGenerators     int
+	Verbose                bool
+	VertexBasisFile        string
 	golsv.ProfileArgs
 }
 
 func parseFlags() *CalGCayleyExpanderArgs {
 	args := CalGCayleyExpanderArgs{
-		MaxDepth: -1,
+		MaxDepth:           -1,
 		TruncateGenerators: 0,
-		Verbose: true,
-		Modulus: "111",
+		Verbose:            true,
+		Modulus:            "111",
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 output file (sparse column support txt format)")

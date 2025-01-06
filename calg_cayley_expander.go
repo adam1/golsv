@@ -10,19 +10,19 @@ import (
 // xxx rename CalGCayleyComplex?
 // xxx genericise to use any group with comparable element type?
 type CalGCayleyExpander struct {
-	gens        []ElementCalG
-	maxDepth    int
-	curDepth    int
-	verbose     bool
-	modulus     *F2Polynomial
-	quotient    bool
-	attendance  map[ElementCalG]vertexWrapper
-	vertexBasis []ZVertex[ElementCalG]
-	todo        calGTodoQueue
-	edgeSet     map[ZEdge[ElementCalG]]any
-	edgeBasis   []ZEdge[ElementCalG]
+	gens                       []ElementCalG
+	maxDepth                   int
+	curDepth                   int
+	verbose                    bool
+	modulus                    *F2Polynomial
+	quotient                   bool
+	attendance                 map[ElementCalG]vertexWrapper
+	vertexBasis                []ZVertex[ElementCalG]
+	todo                       calGTodoQueue
+	edgeSet                    map[ZEdge[ElementCalG]]any
+	edgeBasis                  []ZEdge[ElementCalG]
 	congruenceSubgroupElements []ElementCalG
-	observer    CalGObserver
+	observer                   CalGObserver
 }
 
 type CalGObserver interface {
@@ -35,7 +35,7 @@ type CalGObserver interface {
 }
 
 type vertexWrapper struct {
-	id  int
+	id int
 	// when a new vertex is created (i.e. we compute a new group
 	// element that has not yet been seen, i.e. is not in the
 	// attendance map), we store the generator that was used to
@@ -98,15 +98,15 @@ func (E *CalGCayleyExpander) Expand() {
 		E.observer.EndVertices()
 	}
 	// xxx experimental for debugging;
-// 	checkCongruenceConsistency1 := true
-// 	if checkCongruenceConsistency1 {
-// 		log.Printf("checking for multiple congruence subgroup identities")
-// 		for g, id := range E.attendance {
-// 			if g.IsIdentityModf(*E.modulus) {
-// 				log.Printf("found congruence subgroup identity: g=(%v) id=%d", g, id)
-// 			}
-// 		}
-// 	}
+	// 	checkCongruenceConsistency1 := true
+	// 	if checkCongruenceConsistency1 {
+	// 		log.Printf("checking for multiple congruence subgroup identities")
+	// 		for g, id := range E.attendance {
+	// 			if g.IsIdentityModf(*E.modulus) {
+	// 				log.Printf("found congruence subgroup identity: g=(%v) id=%d", g, id)
+	// 			}
+	// 		}
+	// 	}
 }
 
 func (E *CalGCayleyExpander) Complex() *ZComplex[ElementCalG] {
@@ -139,12 +139,12 @@ func (E *CalGCayleyExpander) getOrSetVertex(u ElementCalG, genIndex int, uDepth 
 	}
 	uId = len(E.attendance)
 	wrapper = vertexWrapper{
-		id: uId,
+		id:        uId,
 		generator: genIndex,
 	}
 	E.attendance[u] = wrapper
 	E.vertexBasis = append(E.vertexBasis, u)
-	
+
 	// check for congruence subgroup element, unless we are doing a quotient
 	if E.modulus != nil && !E.quotient && !u.IsIdentity() {
 		c := u.Modf(*E.modulus)
@@ -361,12 +361,12 @@ func (E *CalGCayleyExpander) triangleToSortedVertexIndices(t ZTriangle[ElementCa
 func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	if E.verbose {
 		log.Printf("computing triangle basis")
-	}		
+	}
 	//
 	//       f     g     h
 	//    u --- v --- w --- x
 	//
-    basis := make([]ZTriangle[ElementCalG], 0)
+	basis := make([]ZTriangle[ElementCalG], 0)
 	triangleSet := make(map[ZTriangle[ElementCalG]]any)
 	for _, u := range E.vertexBasis {
 		u := u.(ElementCalG)
@@ -467,7 +467,10 @@ func NewZComplexElementCalGFromBasisFiles(vertexBasisFile, edgeBasisFile, triang
 	if verbose {
 		log.Printf("reading triangle basis file %s", triangleBasisFile)
 	}
-	triangleBasis := ReadElementCalGTriangleFile(triangleBasisFile)
+	var triangleBasis []ZTriangle[ElementCalG]
+	if triangleBasisFile != "" {
+		triangleBasis = ReadElementCalGTriangleFile(triangleBasisFile)
+	}
 	sortBases := false
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }

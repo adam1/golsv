@@ -72,7 +72,7 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 				log.Printf("new min weight: %d", minWeight)
 			}
 		}
-		if n > 0 && n % reportInterval == 0 {
+		if n > 0 && n%reportInterval == 0 {
 			timeNow := time.Now()
 			timeElapsed := timeNow.Sub(timeStart)
 			timeInterval := timeNow.Sub(timeLast)
@@ -124,13 +124,15 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 // procedure represented in worksets/Makefile, which uses the
 // individual programs and intermediate files at each step.
 // ComputeFirstSystole is useful for small complexes and for testing.
-func ComputeFirstSystole(d1, d2 BinaryMatrix, verbose bool) int {
+func ComputeFirstSystole(d1, d2 BinaryMatrix, verbose bool) (systole, dimZ1, dimB1, dimH1 int) {
 	if verbose {
 		log.Printf("Computing first homology")
 	}
-	U, B, _ := UBDecomposition(d1, d2, verbose)
+	var U, B BinaryMatrix
+	U, B, _, dimZ1, dimB1, dimH1 = UBDecomposition(d1, d2, verbose)
 	U, B = U.Dense(), B.Dense()
-	return SystoleExhaustiveSearch(U, B, verbose)
+	systole = SystoleExhaustiveSearch(U, B, verbose)
+	return
 }
 
 func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
@@ -139,7 +141,7 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	}
 	delta0 := d1.Transpose().Dense()
 	delta1 := d2.Transpose().Dense()
-	U, B, _ := UBDecomposition(delta1, delta0, verbose)
+	U, B, _, _, _, _ := UBDecomposition(delta1, delta0, verbose)
 	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
 }

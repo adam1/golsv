@@ -12,13 +12,13 @@ import (
 // Reducer computes the Smith normal form of a matrix.
 // We think of the input matrix M as being factorized as
 //
-//   M = P D Q
+//	M = P D Q
 //
 // where
 //
-//   P is an automorphism of the codomain of M,
-//   D is a diagonal matrix, and
-//   Q is an automorphism of the domain of M.
+//	P is an automorphism of the codomain of M,
+//	D is a diagonal matrix, and
+//	Q is an automorphism of the domain of M.
 //
 // The reduction is performed by a sequence of row and column
 // operations.  The row and column operations performed are returned
@@ -32,7 +32,7 @@ import (
 // right-multiplying the matrix by an invertible operation matrix.
 // Hence, the reduction can be thought of as computing
 //
-//     P^{-1} M Q^{-1} = D
+//	P^{-1} M Q^{-1} = D
 //
 // where P^{-1} is the product of the row operations and Q^{-1} is the
 // product of the column operations.
@@ -44,24 +44,24 @@ type Reducer interface {
 }
 
 type DiagonalReducer struct {
-	matrix  BinaryMatrix
+	matrix     BinaryMatrix
 	numWorkers int
 	// xxx working to reduce memory usage by streaming colops and
 	// rowops to disk rather than keeping them in memory
 	colOpWriter OperationWriter
 	//rowOps []Operation
-	rowOpWriter OperationWriter
-	colOpsMatrix BinaryMatrix
-	coimageBasis BinaryMatrix
-	kernelBasis BinaryMatrix
-	reduced bool
-	verbose bool
-	statIntervalSteps int
-	statColumnAdds int
+	rowOpWriter            OperationWriter
+	colOpsMatrix           BinaryMatrix
+	coimageBasis           BinaryMatrix
+	kernelBasis            BinaryMatrix
+	reduced                bool
+	verbose                bool
+	statIntervalSteps      int
+	statColumnAdds         int
 	switchToDensePredicate func(remaining int, subdensity float64) bool
 	// xxx old worker group
-	workers []*worker
-	workerWaitGroup sync.WaitGroup
+	workers               []*worker
+	workerWaitGroup       sync.WaitGroup
 	WriteIntermediateFile bool
 	// xxx new worker group; merge these eventually
 	colWorkGroup *WorkGroup
@@ -69,10 +69,10 @@ type DiagonalReducer struct {
 
 func NewDiagonalReducer(verbose bool) *DiagonalReducer {
 	R := &DiagonalReducer{
-		reduced: false,
-		statIntervalSteps: 1000,
+		reduced:                false,
+		statIntervalSteps:      1000,
 		switchToDensePredicate: defaultSwitchToDensePredicate,
-		verbose: verbose,
+		verbose:                verbose,
 	}
 	gob.Register(&AddOp{})
 	gob.Register(&SwapOp{})
@@ -104,33 +104,33 @@ func (R *DiagonalReducer) Reduce(M BinaryMatrix, rowOpWriter, colOpWriter Operat
 	}
 	for i := 0; i < d; i++ {
 		subdensity := -1.0
-		if i > 0 && i % R.statIntervalSteps == 0 {
+		if i > 0 && i%R.statIntervalSteps == 0 {
 			// if we are not dense, measure density and consider
 			// switching to dense for the remainder
 			_, ok := R.matrix.(*DenseBinaryMatrix)
 			if !ok {
 				subdensity = R.matrix.Density(i, i)
-				doSwitch := R.switchToDensePredicate(d - i, subdensity)
+				doSwitch := R.switchToDensePredicate(d-i, subdensity)
 				if doSwitch {
 					R.reduceDenseSubmatrix(i)
 					break
 				}
 			}
-			if R.verbose  {
+			if R.verbose {
 				// xxx get rid of early exit stuff
-				if profiling && i > 0 && i % profilingExitAt == 0 {
+				if profiling && i > 0 && i%profilingExitAt == 0 {
 					panic("exiting early for profiling")
 				}
 				now := time.Now()
 				elapsed := now.Sub(lastStatTime)
 				lastStatTime = now
 				rate := float64(R.statIntervalSteps) / elapsed.Seconds()
-				estimatedHoursRemaining := float64(d - i) / rate / 3600.0
+				estimatedHoursRemaining := float64(d-i) / rate / 3600.0
 				totalElapsed := now.Sub(startTime)
 				totalRate := float64(i) / totalElapsed.Seconds()
 				msg := fmt.Sprintf("reducing; i=%d coladd=%d trowop=%d tcolop=%d rate=%1.3f trate=%1.3f ehr=%1.2f",
 					i, R.statColumnAdds, R.rowOpWriter.Count(), R.colOpWriter.Count(), rate, totalRate, estimatedHoursRemaining)
-				if subdensity >=0 {
+				if subdensity >= 0 {
 					msg += fmt.Sprintf(" subden=%1.8f", subdensity)
 				}
 				log.Println(msg)
@@ -242,13 +242,13 @@ func (R *DiagonalReducer) reduceDenseSubmatrix(index int) {
 	if R.verbose {
 		log.Printf("finished reducing dense submatrix; submatrix=%v subrank=%d", submatrix, subrank)
 	}
-// 	if true { // xxx sanity check?
-// 		if !binaryMatrixIsSmithNormalForm(submatrix) {
-// 			panic("submatrix is not in smith normal form")
-// 		}
-// 	}
+	// 	if true { // xxx sanity check?
+	// 		if !binaryMatrixIsSmithNormalForm(submatrix) {
+	// 			panic("submatrix is not in smith normal form")
+	// 		}
+	// 	}
 	R.matrix = NewSparseBinaryMatrixDiagonal(
-		R.matrix.NumRows(), R.matrix.NumColumns(), index + subrank)
+		R.matrix.NumRows(), R.matrix.NumColumns(), index+subrank)
 	for _, op := range subColOpWriter.Slice() {
 		op = op.Shift(index)
 		if err := R.colOpWriter.Write(op); err != nil {
@@ -268,16 +268,16 @@ func (R *DiagonalReducer) setPivotScanDown(i int) (found bool) {
 	// scan down, col by col, to find a 1, then do the necessary
 	// permutations to move it to (i,i).
 	r, c := -1, -1
-    for j := i; j < cols; j++ {
+	for j := i; j < cols; j++ {
 		k := R.matrix.ScanDown(i, j)
 		if k != -1 {
 			r, c = k, j
 			break
 		}
 	}
-// 	if R.verbose {
-// 		log.Printf("xxx found pivot at %d,%d", r, c)
-// 	}
+	// 	if R.verbose {
+	// 		log.Printf("xxx found pivot at %d,%d", r, c)
+	// 	}
 	if r == -1 {
 		return false
 	}
@@ -291,22 +291,22 @@ func (R *DiagonalReducer) setPivotScanDown(i int) (found bool) {
 }
 
 type worker struct {
-	index int
-	group *sync.WaitGroup
-	matrix BinaryMatrix
-	todo chan any
-	workRow int
+	index        int
+	group        *sync.WaitGroup
+	matrix       BinaryMatrix
+	todo         chan any
+	workRow      int
 	workColStart int
-	workColEnd int
-	resultOps []Operation
+	workColEnd   int
+	resultOps    []Operation
 }
 
 func New_worker(index int, group *sync.WaitGroup, matrix BinaryMatrix) *worker {
 	w := &worker{
-		index: index,
-		group: group,
-		matrix: matrix,
-		todo: make(chan any),
+		index:     index,
+		group:     group,
+		matrix:    matrix,
+		todo:      make(chan any),
 		resultOps: make([]Operation, 0),
 	}
 	go w.run()
@@ -315,7 +315,7 @@ func New_worker(index int, group *sync.WaitGroup, matrix BinaryMatrix) *worker {
 
 func (w *worker) run() {
 	for {
-		<- w.todo
+		<-w.todo
 		w.doWork()
 	}
 }
@@ -365,16 +365,16 @@ func (R *DiagonalReducer) applyColumnOp(op Operation) {
 }
 
 func (R *DiagonalReducer) applyRowOp(op Operation) {
-// 	if R.verbose {
-// 		log.Printf("xxx applyRowOp: op=%v", op)
-// 	}
+	// 	if R.verbose {
+	// 		log.Printf("xxx applyRowOp: op=%v", op)
+	// 	}
 	R.matrix.ApplyRowOperation(op)
 	if err := R.rowOpWriter.Write(op); err != nil {
 		panic(err)
 	}
-// 	if R.verbose {
-// 		log.Printf("xxx applyRowOp done")
-// 	}
+	//	if R.verbose {
+	//		log.Printf("xxx applyRowOp done")
+	//	}
 }
 
 // xxx factoring out WorkGroup; here a column is a unit of work.  in
@@ -397,7 +397,7 @@ func (R *DiagonalReducer) clearRowParallel(d int) {
 		}
 		started++
 		end := start + colsPerWorker
-		if w == R.numWorkers - 1 {
+		if w == R.numWorkers-1 {
 			end = cols
 		}
 		R.workers[w].setWork(d, start, end)
@@ -430,21 +430,21 @@ func firstZeroCol(M BinaryMatrix) int {
 	return zeroCol
 }
 
-func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B, Z1 BinaryMatrix) {
+func UBDecomposition(d1, d2 BinaryMatrix, verbose bool) (U, B, Z1 BinaryMatrix, dimZ1 int, dimB1 int, dimH1 int) {
 	// here we adapt the recipes from worskets/Makefile to be run
 	dimC0 := d1.NumRows()
 	dimC1 := d1.NumColumns()
 	dimC2 := d2.NumColumns()
 
 	_, _, d1colops, d1rank := smithNormalForm(d1, verbose)
-	dimZ1 := d1.NumColumns() - d1rank
+	dimZ1 = d1.NumColumns() - d1rank
 
 	_, _, d2colops, d2rank := smithNormalForm(d2, verbose)
-	dimB1 := d2rank
-	dimH1 := dimZ1 - dimB1
+	dimB1 = d2rank
+	dimH1 = dimZ1 - dimB1
 	if verbose {
 		log.Printf(
-`
+			`
 C_2 ------------> C_1 ------------> C_0
 dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
                   dim(Z_1)=%-8d
@@ -452,7 +452,6 @@ dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
                   dim(H_1)=%-8d
 `, dimC2, dimC1, dimC0, dimZ1, dimB1, dimH1)
 	}
-
 
 	Z1 = automorphism(d1colops, dimC1, d1rank, dimC1, verbose)
 
@@ -465,7 +464,7 @@ dim(C_2)=%-8d dim(C_1)=%-8d dim(C_0)=%-8d
 	P := PT.Transpose()
 
 	U = align(B1smith.Sparse(), P.Dense(), B1colops, Z1.Sparse(), verbose)
-	return U, B1, Z1
+	return U, B1, Z1, dimZ1, dimB1, dimH1
 }
 
 func smithNormalForm(M BinaryMatrix, verbose bool) (smith BinaryMatrix, rowops, colops []Operation, rank int) {
@@ -480,10 +479,10 @@ func smithNormalForm(M BinaryMatrix, verbose bool) (smith BinaryMatrix, rowops, 
 }
 
 func automorphism(ops []Operation, dim, cropStart, cropEnd int, verbose bool) BinaryMatrix {
-  	M := NewDenseBinaryMatrixIdentity(dim)
+	M := NewDenseBinaryMatrixIdentity(dim)
 	reader := NewOperationSliceReader(ops)
 	streamer := NewOpsFileMatrixStreamer(reader, M, verbose)
- 	streamer.Stream()
+	streamer.Stream()
 	if cropStart > 0 || cropEnd < dim {
 		if verbose {
 			log.Printf("cropping to columns %d-%d", cropStart, cropEnd)

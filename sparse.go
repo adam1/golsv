@@ -17,8 +17,8 @@ import (
 // list-of-lists format.  (aka "column support" format)
 type Sparse struct {
 	Rows, Cols int
-	ColData []orderedIntSet
-	verbose bool
+	ColData    []orderedIntSet
+	verbose    bool
 }
 
 func NewSparseBinaryMatrix(rows, cols int) *Sparse {
@@ -27,10 +27,24 @@ func NewSparseBinaryMatrix(rows, cols int) *Sparse {
 		colData[j] = make(orderedIntSet, 0)
 	}
 	return &Sparse{
-		Rows: rows,
-		Cols: cols,
+		Rows:    rows,
+		Cols:    cols,
 		ColData: colData,
 	}
+}
+
+func NewSparseBinaryMatrixFromColumnVectors(vecs []BinaryVector) *Sparse {
+	rows := vecs[0].Length()
+	cols := len(vecs)
+	M := NewSparseBinaryMatrix(rows, cols)
+	for j, v := range vecs {
+		for i := 0; i < rows; i++ {
+			if v.Get(i) == 1 {
+				M.Set(i, j, 1)
+			}
+		}
+	}
+	return M
 }
 
 func NewSparseBinaryMatrixFromRowInts(ints [][]uint8) *Sparse {
@@ -43,9 +57,9 @@ func NewSparseBinaryMatrixFromRowInts(ints [][]uint8) *Sparse {
 
 func NewSparseBinaryMatrixFromString(s string) *Sparse {
 	// e.g.
-	// 0 1 1 
-	// 1 0 0 
-	// 0 1 1 
+	// 0 1 1
+	// 1 0 0
+	// 0 1 1
 	rowStrings := strings.Split(strings.TrimSpace(s), "\n")
 	rows := len(rowStrings)
 	cols := len(strings.Split(strings.TrimSpace(rowStrings[0]), " "))
@@ -96,22 +110,22 @@ func (S *Sparse) AddColumn(source, target int) {
 func (S *Sparse) AddRow(source, target int) {
 	genericAddRow(S, source, target)
 	// xxx this seems klunky;  not being utilized currently
-// 	for j := 0; j < S.NumColumns(); j++ {
-// 		if S.Get(source, j) == 1 {
-// 			added := false
-// 			for _, k := range S.ColData[j] {
-// 				if k > target {
-// 					break
-// 				} else if k == target {
-// 					S.ColData[j].Unset(k)
-// 					added = true
-// 				}
-// 			}
-// 			if !added {
-// 				S.ColData[j].Set(target)
-// 			}
-// 		}
-// 	}
+	// 	for j := 0; j < S.NumColumns(); j++ {
+	// 		if S.Get(source, j) == 1 {
+	// 			added := false
+	// 			for _, k := range S.ColData[j] {
+	// 				if k > target {
+	// 					break
+	// 				} else if k == target {
+	// 					S.ColData[j].Unset(k)
+	// 					added = true
+	// 				}
+	// 			}
+	// 			if !added {
+	// 				S.ColData[j].Set(target)
+	// 			}
+	// 		}
+	// 	}
 }
 
 func (S *Sparse) ApplyColumnOperation(op Operation) {
@@ -163,6 +177,22 @@ func (S *Sparse) AsRowVector() BinaryVector {
 	return genericAsRowVector(S)
 }
 
+func (S *Sparse) ColumnDifferences() BinaryMatrix {
+	colVecs := make([]BinaryVector, S.NumColumns())
+	for j := 0; j < S.NumColumns(); j++ {
+		colVecs[j] = S.ColumnVector(j)
+	}
+	diffVecs := make([]BinaryVector, 0)
+	for j := 0; j < S.NumColumns()-1; j++ {
+		for k := j + 1; k < S.NumColumns(); k++ {
+			//log.Printf("diffVecs (%d, %d) -> %d", j, k, len(diffVecs))
+			diff := colVecs[j].Add(colVecs[k])
+			diffVecs = append(diffVecs, diff)
+		}
+	}
+	return NewSparseBinaryMatrixFromColumnVectors(diffVecs)
+}
+
 func (S *Sparse) ColumnIsZero(index int) bool {
 	return genericColumnIsZero(S, index)
 }
@@ -185,8 +215,8 @@ func (S *Sparse) ColumnWeight(index int) int {
 
 func (S *Sparse) Copy() BinaryMatrix {
 	N := &Sparse{
-		Rows: S.Rows,
-		Cols: S.Cols,
+		Rows:    S.Rows,
+		Cols:    S.Cols,
 		ColData: make([]orderedIntSet, S.Cols),
 	}
 	for j := 0; j < S.Cols; j++ {
@@ -202,7 +232,7 @@ func (S *Sparse) Dense() *DenseBinaryMatrix {
 
 func (S *Sparse) DenseSubmatrix(rowStart, rowEnd, colStart, colEnd int) *DenseBinaryMatrix {
 	var M *DenseBinaryMatrix
-	M = NewDenseBinaryMatrix(rowEnd - rowStart, colEnd - colStart)
+	M = NewDenseBinaryMatrix(rowEnd-rowStart, colEnd-colStart)
 	verbose := false
 	colWorkGroup := NewWorkGroup(verbose)
 	batch := make([]Work, 0)
@@ -214,16 +244,16 @@ func (S *Sparse) DenseSubmatrix(rowStart, rowEnd, colStart, colEnd int) *DenseBi
 }
 
 type copyToDenseInitedColumnWork struct {
-	src *Sparse
-	dest *DenseBinaryMatrix
-	col, colDest int
+	src              *Sparse
+	dest             *DenseBinaryMatrix
+	col, colDest     int
 	rowStart, rowEnd int
 }
 
 func (w *copyToDenseInitedColumnWork) Do() {
 	for _, i := range w.src.ColData[w.col] {
 		if i >= w.rowStart && i < w.rowEnd {
-			w.dest.Set(i - w.rowStart, w.colDest, 1)
+			w.dest.Set(i-w.rowStart, w.colDest, 1)
 		}
 	}
 }
@@ -237,7 +267,7 @@ func (S *Sparse) Density(row, col int) float64 {
 			}
 		}
 	}
-	return float64(count) / float64((S.Rows - row) * (S.Cols - col))
+	return float64(count) / float64((S.Rows-row)*(S.Cols-col))
 }
 
 // xxx
@@ -340,6 +370,17 @@ func (S *Sparse) NumRows() int {
 	return S.Rows
 }
 
+func (S *Sparse) OmitColumns(columns map[int]any) BinaryMatrix {
+	M := NewSparseBinaryMatrix(S.Rows, 0)
+	for j := 0; j < S.NumColumns(); j++ {
+		if _, ok := columns[j]; !ok {
+			P := S.Submatrix(0, S.NumRows(), j, j+1)
+			M.AppendColumns(P)
+		}
+	}
+	return M
+}
+
 func (S *Sparse) Overwrite(row int, col int, N BinaryMatrix) {
 	// xxx optimize
 	genericOverwrite(S, row, col, N)
@@ -416,8 +457,8 @@ func (S *Sparse) Submatrix(rowStart, rowEnd, colStart, colEnd int) BinaryMatrix 
 	if rowStart == 0 && rowEnd == S.Rows {
 		// this particular case is optimized
 		return &Sparse{
-			Rows: S.Rows,
-			Cols: colEnd - colStart,
+			Rows:    S.Rows,
+			Cols:    colEnd - colStart,
 			ColData: S.ColData[colStart:colEnd],
 		}
 	}
@@ -447,7 +488,7 @@ func (S *Sparse) Transpose() BinaryMatrix {
 	timeStart := time.Now()
 	timeLastReport := timeStart
 	jLastReport := 0
-	
+
 	for j := 0; j < S.NumColumns(); j++ {
 		for _, i := range S.ColData[j] {
 			M.Set(j, i, 1)
@@ -465,7 +506,7 @@ func (S *Sparse) Transpose() BinaryMatrix {
 			timeLastReport = now
 			jLastReport = j
 			if intervalElapsed.Seconds() > 10 {
-				statInterval = 1 + statInterval / 2
+				statInterval = 1 + statInterval/2
 			} else if intervalElapsed.Seconds() < 1 {
 				statInterval *= 2
 			}
@@ -481,7 +522,6 @@ func (S *Sparse) Transpose() BinaryMatrix {
 //   - each line is a space-separated list of integers
 //     representing the row indices of the 1s in that column.
 //   - first line is a header with the number of rows and columns
-//
 func (S *Sparse) WriteFile(filename string) {
 	f, err := os.Create(filename)
 	if err != nil {
@@ -569,7 +609,6 @@ func ReadSparseBinaryMatrixFile(filename string) BinaryMatrix {
 	}
 }
 
-
 type orderedIntSet []int
 
 // xxx later: upgrade to binary search
@@ -582,7 +621,7 @@ func (O *orderedIntSet) Max() int {
 }
 
 func (O *orderedIntSet) Set(m int) {
-    for p := 0; p < len(*O); p++ {
+	for p := 0; p < len(*O); p++ {
 		if (*O)[p] > m {
 			*O = append((*O)[:p], append([]int{m}, (*O)[p:]...)...)
 			return

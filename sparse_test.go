@@ -7,33 +7,43 @@ import (
 	"testing"
 )
 
+func TestNewSparseBinaryMatrixFromColumnVectors(t *testing.T) {
+	M := NewSparseBinaryMatrixFromColumnVectors([]BinaryVector{
+		NewBinaryVectorFromString("100"),
+		NewBinaryVectorFromString("010"),
+		NewBinaryVectorFromString("001"),
+	})
+	if !M.Equal(NewSparseBinaryMatrixIdentity(3)) {
+		t.Errorf("M != I")
+	}
+}
 
 func TestOrderedIntSet_SetUnset(t *testing.T) {
 	SET, UNSET := 1, 2
-    tests := []struct {
+	tests := []struct {
 		set  orderedIntSet
 		op   int
 		val  int
 		want orderedIntSet
 	}{
 		{orderedIntSet{}, SET, 0, orderedIntSet{0}},
-		{orderedIntSet{1}, SET, 0, orderedIntSet{0,1}},
-		{orderedIntSet{1}, SET, 2, orderedIntSet{1,2}},
+		{orderedIntSet{1}, SET, 0, orderedIntSet{0, 1}},
+		{orderedIntSet{1}, SET, 2, orderedIntSet{1, 2}},
 		{orderedIntSet{1}, SET, 1, orderedIntSet{1}},
-		{orderedIntSet{1,77}, SET, 77, orderedIntSet{1,77}},
-		{orderedIntSet{1,77}, SET, 0, orderedIntSet{0,1,77}},
-		{orderedIntSet{1,77}, SET, 14, orderedIntSet{1,14,77}},
-		{orderedIntSet{1,77}, SET, 77, orderedIntSet{1,77}},
-		{orderedIntSet{1,77}, SET, 78, orderedIntSet{1,77,78}},
+		{orderedIntSet{1, 77}, SET, 77, orderedIntSet{1, 77}},
+		{orderedIntSet{1, 77}, SET, 0, orderedIntSet{0, 1, 77}},
+		{orderedIntSet{1, 77}, SET, 14, orderedIntSet{1, 14, 77}},
+		{orderedIntSet{1, 77}, SET, 77, orderedIntSet{1, 77}},
+		{orderedIntSet{1, 77}, SET, 78, orderedIntSet{1, 77, 78}},
 		{orderedIntSet{}, UNSET, 0, orderedIntSet{}},
 		{orderedIntSet{0}, UNSET, 0, orderedIntSet{}},
-		{orderedIntSet{0,1}, UNSET, 0, orderedIntSet{1}},
-		{orderedIntSet{0,1}, UNSET, 1, orderedIntSet{0}},
-		{orderedIntSet{0,1,77}, UNSET, -1, orderedIntSet{0,1,77}},
-		{orderedIntSet{0,1,77}, UNSET, 0, orderedIntSet{1,77}},
-		{orderedIntSet{0,1,77}, UNSET, 1, orderedIntSet{0,77}},
-		{orderedIntSet{0,1,77}, UNSET, 77, orderedIntSet{0,1}},
-		{orderedIntSet{0,1,77}, UNSET, 78, orderedIntSet{0,1,77}},
+		{orderedIntSet{0, 1}, UNSET, 0, orderedIntSet{1}},
+		{orderedIntSet{0, 1}, UNSET, 1, orderedIntSet{0}},
+		{orderedIntSet{0, 1, 77}, UNSET, -1, orderedIntSet{0, 1, 77}},
+		{orderedIntSet{0, 1, 77}, UNSET, 0, orderedIntSet{1, 77}},
+		{orderedIntSet{0, 1, 77}, UNSET, 1, orderedIntSet{0, 77}},
+		{orderedIntSet{0, 1, 77}, UNSET, 77, orderedIntSet{0, 1}},
+		{orderedIntSet{0, 1, 77}, UNSET, 78, orderedIntSet{0, 1, 77}},
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -53,19 +63,19 @@ func TestOrderedIntSet_SetUnset(t *testing.T) {
 func TestOrderedIntSet_Next(t *testing.T) {
 	tests := []struct {
 		set  orderedIntSet
-		m int
+		m    int
 		want int
 	}{
 		{orderedIntSet{}, 0, -1},
 		{orderedIntSet{0}, 0, 0},
 		{orderedIntSet{0}, 1, -1},
-		{orderedIntSet{0,1}, 0, 0},
-		{orderedIntSet{0,1}, 1, 1},
-		{orderedIntSet{0,2}, 1, 2},
-		{orderedIntSet{0,2,77}, 1, 2},
-		{orderedIntSet{0,2,77}, 3, 77},
-		{orderedIntSet{0,2,77}, 77, 77},
-		{orderedIntSet{0,2,77}, 78, -1},
+		{orderedIntSet{0, 1}, 0, 0},
+		{orderedIntSet{0, 1}, 1, 1},
+		{orderedIntSet{0, 2}, 1, 2},
+		{orderedIntSet{0, 2, 77}, 1, 2},
+		{orderedIntSet{0, 2, 77}, 3, 77},
+		{orderedIntSet{0, 2, 77}, 77, 77},
+		{orderedIntSet{0, 2, 77}, 78, -1},
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
@@ -79,19 +89,19 @@ func TestOrderedIntSet_Next(t *testing.T) {
 
 func TestOrderedIntSet_MergeDrop(t *testing.T) {
 	tests := []struct {
-		set  orderedIntSet
+		set   orderedIntSet
 		other orderedIntSet
-		want orderedIntSet
+		want  orderedIntSet
 	}{
 		{orderedIntSet{}, orderedIntSet{}, orderedIntSet{}},
 		{orderedIntSet{}, orderedIntSet{1}, orderedIntSet{1}},
 		{orderedIntSet{1}, orderedIntSet{}, orderedIntSet{1}},
 		{orderedIntSet{1}, orderedIntSet{1}, orderedIntSet{}},
-		{orderedIntSet{1}, orderedIntSet{1,2}, orderedIntSet{2}},
-		{orderedIntSet{0,7}, orderedIntSet{0,7}, orderedIntSet{}},
-		{orderedIntSet{1,7}, orderedIntSet{0}, orderedIntSet{0,1,7}},
-		{orderedIntSet{1,7}, orderedIntSet{0,1}, orderedIntSet{0,7}},
-		{orderedIntSet{1,7}, orderedIntSet{0,9}, orderedIntSet{0,1,7,9}},
+		{orderedIntSet{1}, orderedIntSet{1, 2}, orderedIntSet{2}},
+		{orderedIntSet{0, 7}, orderedIntSet{0, 7}, orderedIntSet{}},
+		{orderedIntSet{1, 7}, orderedIntSet{0}, orderedIntSet{0, 1, 7}},
+		{orderedIntSet{1, 7}, orderedIntSet{0, 1}, orderedIntSet{0, 7}},
+		{orderedIntSet{1, 7}, orderedIntSet{0, 9}, orderedIntSet{0, 1, 7, 9}},
 	}
 	for i, tt := range tests {
 		name := fmt.Sprintf("%d", i)
@@ -106,16 +116,16 @@ func TestOrderedIntSet_MergeDrop(t *testing.T) {
 
 func TestOrderedIntSet_Toggle(t *testing.T) {
 	tests := []struct {
-		set  orderedIntSet
+		set   orderedIntSet
 		index int
-		want orderedIntSet
+		want  orderedIntSet
 	}{
 		{orderedIntSet{}, 0, orderedIntSet{0}},
 		{orderedIntSet{0}, 0, orderedIntSet{}},
-		{orderedIntSet{0}, 1, orderedIntSet{0,1}},
-		{orderedIntSet{0,1}, 0, orderedIntSet{1}},
-		{orderedIntSet{0,1}, 1, orderedIntSet{0}},
-		{orderedIntSet{0,1}, 2, orderedIntSet{0,1,2}},
+		{orderedIntSet{0}, 1, orderedIntSet{0, 1}},
+		{orderedIntSet{0, 1}, 0, orderedIntSet{1}},
+		{orderedIntSet{0, 1}, 1, orderedIntSet{0}},
+		{orderedIntSet{0, 1}, 2, orderedIntSet{0, 1, 2}},
 	}
 	for i, tt := range tests {
 		name := fmt.Sprintf("%d", i)
@@ -136,90 +146,90 @@ func Benchmark_SparseAddColumn(b *testing.B) {
 	s := NewRandomSparseBinaryMatrix(rows, cols, density, secureRandom)
 	source := rand.Intn(cols / 2)
 	for i := 0; i < b.N; i++ {
-		target := source + 1 + rand.Intn((cols - 1)  / 2)
+		target := source + 1 + rand.Intn((cols-1)/2)
 		s.AddColumn(source, target)
 	}
 }
 
 func TestSparse_IsSmithNormalForm(t *testing.T) {
 	tests := []struct {
-		s    *Sparse
+		s         *Sparse
 		wantSmith bool
-		wantRank int
+		wantRank  int
 	}{
 		{
 			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,0,0},
-			{0,1,0},
-			{0,0,1},
-		}), true, 3},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,1,0},
-			{0,1,0},
-			{0,0,1},
-		}), false, 0},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,0,0},
-			{0,1,0},
-			{1,0,1},
-		}), false, 0},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,0,0,0},
-			{0,1,0,0},
-			{0,0,1,0},
-		}), true, 3},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,0,0},
-			{0,1,0},
-			{0,0,1},
-			{0,0,0},
-		}), true, 3},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,1,0,0},
-			{0,1,0,0},
-			{0,0,1,0},
-		}), false, 0},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,1,0},
-			{0,1,0},
-			{0,0,1},
-			{0,0,0},
-			}), false, 0},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{0,0},
-			{0,0},
-			{0,0},
-			{0,0},
-			{1,0},
-			{0,1},
-			}), false, 0},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{0,0,0},
-			{0,0,1},
-			{0,0,0},
-			{0,0,0},
-			{1,0,0},
-			{0,1,0},
-			}), false, 0},
-		{
-			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,0,0,0},
-			{0,1,0,0},
-			{0,0,1,0},
+				{1, 0, 0},
+				{0, 1, 0},
+				{0, 0, 1},
 			}), true, 3},
 		{
 			NewSparseBinaryMatrixFromRowInts([][]uint8{
-			{1,0,0,0},
-			{0,1,0,1},
-			{0,0,1,0},
+				{1, 1, 0},
+				{0, 1, 0},
+				{0, 0, 1},
+			}), false, 0},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0},
+				{0, 1, 0},
+				{1, 0, 1},
+			}), false, 0},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0, 0},
+				{0, 1, 0, 0},
+				{0, 0, 1, 0},
+			}), true, 3},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0},
+				{0, 1, 0},
+				{0, 0, 1},
+				{0, 0, 0},
+			}), true, 3},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 1, 0, 0},
+				{0, 1, 0, 0},
+				{0, 0, 1, 0},
+			}), false, 0},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 1, 0},
+				{0, 1, 0},
+				{0, 0, 1},
+				{0, 0, 0},
+			}), false, 0},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{0, 0},
+				{1, 0},
+				{0, 1},
+			}), false, 0},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{0, 0, 0},
+				{0, 0, 1},
+				{0, 0, 0},
+				{0, 0, 0},
+				{1, 0, 0},
+				{0, 1, 0},
+			}), false, 0},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0, 0},
+				{0, 1, 0, 0},
+				{0, 0, 1, 0},
+			}), true, 3},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0, 0},
+				{0, 1, 0, 1},
+				{0, 0, 1, 0},
 			}), false, 0},
 	}
 	for i, tt := range tests {
@@ -316,5 +326,108 @@ func TestSparseAppendSparseColumn(t *testing.T) {
 		if !col.Equal(v) {
 			t.Errorf("!col.Equal(v)")
 		}
+	}
+}
+
+func TestSparseColumnDifferences(t *testing.T) {
+	tests := []struct {
+		matrix *Sparse
+		want   BinaryMatrix
+	}{
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0},
+				{0, 1, 0},
+				{0, 0, 1},
+			}),
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 1, 0},
+				{1, 0, 1},
+				{0, 1, 1},
+			}),
+		},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 1, 0},
+				{0, 1, 1},
+				{1, 0, 1},
+			}),
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{0, 1, 1},
+				{1, 1, 0},
+				{1, 0, 1},
+			}),
+		},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0},
+				{0, 1},
+			}),
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1},
+				{1},
+			}),
+		},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 1},
+				{1, 1},
+			}),
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{0},
+				{0},
+			}),
+		},
+	}
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			got := tt.matrix.ColumnDifferences()
+			if !got.Equal(tt.want) {
+				t.Errorf("test %d: got %v, want %v", i, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSparseOmitColumns(t *testing.T) {
+	tests := []struct {
+		matrix *Sparse
+		omit   map[int]any
+		want   BinaryMatrix
+	}{
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0},
+				{0, 1, 0},
+				{0, 0, 1},
+			}),
+			map[int]any{1: nil},
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0},
+				{0, 0},
+				{0, 1},
+			}),
+		},
+		{
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{1, 0, 0},
+				{0, 1, 0},
+				{0, 0, 1},
+			}),
+			map[int]any{0: nil, 2: nil},
+			NewSparseBinaryMatrixFromRowInts([][]uint8{
+				{0},
+				{1},
+				{0},
+			}),
+		},
+	}
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			got := tt.matrix.OmitColumns(tt.omit)
+			if !got.Equal(tt.want) {
+				t.Errorf("test %d: got %v, want %v", i, got, tt.want)
+			}
+		})
 	}
 }

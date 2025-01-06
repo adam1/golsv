@@ -86,7 +86,7 @@ func (E Edge) OrbitContainsEdge(lsv *LsvContext, f Edge) (g *MatGF, ok bool) {
 	// if g*E = f, then either
 	//     1) g*[c,d] = [a,b]
 	//       so g*c = a and g*d = b, hence g = a c^-1
-	// 
+	//
 	//  OR 2) g*[c,d] = [b,a]
 	//       so g*c = b and g*d = a, hence g = b c^-1
 	//
@@ -95,7 +95,7 @@ func (E Edge) OrbitContainsEdge(lsv *LsvContext, f Edge) (g *MatGF, ok bool) {
 	gd := g.Multiply(lsv, &d)
 	if gd.Equal(lsv, &b) {
 		return g, true
-	}		
+	}
 	g = b.Multiply(lsv, cInv)
 	gd = g.Multiply(lsv, &d)
 	if gd.Equal(lsv, &a) {
@@ -117,7 +117,6 @@ func (E Edge) String() string {
 func (E Edge) Generator(lsv *LsvContext) *MatGF {
 	return E[0].Inverse(lsv).Multiply(lsv, &E[1]).MakeCanonical(lsv)
 }
-
 
 // xxx this might be more appropriately called EdgeSet, unless we
 // enforce that the edges are sorted such that adjacent edges share a
@@ -155,7 +154,7 @@ func NewPathFromEdges(lsv *LsvContext, edges []Edge) Path {
 func (p Path) Chords(lsv *LsvContext, gens []MatGF) []Edge {
 	// log.Printf("xxx Chords: len(gens)= %v", len(gens))
 	chords := make([]Edge, 0)
- 	_, vertices := p.Word(lsv)
+	_, vertices := p.Word(lsv)
 	// if the path is a cycle, i.e. the first and last vertices are
 	// the same, then we don't want to consider the last vertex as the
 	// end of a chord, since it would be redundant with counting that
@@ -168,13 +167,13 @@ func (p Path) Chords(lsv *LsvContext, gens []MatGF) []Edge {
 	if isCycle {
 		n--
 	}
-	for i := 0; i < n - 2; i++ {
+	for i := 0; i < n-2; i++ {
 		v := vertices[i]
 		end := n
 		if isCycle && i == 0 && end > 0 {
 			end--
 		}
-		for j := i+2; j < end; j++ {
+		for j := i + 2; j < end; j++ {
 			// log.Printf("xxx i=%d j=%d", i, j)
 			u := vertices[j]
 			for _, g := range gens {
@@ -201,7 +200,7 @@ func (p Path) Chords(lsv *LsvContext, gens []MatGF) []Edge {
 // 		// when incrementing length, does not have to redo enumeration
 // 		// of subwords.
 // 		for _, g := range gens {
-			
+
 // 		}
 // 	}
 // 	return nil
@@ -349,7 +348,7 @@ func (T Triangle) OrbitContainsEdge(lsv *LsvContext, e Edge) (g *MatGF, found bo
 			// log.Printf("found edge %v in orbit of %v via %v", e, f, g)
 			return g, true
 		}
-	}		
+	}
 	return nil, false
 }
 
@@ -413,13 +412,12 @@ func (T Triangle) String() string {
 	return fmt.Sprintf("[%s %s %s]", T[0], T[1], T[2])
 }
 
-
 type Complex struct {
-    vertexBasis   []Vertex
+	vertexBasis   []Vertex
 	edgeBasis     []Edge
 	triangleBasis []Triangle
 	d1            BinaryMatrix
-	d2 		      BinaryMatrix
+	d2            BinaryMatrix
 	d2Transpose   BinaryMatrix
 	EdgeIndex     map[Edge]int   // edge -> index in basis
 	VertexIndex   map[Vertex]int // vertex -> index in basis
@@ -439,10 +437,10 @@ func NewComplex(vertexBasis []Vertex, edgeBasis []Edge, triangleBasis []Triangle
 		})
 	}
 	C := Complex{
-		vertexBasis: vertexBasis,
-		edgeBasis: edgeBasis,
+		vertexBasis:   vertexBasis,
+		edgeBasis:     edgeBasis,
 		triangleBasis: triangleBasis,
-		verbose: verbose,
+		verbose:       verbose,
 	}
 	C.computeVertexIndex()
 	C.computeEdgeIndex()
@@ -539,7 +537,7 @@ func (C *Complex) DumpBases() (s string) {
 	s += "triangleBasis:\n"
 	for i, t := range C.triangleBasis {
 		s += fmt.Sprintf("  %d: [%d %d %d]\n", i, C.VertexIndex[t[0]], C.VertexIndex[t[1]], C.VertexIndex[t[2]])
-	}		
+	}
 	return s
 }
 
@@ -641,7 +639,7 @@ func (C *Complex) VertexBasis() []Vertex {
 	return C.vertexBasis
 }
 
-func WriteStringFile[S fmt.Stringer] (items []S, filename string) {
+func WriteStringFile[S fmt.Stringer](items []S, filename string) {
 	f, err := os.Create(filename)
 	if err != nil {
 		panic(err)
@@ -660,7 +658,7 @@ func WriteStringFile[S fmt.Stringer] (items []S, filename string) {
 	}
 }
 
-func ReadStringFile[T any] (filename string, fromString func(string) T) []T {
+func ReadStringFile[T any](filename string, fromString func(string) T) []T {
 	objects := make([]T, 0)
 	f, err := os.Open(filename)
 	if err != nil {
@@ -711,3 +709,25 @@ func ReadTriangleFile(filename string) (triangles []Triangle) {
 	return ReadStringFile(filename, NewTriangleFromString)
 }
 
+func WriteComplexGraphvizFile[T any](C *ZComplex[T], filename string, verbose bool) {
+	viz := NewZComplexToGraphviz(C)
+	G, err := viz.Graphviz()
+	if err != nil {
+		log.Fatalf("error creating graphviz: %v", err)
+	}
+	if verbose {
+		log.Printf("writing graphviz file to %s", filename)
+	}
+	f, err := os.Create(filename)
+	if err != nil {
+		log.Fatalf("error creating graphviz file: %v", err)
+	}
+	defer f.Close()
+	s := G.String()
+	if err := os.WriteFile(filename, []byte(s), 0644); err != nil {
+		log.Fatalf("error writing graphviz file: %v", err)
+	}
+	if verbose {
+		log.Printf("done writing graphviz file")
+	}
+}

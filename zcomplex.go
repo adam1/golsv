@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 )
+
 // this file models a 2-d simplicial complex.  it was originally
 // derived from complex.go in an attempt to factor out the common part
 // in a type-generic way.
@@ -129,11 +130,11 @@ func TriangleSetEqual[VertexType any](S, U []ZTriangle[VertexType]) bool {
 }
 
 type ZComplex[T any] struct {
-    vertexBasis   []ZVertex[T]
+	vertexBasis   []ZVertex[T]
 	edgeBasis     []ZEdge[T]
 	triangleBasis []ZTriangle[T]
 	d1            BinaryMatrix
-	d2 		      BinaryMatrix
+	d2            BinaryMatrix
 	edgeIndex     map[ZEdge[T]]int   // edge -> index in basis
 	vertexIndex   map[ZVertex[T]]int // vertex -> index in basis
 	verbose       bool
@@ -152,10 +153,10 @@ func NewZComplex[T any](vertexBasis []ZVertex[T], edgeBasis []ZEdge[T], triangle
 		})
 	}
 	C := ZComplex[T]{
-		vertexBasis: vertexBasis,
-		edgeBasis: edgeBasis,
+		vertexBasis:   vertexBasis,
+		edgeBasis:     edgeBasis,
 		triangleBasis: triangleBasis,
-		verbose: verbose,
+		verbose:       verbose,
 	}
 	C.computeVertexIndex()
 	C.computeEdgeIndex()
@@ -326,13 +327,13 @@ func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) {
 		a := C.edgeBasis[i]
 		b := C.edgeBasis[j]
 		return nearerEdgeInNewIndex(newVertexIndex, a, b)
-	}) 
+	})
 	C.computeEdgeIndex()
 	sort.Slice(C.triangleBasis, func(i, j int) bool {
 		a := C.triangleBasis[i]
 		b := C.triangleBasis[j]
 		return nearerTriangleInNewIndex(newVertexIndex, a, b)
-	}) 
+	})
 	C.d1 = nil
 	C.d2 = nil
 }
@@ -424,8 +425,28 @@ func (C *ZComplex[T]) DumpBases() (s string) {
 	s += "triangleBasis:\n"
 	for i, t := range C.triangleBasis {
 		s += fmt.Sprintf("  %d: %s\n", i, t)
-	}		
+	}
 	return s
+}
+
+// xxx test
+func (C *ZComplex[T]) SubcomplexByEdges(edges map[int]any) *ZComplex[T] {
+	vertices := make(map[ZVertex[T]]bool)
+	edgeBasis := make([]ZEdge[T], 0)
+	for i, e := range C.edgeBasis {
+		if _, ok := edges[i]; ok {
+			edgeBasis = append(edgeBasis, e)
+			vertices[e[0]] = true
+			vertices[e[1]] = true
+		}
+	}
+	vertexBasis := make([]ZVertex[T], 0, len(vertices))
+	for v := range vertices {
+		vertexBasis = append(vertexBasis, v)
+	}
+	sortBases := false
+	verbose := false
+	return NewZComplex(vertexBasis, edgeBasis, nil, sortBases, verbose)
 }
 
 // xxx test
@@ -598,7 +619,6 @@ func (Q *ZTriangleQueue[T]) Len() int {
 	return len(Q.slice)
 }
 
-
 type ZPath[T any] []ZEdge[T]
 
 // xxx test
@@ -631,15 +651,15 @@ func (v ZVertexInt) String() string {
 }
 
 func NewZComplexEmptyTriangle() *ZComplex[ZVertexInt] {
-	return NewZComplexFromMaximalSimplices([][]int{{0,1}, {1,2}, {2,0}})
+	return NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2}, {2, 0}})
 }
 
 func NewZComplexFilledTriangle() *ZComplex[ZVertexInt] {
-	return NewZComplexFromMaximalSimplices([][]int{{0,1,2}})
+	return NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}})
 }
 
 func NewZComplexJoinedFilledTriangles() *ZComplex[ZVertexInt] {
-	return NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {1,2,}})
+	return NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2}})
 }
 
 func NewZComplexFromTriangles(S []ZTriangle[ZVertexInt]) *ZComplex[ZVertexInt] {
@@ -803,4 +823,3 @@ func NewZComplexFromBoundaryMatrices(d_1, d_2 BinaryMatrix) *ZComplex[ZVertexInt
 	verbose := false
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }
-	

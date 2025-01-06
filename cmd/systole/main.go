@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"golsv"
 	"log"
 	"os"
-	"golsv"
 )
 
 // Usage 1 (given matrices B and U (see systole.go for their meaning):
@@ -20,10 +20,10 @@ import (
 // format.  First, it checks the weight of each column of U.  The
 // minimum weight is an upper bound for the minimum weight of a
 // nonzero vector Z_1 \setminus B_1. (see the align program.)
-// 
+//
 // If N is zero, the program exhaustively enumerates all sums of
 // columns of B and U, and records the minimum weight to min.txt.
-// 
+//
 // If N > 0, then for N iterations, it picks a random column vector
 // from U and adds random vector from the column space of B.  It
 // measures the weight of the resulting vector.  Repeatedly doing
@@ -46,7 +46,7 @@ func main() {
 		D2 = golsv.ReadSparseBinaryMatrixFile(args.D2File)
 		log.Printf("done; read %s", D2)
 
-		systole := golsv.ComputeFirstSystole(D1, D2, args.verbose)
+		systole, _, _, _ := golsv.ComputeFirstSystole(D1, D2, args.verbose)
 		log.Printf("systole=%d", systole)
 		if args.SystoleFile != "" {
 			writeMinWeight(systole, args.SystoleFile)
@@ -98,14 +98,14 @@ func writeMinWeight(minWeight int, minFile string) {
 
 type Args struct {
 	golsv.ProfileArgs
-	BFile string
-	UFile string
-	D1File string
-	D2File string
-	SystoleFile string
+	BFile         string
+	UFile         string
+	D1File        string
+	D2File        string
+	SystoleFile   string
 	CosystoleFile string
-	Trials int
-	verbose bool
+	Trials        int
+	verbose       bool
 }
 
 func parseFlags() *Args {

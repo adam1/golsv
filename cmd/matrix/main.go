@@ -18,13 +18,16 @@ type MatrixArgs struct {
 	Dump              bool
 	RowWeights        bool
 	ColWeights        bool
+	ColDiffs          bool
+	OmitColumns       map[int]any
 	ProjectionRowMask map[int]any
 	golsv.ProfileArgs
 }
 
 func parseFlags() MatrixArgs {
 	args := MatrixArgs{
-		Verbose: true,
+		Verbose:           true,
+		OmitColumns:       make(map[int]any),
 		ProjectionRowMask: make(map[int]any),
 	}
 	args.ProfileArgs.ConfigureFlags()
@@ -34,10 +37,13 @@ func parseFlags() MatrixArgs {
 	flag.BoolVar(&args.Verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&args.RowWeights, "row-weights", false, "Show row weights")
 	flag.BoolVar(&args.ColWeights, "col-weights", false, "Show column weights")
+	flag.BoolVar(&args.ColDiffs, "col-diffs", false, "Compute column differences")
 
 	var rowIndicesStr string
 	flag.StringVar(&rowIndicesStr, "project-rows", "", "Project rows to the given indices (comma-separated)")
-	args.ProjectionRowMask = stringToIntSet(rowIndicesStr)
+
+	var omitColumnsStr string
+	flag.StringVar(&omitColumnsStr, "omit-columns", "", "Omit columns with the given indices (comma-separated)")
 
 	flag.BoolVar(&args.Dump, "dump", false, "Dump the matrix to stdout")
 	flag.Parse()
@@ -46,6 +52,8 @@ func parseFlags() MatrixArgs {
 		flag.Usage()
 		os.Exit(1)
 	}
+	args.ProjectionRowMask = stringToIntSet(rowIndicesStr)
+	args.OmitColumns = stringToIntSet(omitColumnsStr)
 	return args
 }
 
@@ -113,6 +121,16 @@ func main() {
 			fmt.Printf("col %d: %d\n", j, w)
 		}
 	}
+	if len(args.OmitColumns) > 0 {
+		M = M.Sparse().OmitColumns(args.OmitColumns)
+		if args.Verbose {
+			log.Printf("matrix after omitting columns: %s", M)
+		}
+	}
+
+	if args.ColDiffs {
+		M = M.Sparse().ColumnDifferences()
+	}
 	if args.OutputFile != "" {
 		if args.Verbose {
 			log.Printf("writing matrix to %s", args.OutputFile)
@@ -128,4 +146,3 @@ func readDebugMatrix(filename string) golsv.BinaryMatrix {
 	}
 	return golsv.NewSparseBinaryMatrixFromString(string(content))
 }
-

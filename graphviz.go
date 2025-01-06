@@ -17,8 +17,8 @@ func (viz *ZComplexToGraphviz[T]) Graphviz() (G *dot.Graph, err error) {
 
 	g.NodeInitializer(func(n dot.Node) {
 		n.Attr("shape", "circle")
-		n.Attr("width", "0.1")
-		n.Attr("height", "0.1")
+		n.Attr("width", "0.05")
+		n.Attr("height", "0.05")
 		n.Attr("fixedsize", "true")
 		n.Attr("label", "")
 		n.Attr("style", "filled")
@@ -34,10 +34,10 @@ func (viz *ZComplexToGraphviz[T]) Graphviz() (G *dot.Graph, err error) {
 	//edgeIndex := viz.complex.EdgeIndex()
 	for _, e := range viz.complex.EdgeBasis() {
 		// with label
-// 		ei, ok := edgeIndex[e]
-// 		if !ok {
-// 			panic("edge not found in edge index")
-// 		}
+		// 		ei, ok := edgeIndex[e]
+		// 		if !ok {
+		// 			panic("edge not found in edge index")
+		// 		}
 		// g.Edge(g.Node(e[0].String()), g.Node(e[1].String())).Attr("label", fmt.Sprintf("%d", ei))
 
 		// without label

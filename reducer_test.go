@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-
 func doKernelBasisTest(t *testing.T, A BinaryMatrix, numSamples int) (kernelMatrix BinaryMatrix) {
 	//  A = input matrix
 	//  B = reduced matrix
@@ -32,7 +31,7 @@ func doKernelBasisTest(t *testing.T, A BinaryMatrix, numSamples int) (kernelMatr
 	if showSteps {
 		fmt.Printf("kernelMatrix: %v", kernelMatrix)
 	}
-	dreducer := reducer.(*DiagonalReducer) 
+	dreducer := reducer.(*DiagonalReducer)
 	coimageMatrix := dreducer.CoimageBasis()
 	if rank != coimageMatrix.NumColumns() {
 		t.Errorf("Rank of reduced matrix does not match length of coimage basis")
@@ -72,8 +71,8 @@ func doKernelBasisTest(t *testing.T, A BinaryMatrix, numSamples int) (kernelMatr
 
 func TestReducer_KernelBasis(t *testing.T) {
 	tests := []struct {
-		name string
-		A    BinaryMatrix
+		name      string
+		A         BinaryMatrix
 		dimKernel int
 	}{
 		{
@@ -141,7 +140,7 @@ func TestReducer_KernelBasis(t *testing.T) {
 		{
 			name: "Test 8",
 			A: NewSparseBinaryMatrixFromString(
-`1 1 1 1 0 0 1 
+				`1 1 1 1 0 0 1 
 0 0 0 0 0 1 1
 1 0 1 0 0 0 0
 1 0 1 1 1 0 0
@@ -153,7 +152,7 @@ func TestReducer_KernelBasis(t *testing.T) {
 		{
 			name: "Test 9",
 			A: NewSparseBinaryMatrixFromString(
-`1 0 0 0 0 0 1 0 1 0 0 0 1 0 0 0 0
+				`1 0 0 0 0 0 1 0 1 0 0 0 1 0 0 0 0
  0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0
  0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1
  0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 1
@@ -163,7 +162,7 @@ func TestReducer_KernelBasis(t *testing.T) {
  0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
  0 0 1 0 0 0 0 0 0 0 1 0 0 0 1 0 0
  1 0 0 0 1 0 0 0 0 0 1 0 1 0 0 0 1`),
-				dimKernel: 9,
+			dimKernel: 9,
 		},
 	}
 	for _, tt := range tests {
@@ -249,7 +248,7 @@ func TestReducer_SwitchToDense(t *testing.T) {
 			// log.Printf("xxx ==================== Reducer 2:\n")
 			R2 := NewDiagonalReducer(verbose)
 			R2.switchToDensePredicate = func(remaining int, subdensity float64) bool {
-				return remaining <= cols / 2
+				return remaining <= cols/2
 			}
 			R2.statIntervalSteps = 1
 			B2 := A.Copy()
@@ -271,7 +270,7 @@ func TestReducerCheckOps(t *testing.T) {
 	for n := 0; n < trials; n++ {
 		var m int
 		if minSize < maxSize {
-			m = minSize + rand.Intn(maxSize - minSize) + 1
+			m = minSize + rand.Intn(maxSize-minSize) + 1
 		} else {
 			m = minSize
 		}
@@ -300,7 +299,7 @@ func TestReducerCheckOpsMatrices(t *testing.T) {
 	for n := 0; n < trials; n++ {
 		var m int
 		if minSize < maxSize {
-			m = minSize + rand.Intn(maxSize - minSize) + 1
+			m = minSize + rand.Intn(maxSize-minSize) + 1
 		} else {
 			m = minSize
 		}
@@ -324,7 +323,7 @@ func TestReducerCheckOpsMatricesSpecific(t *testing.T) {
 		M BinaryMatrix
 	}{
 		{NewDenseBinaryMatrixFromString(
-`0 0 0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0 0
+			`0 0 0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0 0
 1 0 0 1 0 0 0 0 1 0 0 0 0 1 0 1 1 1 0
 0 0 0 0 0 0 1 0 0 1 1 1 0 1 0 1 1 0 0
 0 1 1 0 1 0 0 0 0 0 1 1 0 0 1 1 1 1 0
@@ -369,7 +368,7 @@ func TestReducerInvertRandom(t *testing.T) {
 	for n := 0; n < trials; n++ {
 		var m int
 		if minSize < maxSize {
-			m = minSize + rand.Intn(maxSize - minSize) + 1
+			m = minSize + rand.Intn(maxSize-minSize) + 1
 		} else {
 			m = minSize
 		}
@@ -406,7 +405,7 @@ func attemptInvert(t *testing.T, M BinaryMatrix) (MInv BinaryMatrix, ok bool) {
 
 func TestImageBasis(t *testing.T) {
 	tests := []struct {
-		M BinaryMatrix
+		M    BinaryMatrix
 		want BinaryMatrix
 	}{
 		{
@@ -473,7 +472,7 @@ func TestShor9qubit(t *testing.T) {
 		t.Errorf("d_1 * d_2 != 0")
 	}
 	verbose := false
-	U_1, B_1, Z_1 := UBDecomposition(d_1, d_2, verbose)
+	U_1, B_1, Z_1, _, _, _ := UBDecomposition(d_1, d_2, verbose)
 	dimH_1 := U_1.NumColumns()
 	if dimH_1 != 1 {
 		t.Errorf("dim(H_1) = %d, want 1", dimH_1)
@@ -486,32 +485,32 @@ func TestShor9qubit(t *testing.T) {
 	if S_1 != 3 {
 		t.Errorf("S_1 = %d, want 3", S_1)
 	}
-	Su1 := ComputeFirstSystole(d_1, d_2, verbose)
+	Su1, _, _, _ := ComputeFirstSystole(d_1, d_2, verbose)
 	if Su1 != 3 {
 		t.Errorf("Su1 = %d, want 3", Su1)
 	}
 
-// 	// xxx experimental; considering the effect of an automorphism
-// 	f := NewDenseBinaryMatrixFromString(
-// 		`1 0 0 0 0 0 0 0 0
-// 		 1 1 0 0 0 0 0 0 0
-// 		 0 0 1 0 0 0 0 0 0
-// 		 0 0 0 1 0 0 0 0 0
-// 		 0 0 0 0 1 0 0 0 0
-// 		 0 0 0 0 0 1 0 0 0
-// 		 0 0 0 0 0 0 1 0 0
-// 		 0 0 0 0 0 0 0 1 0
-// 		 0 0 0 0 0 0 0 0 1`)
-// 	fZ_1 := f.MultiplyRight(Z_1)
-// 	log.Printf("fZ_1: %s\n%s", fZ_1, DumpMatrix(fZ_1))
+	// 	// xxx experimental; considering the effect of an automorphism
+	// 	f := NewDenseBinaryMatrixFromString(
+	// 		`1 0 0 0 0 0 0 0 0
+	// 		 1 1 0 0 0 0 0 0 0
+	// 		 0 0 1 0 0 0 0 0 0
+	// 		 0 0 0 1 0 0 0 0 0
+	// 		 0 0 0 0 1 0 0 0 0
+	// 		 0 0 0 0 0 1 0 0 0
+	// 		 0 0 0 0 0 0 1 0 0
+	// 		 0 0 0 0 0 0 0 1 0
+	// 		 0 0 0 0 0 0 0 0 1`)
+	// 	fZ_1 := f.MultiplyRight(Z_1)
+	// 	log.Printf("fZ_1: %s\n%s", fZ_1, DumpMatrix(fZ_1))
 
-// 	fB_1 := f.MultiplyRight(B_1)
-// 	log.Printf("fB_1: %s\n%s", fB_1, DumpMatrix(fB_1))
+	// 	fB_1 := f.MultiplyRight(B_1)
+	// 	log.Printf("fB_1: %s\n%s", fB_1, DumpMatrix(fB_1))
 
-// 	d_1Uy := f.MultiplyRight(d_1).MultiplyRight(f) // note: f = f^-1
-// 	d_2Uy := f.MultiplyRight(d_2).MultiplyRight(f)
+	// 	d_1Uy := f.MultiplyRight(d_1).MultiplyRight(f) // note: f = f^-1
+	// 	d_2Uy := f.MultiplyRight(d_2).MultiplyRight(f)
 
-// 	log.Printf("d_1Uy: %s\n%s", d_1Uy, DumpMatrix(d_1Uy))
-// 	log.Printf("d_2Uy: %s\n%s", d_2Uy, DumpMatrix(d_2Uy))
-	
+	// 	log.Printf("d_1Uy: %s\n%s", d_1Uy, DumpMatrix(d_1Uy))
+	// 	log.Printf("d_2Uy: %s\n%s", d_2Uy, DumpMatrix(d_2Uy))
+
 }

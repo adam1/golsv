@@ -10,7 +10,7 @@ import (
 func TestCosystoleSearchTransform0(t *testing.T) {
 	tests := []struct {
 		EdgeStates [3]kEdgeState
-		Expected [][3]bool
+		Expected   [][3]bool
 	}{
 		{
 			[3]kEdgeState{kEdgeOff, kEdgeOff, kEdgeOff},
@@ -70,7 +70,7 @@ func TestCosystoleSearchTransform0(t *testing.T) {
 func TestCosystoleSearchTransform1(t *testing.T) {
 	tests := []struct {
 		EdgeStates [3]kEdgeState
-		Expected [][3]bool
+		Expected   [][3]bool
 	}{
 		{
 			[3]kEdgeState{kEdgeUndecided, kEdgeOff, kEdgeOff},
@@ -141,11 +141,10 @@ func TestCosystoleSearchTransform1(t *testing.T) {
 	}
 }
 
-
 func TestCosystoleSearchTransform2(t *testing.T) {
 	tests := []struct {
 		EdgeStates [3]kEdgeState
-		Expected [][3]bool
+		Expected   [][3]bool
 	}{
 		{
 			[3]kEdgeState{kEdgeUndecided, kEdgeUndecided, kEdgeOff},
@@ -201,7 +200,7 @@ func TestCosystoleSearchTransform2(t *testing.T) {
 func TestCosystoleSearchTransform3(t *testing.T) {
 	tests := []struct {
 		EdgeStates [3]kEdgeState
-		Expected [][3]bool
+		Expected   [][3]bool
 	}{
 		{
 			[3]kEdgeState{kEdgeUndecided, kEdgeUndecided, kEdgeUndecided},
@@ -222,9 +221,9 @@ func TestCosystoleSearchTransform3(t *testing.T) {
 }
 
 type tcase struct {
-	Complex *ZComplex[ZVertexInt]
-	Leaf *StateNode
-	Level int // level of leaf
+	Complex  *ZComplex[ZVertexInt]
+	Leaf     *StateNode
+	Level    int // level of leaf
 	Expected [3]kEdgeState
 }
 
@@ -232,9 +231,9 @@ func newTcase(simplices [][]int, branchData [][3]bool, level int, expected [3]kE
 	complex := NewZComplexFromMaximalSimplices(simplices)
 	_, leaf := branchFromBools(branchData, level)
 	return &tcase{
-		Complex: complex,
-		Leaf: leaf,
-		Level: level,
+		Complex:  complex,
+		Leaf:     leaf,
+		Level:    level,
 		Expected: expected,
 	}
 }
@@ -297,8 +296,8 @@ func TestCosystoleSearchEdgeStateForTriangle(t *testing.T) {
 
 	params := CosystoleSearchParams{
 		PruneByCohomologyProjection: false,
-		InitialSupport: false,
-		Verbose: false,
+		InitialSupport:              false,
+		Verbose:                     false,
 	}
 	for n, test := range tests {
 		search := NewCosystoleSearch(test.Complex, nil, nil, nil, params)
@@ -312,7 +311,7 @@ func TestCosystoleSearchEdgeStateForTriangle(t *testing.T) {
 
 func TestCosystoleSearchCocycles(t *testing.T) {
 	tests := []struct {
-		C *ZComplex[ZVertexInt]
+		C        *ZComplex[ZVertexInt]
 		Expected []BinaryVector
 	}{
 		{
@@ -340,8 +339,8 @@ func TestCosystoleSearchCocycles(t *testing.T) {
 	}
 	params := CosystoleSearchParams{
 		PruneByCohomologyProjection: false,
-		InitialSupport: false,
-		Verbose: false,
+		InitialSupport:              false,
+		Verbose:                     false,
 	}
 	for n, test := range tests {
 		S := NewCosystoleSearch(test.C, nil, nil, nil, params)
@@ -354,7 +353,7 @@ func TestCosystoleSearchCocycles(t *testing.T) {
 
 func TestCosystoleSearchSmall(t *testing.T) {
 	tests := []struct {
-		C *ZComplex[ZVertexInt]
+		C        *ZComplex[ZVertexInt]
 		Expected int
 	}{
 		{
@@ -368,11 +367,11 @@ func TestCosystoleSearchSmall(t *testing.T) {
 	}
 	params := CosystoleSearchParams{
 		PruneByCohomologyProjection: false,
-		InitialSupport: false,
-		Verbose: false,
+		InitialSupport:              false,
+		Verbose:                     false,
 	}
 	for n, test := range tests {
-		_, _, Z_1 := UBDecomposition(test.C.D1(), test.C.D2(), params.Verbose)
+		_, _, Z_1, _, _, _ := UBDecomposition(test.C.D1(), test.C.D2(), params.Verbose)
 		S := NewCosystoleSearch(test.C, Z_1, nil, nil, params)
 		cosystole := S.Cosystole()
 		if cosystole != test.Expected {
@@ -383,21 +382,21 @@ func TestCosystoleSearchSmall(t *testing.T) {
 
 func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 	tests := []struct {
-		C *ZComplex[ZVertexInt]
+		C     *ZComplex[ZVertexInt]
 		Focus bool
 	}{
 		// these are specific cases that highlighted bugs in the past
 		{
 			NewZComplexFromBoundaryMatrices(
 				NewDenseBinaryMatrixFromString(
-`1 0 0 0 0 0 0 0 0 0
+					`1 0 0 0 0 0 0 0 0 0
 0 1 1 1 0 0 0 0 0 0
 0 0 0 0 1 1 1 0 0 0
 1 1 0 0 1 0 0 1 1 0
 0 0 1 0 0 1 0 1 0 1
 0 0 0 1 0 0 1 0 1 1`),
 				NewDenseBinaryMatrixFromString(
-`0
+					`0
 0
 1
 1
@@ -411,20 +410,20 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 			true,
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 2, 4}, {0, 3, 4}, {2,3,4}}),
+			NewZComplexFromMaximalSimplices([][]int{{0, 2, 4}, {0, 3, 4}, {2, 3, 4}}),
 			true,
 		},
 		{
 			NewZComplexFromBoundaryMatrices(
 				NewDenseBinaryMatrixFromString(
-`1 1 1 0 0 0 0 0 0 0
+					`1 1 1 0 0 0 0 0 0 0
 0 0 0 1 0 0 0 0 0 0
 1 0 0 0 1 1 1 0 0 0
 0 1 0 0 1 0 0 1 1 0
 0 0 1 1 0 1 0 1 0 1
 0 0 0 0 0 0 1 0 1 1`),
 				NewDenseBinaryMatrixFromString(
-`1 0 0 0 0 0
+					`1 0 0 0 0 0
 0 1 0 0 0 0
 1 1 0 0 0 0
 0 0 0 0 0 0
@@ -440,7 +439,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 		{
 			NewZComplexFromBoundaryMatrices(
 				NewDenseBinaryMatrixFromString(
-`1 1 0 0 0 0 0 0 0 0 0 0 0 0 0
+					`1 1 0 0 0 0 0 0 0 0 0 0 0 0 0
 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0
 0 0 1 0 0 0 1 1 1 1 0 0 0 0 0
 0 0 0 1 0 0 1 0 0 0 1 1 0 0 0
@@ -448,7 +447,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 0 1 0 0 1 0 0 0 1 0 1 0 1 0 1
 0 0 0 0 0 1 0 0 0 1 0 1 0 1 1`),
 				NewDenseBinaryMatrixFromString(
-`0 0 0 0 0 0
+					`0 0 0 0 0 0
 0 0 0 0 0 0
 1 1 0 0 0 0
 1 0 0 0 0 0
@@ -471,11 +470,11 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 			true,
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}, {1, 2, 4}, {0,2,5}}),
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}, {1, 2, 4}, {0, 2, 5}}),
 			true,
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 3}, {1, 2, 4}, {0,2,5}}),
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 3}, {1, 2, 4}, {0, 2, 5}}),
 			true,
 		},
 		{
@@ -485,7 +484,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 		{
 			NewZComplexFromBoundaryMatrices(
 				NewDenseBinaryMatrixFromString(
-`1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+					`1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 1 0 0 0 0 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 0 1 0 0 0 0 0 0 0 0 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 0 0 0 0 0 0 0 0 0
@@ -496,7 +495,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0
 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 1 0 0 1 0 0 1`),
 				NewDenseBinaryMatrixFromString(
-`1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+					`1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -531,14 +530,14 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 		{
 			NewZComplexFromBoundaryMatrices(
 				NewDenseBinaryMatrixFromString(
-`1 1 1 0 0 0 0 0 0 0
+					`1 1 1 0 0 0 0 0 0 0
 1 0 0 1 1 1 0 0 0 0
 0 1 0 1 0 0 1 1 0 0
 0 0 0 0 0 0 0 0 1 0
 0 0 1 0 1 0 1 0 1 1
 0 0 0 0 0 1 0 1 0 1`),
 				NewDenseBinaryMatrixFromString(
-`1 0 0 0
+					`1 0 0 0
 1 1 0 0
 0 1 0 0
 1 0 1 0
@@ -550,7 +549,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 0 0 0 1`)),
 			true,
 		},
- 	}
+	}
 	verbose := false
 	for n, test := range tests {
 		if !test.Focus {
@@ -564,7 +563,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 			log.Printf("D2=%v\n%s", d2, dumpMatrix(d2))
 			log.Printf("bases:\n%s", test.C.DumpBases())
 		}
-		_, _, Z_1 := UBDecomposition(d1, d2, verbose)
+		_, _, Z_1, _, _, _ := UBDecomposition(d1, d2, verbose)
 		if verbose {
 			log.Printf("Computing cosystole by exhaustive search")
 		}
@@ -579,8 +578,8 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 		}
 		params := CosystoleSearchParams{
 			PruneByCohomologyProjection: false,
-			InitialSupport: false,
-			Verbose: verbose,
+			InitialSupport:              false,
+			Verbose:                     verbose,
 		}
 		S := NewCosystoleSearch(test.C, Z_1, nil, nil, params)
 		cosystoleSimplicial := S.Cosystole()
@@ -595,10 +594,10 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedSmallCases(t *testing.T) {
 		}
 		delta0 := d1.Transpose().Dense()
 		delta1 := d2.Transpose().Dense()
-		Uu1, Bu1, Zu1 := UBDecomposition(delta1, delta0, verbose)
-// 		log.Printf("xxx Uu1=%v\n%s", Uu1, dumpMatrix(Uu1))
-// 		log.Printf("xxx Bu1=%v\n%s", Bu1, dumpMatrix(Bu1))
-// 		log.Printf("xxx Zu1=%v\n%s", Zu1, dumpMatrix(Zu1))
+		Uu1, Bu1, Zu1, _, _, _ := UBDecomposition(delta1, delta0, verbose)
+		// 		log.Printf("xxx Uu1=%v\n%s", Uu1, dumpMatrix(Uu1))
+		// 		log.Printf("xxx Bu1=%v\n%s", Bu1, dumpMatrix(Bu1))
+		// 		log.Printf("xxx Zu1=%v\n%s", Zu1, dumpMatrix(Zu1))
 		// sanity check that delta_1 * Uu1 = 0
 		if !delta1.MultiplyRight(Uu1).IsZero() {
 			t.Fatalf("Test %d: delta_1 * Uu1 != 0", n)
@@ -647,7 +646,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedRandomCases(t *testing.T) 
 				log.Printf("d_2=%v:\n%s", d_2, dumpMatrix(d_2))
 			}
 		}
-		_, _, Z_1 := UBDecomposition(d_1, d_2, reallyVerbose)
+		_, _, Z_1, _, _, _ := UBDecomposition(d_1, d_2, reallyVerbose)
 		if verbose {
 			log.Printf("Computing cosystole by exhaustive search")
 		}
@@ -659,8 +658,8 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedRandomCases(t *testing.T) 
 		complex := NewZComplexFromBoundaryMatrices(d_1, d_2)
 		params := CosystoleSearchParams{
 			PruneByCohomologyProjection: false,
-			InitialSupport: false,
-			Verbose: reallyVerbose,
+			InitialSupport:              false,
+			Verbose:                     reallyVerbose,
 		}
 		search := NewCosystoleSearch(complex, Z_1, nil, nil, params)
 		cosystoleSimplicial := search.Cosystole()
@@ -675,7 +674,7 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedRandomCases(t *testing.T) 
 
 		delta0 := d_1.Transpose().Dense()
 		delta1 := d_2.Transpose().Dense()
-		_, Bu1, Zu1 := UBDecomposition(delta1, delta0, reallyVerbose)
+		_, Bu1, Zu1, _, _, _ := UBDecomposition(delta1, delta0, reallyVerbose)
 		params.PruneByCohomologyProjection = true
 		T := NewCosystoleSearch(complex, Z_1, Zu1, Bu1, params)
 		cosystoleSimplicialPruneByCoho := T.Cosystole()
@@ -692,8 +691,8 @@ func TestCosystoleSearchExhaustiveVsSimplicialVsPrunedRandomCases(t *testing.T) 
 
 func TestCosystoleSearchIsCoboundary(t *testing.T) {
 	tests := []struct {
-		C *ZComplex[ZVertexInt]
-		cochain BinaryMatrix
+		C        *ZComplex[ZVertexInt]
+		cochain  BinaryMatrix
 		expected bool
 	}{
 		{
@@ -721,15 +720,14 @@ func TestCosystoleSearchIsCoboundary(t *testing.T) {
 	}
 	params := CosystoleSearchParams{
 		PruneByCohomologyProjection: false,
-		InitialSupport: false,
-		Verbose: false,
+		InitialSupport:              false,
+		Verbose:                     false,
 	}
 	for n, test := range tests {
-		_, _, Z_1 := UBDecomposition(test.C.D1(), test.C.D2(), params.Verbose)
+		_, _, Z_1, _, _, _ := UBDecomposition(test.C.D1(), test.C.D2(), params.Verbose)
 		got := isCoboundary(test.cochain, Z_1)
 		if got != test.expected {
 			t.Errorf("Test %d: got=%v expected=%v", n, got, test.expected)
 		}
 	}
 }
-

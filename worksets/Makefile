@@ -22,7 +22,7 @@ $(shell touch $(log))
 # that is the affine building or downstairs, in the finite quotient.
 #
 # These two tools thus amount to different ways of computing a complex
-# X, specificaly producing the files:
+# X, specifically producing the files:
 #
 #    d1.txt: matrix for boundary map d_1
 #    d2.txt: matrix for boundary map d_2
@@ -144,6 +144,7 @@ KB1.txt: K.txt B1.txt
 K.txt: KT.txt
 	transpose -in KT.txt -out K.txt 2>&1 | tee K.$(log)
 
+# Matrix KT has columns that form a basis for the kernel of d_2^T.
 KT.txt: d2Tcolops.txt d2Tsmith.txt
 	automorphism -in d2Tcolops.txt -dim `dim -in d2Tsmith.txt -domain` -crop-start `dim -in d2Tsmith.txt -image` -out KT.txt 2>&1 | tee KT.$(log)
 
@@ -152,6 +153,20 @@ d2Tsmith.txt d2Tcolops.txt: d2T.txt
 
 d2T.txt: d2.txt
 	transpose -in d2.txt -out d2T.txt 2>&1 | tee d2T.$(log)
+
+# Here we verify that columns of KT are in the kernel of d_2^T.
+d2TKT.txt: d2T.txt KT.txt
+	multiply -A d2T.txt -B KT.txt -C d2TKT.txt 2>&1 | tee d2TKT.$(log)
+
+check-d2TKT: d2TKT.txt
+	rank=$$(dim -in d2TKT.txt -image) && if [[ $$rank -eq '0' ]]; then echo "KT is contained in ker d2T"; else echo "KT is NOT contained in ker d2T!"; false; fi
+
+# For completeness, verify that the columns of KT are independent.
+check-KTsmith: KTsmith.txt
+	rank=$$(dim -in KTsmith.txt -image) && if [[ $$rank -eq `dim -in KT.txt -domain` ]]; then echo "columns of KT are independent"; else echo "columns of KT are NOT independent!"; false; fi
+
+KTsmith.txt: KT.txt
+	smith -in KT.txt -smith KTsmith.txt 2>&1 | tee KTsmith.$(log)
 
 # This target checks that the basis for U we found is actually
 # contained in the kernel of d_1.
@@ -178,6 +193,12 @@ systole.txt: U1.txt B1.txt
 KS.txt: K.txt S.txt
 	multiply -A K.txt -B S.txt -C KS.txt 2>&1 | tee KS.$(log)
 
+Ssmith.txt: S.txt
+	smith -in S.txt -smith Ssmith.txt 2>&1 | tee Ssmith.$(log)
+
+rank-Ssmith.txt: Ssmith.txt
+	dim -in Ssmith.txt -image > rank-Ssmith.txt
+
 rank-KSsmith.txt: KSsmith.txt
 	dim -in KSsmith.txt -image > rank-KSsmith.txt
 
@@ -191,8 +212,46 @@ d1S.txt: d1.txt S.txt
 check-d1S: d1S.txt
 	rank=$$(dim -in d1S.txt -image) && if [[ $$rank -eq '0' ]]; then echo "candidates S are contained in ker d1"; else echo "candidates S are NOT contained in ker d1!"; false; fi
 
-really-clean:
-	rm -f d1smith.txt d1colops.txt d2smith.txt d2colops.txt dim-Z1.txt dim-B1.txt dim-H1.txt Z1.txt d2coimage.txt B1.txt B1smith.txt B1colops.txt Q.txt U1.txt KB1.txt K.txt KT.txt d2Tsmith.txt d2Tcolops.txt d2T.txt d1U1.txt KU1.txt *.log*
+# WIP visualization of systolic cycles
+
+# The matrix Sdiffs is a matrix in which each column corresponds to a 
+# difference between a pair of systolic candidates.  The matrix is
+# constructed by taking the difference of each pair of columns of S,
+# ordered in the natural way.  Say S has n columns.  Then Sdiffs has
+# n(n-1)/2 columns, ordered as follows: the first n-1 columns are the
+# differences between the first column of S and each of the next n-1
+# columns of S.  The next n-2 columns are the differences between the
+# second column of S and each of the next n-2 columns of S, and so on.
+Sdiffs.txt: S.txt
+	matrix -col-diffs -in S.txt -out Sdiffs.txt 2>&1 | tee Sdiffs.$(log)
+
+KSdiffs.txt: Sdiffs.txt
+	multiply -A K.txt -B Sdiffs.txt -C KSdiffs.txt 2>&1 | tee KSdiffs.$(log)
+
+cand-vertex-basis.txt cand-edge-basis.txt: vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt
+	complex -verbose -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
+	-subcomplex-by-edges S.txt -subcomplex-out-vertex-basis cand-vertex-basis.txt -subcomplex-out-edge-basis cand-edge-basis.txt 2>&1 | tee cand-complex.$(log)
+
+cand-graphviz.dot: cand-vertex-basis.txt cand-edge-basis.txt
+	complex -verbose -vertex-basis cand-vertex-basis.txt -edge-basis cand-edge-basis.txt -graphviz cand-graphviz.dot
+
+cand-graphviz.pdf: cand-graphviz.dot
+	dot -Tpdf -Kfdp cand-graphviz.dot -o cand-graphviz.pdf
+
+# the following list of columns to prune is created semi-manually at the moment
+systolic-coset-gens.txt: S.txt
+	matrix -verbose -in S.txt -omit-columns 11,12,14,20,21,22,23,25,27,28,29,30,31,32,33,34,35,37,38,39,41 -out systolic-coset-gens.txt 2>&1 | tee systolic-coset-gens.$(log)
+
+systolic-coset-gens-vertex-basis.txt systolic-coset-gens-edge-basis.txt: vertex-basis.txt edge-basis.txt triangle-basis.txt systolic-coset-gens.txt
+	complex -verbose -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
+	-subcomplex-by-edges systolic-coset-gens.txt -subcomplex-out-vertex-basis systolic-coset-gens-vertex-basis.txt -subcomplex-out-edge-basis systolic-coset-gens-edge-basis.txt 2>&1 | tee systolic-coset-gens-complex.$(log)
+
+systolic-coset-gens-graphviz.dot: systolic-coset-gens-vertex-basis.txt systolic-coset-gens-edge-basis.txt
+	complex -verbose -vertex-basis systolic-coset-gens-vertex-basis.txt -edge-basis systolic-coset-gens-edge-basis.txt -graphviz systolic-coset-gens-graphviz.dot
+
+systolic-coset-gens-graphviz.pdf: systolic-coset-gens-graphviz.dot
+	dot -Tpdf -Kfdp systolic-coset-gens-graphviz.dot -o systolic-coset-gens-graphviz.pdf
+
 
 # cochain complex / cosystole targets
 #
@@ -345,4 +404,18 @@ simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edg
 
 sample-coboundary-decoder: d1.txt d2.txt Z1.txt
 	coboundary-decoder -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -min-error-weight 67098 -max-error-weight 67098 -verbose -results results-$(log).json 2>&1 | tee sample-coboundary-decoder.$(log)
+
+really-clean:
+		rm -f B1.txt B1colops.txt B1rowops.txt B1smith.txt C.txt F.txt FG.txt G.txt K.txt KB1.txt KS.txt \
+		KSdiffs.txt KSsmith.txt KT.txt KTsmith.txt M.txt Mcolops.txt Mrowops.txt Msmith.txt P1.txt \
+		P1T.txt P^1.txt P^1T.txt R.txt S.txt Sdiffs.txt Ssmith.txt U1.txt U^1.txt U^1T.txt Z1.txt Z^1.txt \
+		cand-edge-basis.txt cand-graphviz.dot cand-graphviz.pdf cand-vertex-basis.txt cosystole.txt \
+		cosystoleExhaustive.txt d1.txt d1S.txt d1U1.txt d1Z1.txt d1colops.txt d1smith.txt d2.txt d2T.txt \
+		d2TKT.txt d2Tcolops.txt d2Tsmith.txt d2colops.txt d2smith.txt d^0.txt d^0coimage.txt d^0colops.txt \
+		d^0smith.txt d^1.txt d^1U^1.txt d^1Z^1.txt d^1colops.txt d^1smith.txt dim-B1.txt dim-B^1.txt \
+		dim-H1.txt dim-H^1.txt dim-Z1.txt dim-Z^1.txt edge-basis.txt results-*.json sample-coboundary-decoder \
+		simp-cosys simp-cosys-coho-orbits simp-cosys-dim-ucd-seq simp-cosys-prune systole.txt \
+		systolic-coset-gens-graphviz.dot systolic-coset-gens-graphviz.pdf systolic-coset-gens-edge-basis.txt \
+		systolic-coset-gens-vertex-basis.txt systolic-coset-gens.txt triangle-basis.txt vertex-basis.txt *.log*
+
 
