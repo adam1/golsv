@@ -18,7 +18,8 @@ The notation here refers to the draft linked above.
 * Representation of two-dimensional simplicial complexes (including graphs) as boundary matrices of $\mathbb{F}_2$-chain complexes
 * Linear algebra with large sparse or small dense matrices over $\mathbb{F}_2$
 * Matrix reduction aka computing Smith normal form 
-* Computing dimension and generators for first homology (simplicial mod two homology) and cohomology
+* Computing dimension of first homology and cohomology (simplicial mod two homology) by rank considerations
+* Computing generators for homology by computing an aligned basis of $B_1$ inside of $Z_1$
 * Finding the systole of $L_2$ by computing the injectivity radius in the cover
 * A simplicial cosystole algorithm (works for small complexes, too slow for $L_2$)
 
