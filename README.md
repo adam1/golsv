@@ -34,20 +34,26 @@ make test
 
 __To use__
 
-See the comments in [worksets/Makefile](worksets/Makefile).  We highlight a few recipes here.  We use the notation `LSV(d,q,f)` to
-identify the finite simplicial complex that is the quotient of an affine building as described in [EKZ] and [LSV].
+See the comments in [worksets/Makefile](worksets/Makefile).  We highlight a few recipes here. 
 
-**Recipe A.** Construct the `d1.txt` and `d2.txt` boundary maps for the LSV complex `LSV(3,2,1+y+y^4)`:
+**Recipe A.** Generate the Cayley complex of $L_2$ from scratch and compute the dimension of first homology.  This takes about one day on a contemporary laptop.
 
 ```
 mkdir worksets/aaa
 cd worksets/aaa
-make -f ../Makefile/pgl-cayley-F16
+echo 111 > modulus.txt
+echo 8 > max-depth.txt
+make -f ../Makefile dim-H1.txt
 ```
-And calculate the first homology:
+
+**Recipe B.** Construct the boundary maps for the $L_4 = \text{LSV}(3,2,1+y+y^4)$.
+
 ```
-make -f ../Makefile/dim-H1.txt
+mkdir worksets/bbb
+cd worksets/bbb
+make -f ../Makefile pgl-cayley-F16
 ```
+
 
 **Profiling**. Most of the programs are built with support for cpu profiling.  Profiling is off by default and can be toggled on and off by sending a `USR1` signal to the program.  Profile data is written to `cpu.out` and will be overwritten, so rename the files if you want to capture more than one profiling session in the lifetime of a process.
 
