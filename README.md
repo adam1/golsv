@@ -64,6 +64,10 @@ kill -USR1 $P; sleep 600; kill -USR 1
 go tool pprof -http : # opens browser
 ```
 
+__To Do__
+
+A bunch of this code is not specific to LSV complexes.  Factor out packages for mod two linear algebra, generic simplicial complexes, homology, Cayley expansion.
+
 __References__
 
 [EKZ] Shai Evra, Tali Kaufman, Gilles Zémor. Decodable quantum LDPC codes beyond the $\sqrt{n}$ distance barrier using high dimensional expanders. [https://arxiv.org/abs/2004.07935v1](https://arxiv.org/abs/2004.07935v1), 2020.
