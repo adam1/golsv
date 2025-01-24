@@ -757,7 +757,7 @@ func cartwrightStegerMatrixRepZ() MatF2Poly {
 func cartwrightStegerMatrixRepB() ProjMatF2Poly {
 	// b = 1 - z^{-1}
 	//
-	// since z^2 = 1 + y(x),
+	// since z^3 = 1 + y(x),
 	//
 	// z^{-1} = 1/(1 + y(x)) z^2
 	//
@@ -766,6 +766,7 @@ func cartwrightStegerMatrixRepB() ProjMatF2Poly {
 	// and projectivizing, we drop the scalar factor
 	//
 	// projRepB = (1 + y(x))I - repZ^2
+	//          = (1 + y(x))I + repZ^2
 	repZ := cartwrightStegerMatrixRepZ()
 	repZSq := repZ.Mul(repZ)
 	id := MatF2PolyIdentity
