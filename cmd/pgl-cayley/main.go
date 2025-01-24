@@ -8,9 +8,9 @@ import (
 
 // Usage:
 //
-//   cayley -base-field=F4 -d1=d1.txt -d2=d2.txt -truncate-generators=0 -max-depth=0
+//   pgl-cayley -base-field=F4 -d1=d1.txt -d2=d2.txt -truncate-generators=0 -max-depth=0
 //
-//   cayley -base-field=F4 -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt
+//   pgl-cayley -base-field=F4 -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt
 //
 func main() {
 	args := parseFlags()
