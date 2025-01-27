@@ -172,16 +172,27 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 		fmt.Printf("u=%v b_u=%v b_uInv=%v\n", info.U, info.B_u, info.B_uInv)
 		combined = append(combined, genInfo{info, gens[i], gens[i+1]})
 	}
-	const latexTemplate = `\begin{array}{|c|c|c|c|c|}
+	const latexTemplate = `\begin{array}{|c|c|c|}
 	\hline
-	u & b_u & b_u^{-1} & \rho(b_u) & \rho(b_u^{-1}\\
+	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1}\\
 	\hline
 	{{range .}}
-	{{.MInfo.U.Latex}} & {{.B_uCalG.Latex}} & {{.B_uInvCalG.Latex}} & {{.MInfo.B_u.Latex}} & {{.MInfo.B_uInv.Latex}} \\
+	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_u "y"}} \\
+	                                        & {{.B_uInvCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_uInv "y"}} \\
 	{{end}}
+	\hline
 \end{array}
 	`
-	tpl, err := template.New("gens").Parse(latexTemplate)
+	funcMap := template.FuncMap{
+		"F2PolyLatexWithVar": func(p golsv.F2Polynomial, varName string) string {
+			return p.Latex(varName)
+		},
+		"ProjMatF2PolyLatexWithVar": func(m golsv.ProjMatF2Poly, varName string) string {
+			return m.Latex(varName)
+		},
+
+	}
+	tpl, err := template.New("gens").Funcs(funcMap).Parse(latexTemplate)
 	if err != nil {
 		log.Fatal(err)
 	}

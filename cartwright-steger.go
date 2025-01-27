@@ -285,9 +285,9 @@ func (g ElementCalG) Latex() string {
 				buf.WriteString(" + ")
 			}
 			if !f.IsOne() {
-				fmt.Fprintf(&buf, "(%v) ", f.Latex())
+				fmt.Fprintf(&buf, "(%v) ", f.Latex("y"))
 			}
-			fmt.Fprintf(&buf, "w_%d", i)
+			fmt.Fprintf(&buf, "\\zeta_%d", i)
 			if j == 1 {
 				fmt.Fprintf(&buf, " z")
 			} else if j == 2 {

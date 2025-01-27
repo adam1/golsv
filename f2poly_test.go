@@ -442,7 +442,7 @@ func TestF2PolynomialLatex(t *testing.T) {
 		{NewF2Polynomial("101"), "1+v^{2}"},
 	}
 	for n, test := range tests {
-		if got := test.f.Latex(); got != test.want {
+		if got := test.f.Latex("v"); got != test.want {
 			t.Errorf("test %d: got %v want %v", n, got, test.want)
 		}
 	}

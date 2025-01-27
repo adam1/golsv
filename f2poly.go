@@ -229,7 +229,7 @@ func (p F2Polynomial) IsZero() bool {
 	return true
 }
 
-func (p F2Polynomial) Latex() string {
+func (p F2Polynomial) Latex(varName string) string {
 	if p.IsZero() {
 		return "0"
 	}
@@ -242,7 +242,7 @@ func (p F2Polynomial) Latex() string {
 			if i == 0 {
 				s += "1"
 			} else {
-				s += "v"
+				s += varName
 				if i > 1 {
 					s += "^{" + fmt.Sprintf("%d", i) + "}"
 				}

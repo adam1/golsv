@@ -46,11 +46,11 @@ func (M MatF2Poly) Equal(N MatF2Poly) bool {
 	return true
 }
 
-func (M MatF2Poly) Latex() string {
+func (M MatF2Poly) Latex(varName string) string {
 	s := "\\begin{bmatrix}"
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
-			s += M[i*3+j].Latex()
+			s += M[i*3+j].Latex(varName)
 			if j < 2 {
 				s += " & "
 			}
@@ -138,8 +138,8 @@ func (M ProjMatF2Poly) Equal(N ProjMatF2Poly) bool {
 	return true
 }
 
-func (M ProjMatF2Poly) Latex() string {
-	return MatF2Poly(M).Latex()
+func (M ProjMatF2Poly) Latex(varName string) string {
+	return MatF2Poly(M).Latex(varName)
 }
 
 func (M ProjMatF2Poly) Mul(N ProjMatF2Poly) ProjMatF2Poly {
