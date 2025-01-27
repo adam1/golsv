@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
 	"golsv"
 	"log"
+	"os"
+	"text/template"
 )
 
 // Usage:
@@ -140,6 +144,10 @@ func prepareGenerators(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial) []gol
 	}
 	b := dumpElements(gens)
 	log.Printf("prepared generators (modified=%v):\n%s", a != b, b)
+
+	if args.GeneratorsLatexFile != "" {
+		produceGeneratorsLatexFile(args, gens)
+	}
 	return gens
 }
 
@@ -154,19 +162,71 @@ func dumpElements(els []golsv.ElementCalG) string {
 	return s
 }
 
+func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.ElementCalG) {
+	// combine the (algebraic) generators with their matrix representations
+	// so as to produce a nice table.
+	_, genMatrixReps := golsv.CartwrightStegerGeneratorsMatrixReps()
+	log.Printf("Generator matrix reps:")
+	combined := make([]genInfo, 0)
+	for i, info := range genMatrixReps {
+		fmt.Printf("u=%v b_u=%v b_uInv=%v\n", info.U, info.B_u, info.B_uInv)
+		combined = append(combined, genInfo{info, gens[i], gens[i+1]})
+	}
+	const latexTemplate = `\begin{array}{|c|c|c|}
+	\hline
+	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1})\\
+	\hline
+	{{range .}}
+	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_u "y"}} \\
+	                                        & {{.B_uInvCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_uInv "y"}} \\
+	{{end}}
+	\hline
+\end{array}`
+	funcMap := template.FuncMap{
+		"F2PolyLatexWithVar": func(p golsv.F2Polynomial, varName string) string {
+			return p.Latex(varName)
+		},
+		"ProjMatF2PolyLatexWithVar": func(m golsv.ProjMatF2Poly, varName string) string {
+			return m.Latex(varName)
+		},
+
+	}
+	tpl, err := template.New("gens").Funcs(funcMap).Parse(latexTemplate)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := tpl.Execute(&out, combined); err != nil {
+		log.Fatal(err)
+	}
+	err = os.WriteFile(args.GeneratorsLatexFile, []byte(out.String()), 0644)
+	if err != nil {
+		panic(err)
+	}
+	if args.Verbose {
+		log.Printf("wrote generator matrix info to %s", args.GeneratorsLatexFile)
+	}
+}
+
+type genInfo struct {
+	MInfo golsv.CartwrightStegerGenMatrixInfo
+	B_uCalG, B_uInvCalG golsv.ElementCalG
+}
+
 type CalGCayleyExpanderArgs struct {
-	D1File                 string
-	D2File                 string
-	EdgeBasisFile          string
-	MaxDepth               int
-	MeshFile               string
-	Modulus                string
-	Quotient               bool
-	SystolicCandidatesFile string
-	TriangleBasisFile      string
-	TruncateGenerators     int
-	Verbose                bool
-	VertexBasisFile        string
+	D1File                  string
+	D2File                  string
+	EdgeBasisFile           string
+	GeneratorsLatexFile     string
+	MaxDepth                int
+	MeshFile                string
+	Modulus                 string
+	Quotient                bool
+	SystolicCandidatesFile  string
+	TriangleBasisFile       string
+	TruncateGenerators      int
+	Verbose                 bool
+	VertexBasisFile         string
 	golsv.ProfileArgs
 }
 
@@ -181,6 +241,7 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 output file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", args.EdgeBasisFile, "edge basis output file (text)")
+	flag.StringVar(&args.GeneratorsLatexFile, "generators-latex-file", args.GeneratorsLatexFile, "write table of generators to this file (latex)")
 	flag.IntVar(&args.MaxDepth, "max-depth", args.MaxDepth, "maximum depth")
 	flag.StringVar(&args.MeshFile, "mesh", args.MeshFile, "mesh output file (OFF Object File Format text)")
 	flag.StringVar(&args.Modulus, "modulus", args.Modulus, "modulus corresponding to a principle congruence subgroup")

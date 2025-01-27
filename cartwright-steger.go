@@ -273,6 +273,34 @@ func (g ElementCalG) isZero() bool {
 	return true
 }
 
+func (g ElementCalG) Latex() string {
+	var buf bytes.Buffer
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			f := g[i*3+j]
+			if f.IsZero() {
+				continue
+			}
+			if buf.Len() > 0 {
+				buf.WriteString(" + ")
+			}
+			if !f.IsOne() {
+				fmt.Fprintf(&buf, "(%v) ", f.Latex("y"))
+			}
+			fmt.Fprintf(&buf, "\\zeta_%d", i)
+			if j == 1 {
+				fmt.Fprintf(&buf, " z")
+			} else if j == 2 {
+				fmt.Fprintf(&buf, " z^{%d}", j)
+			}			
+		}
+	}
+	if buf.Len() == 0 {
+		buf.WriteString("0")
+	}
+	return buf.String()
+}
+
 // xxx test
 func (g ElementCalG) Less(h ElementCalG) bool {
 	for i := 0; i < len(g); i++ {
@@ -699,13 +727,18 @@ var cartwrightStegerEmbeddingY F2Polynomial = NewF2Polynomial("0101") // y(x) = 
 
 // Construct the matrix representations of the Cartwright-Steger
 // generators.  Here, we follow the notation of LSV section 10.
-func CartwrightStegerGeneratorsMatrixReps() []ProjMatF2Poly {
+type CartwrightStegerGenMatrixInfo struct {
+	U           F2Polynomial
+	B_u, B_uInv ProjMatF2Poly
+}
+
+func CartwrightStegerGeneratorsMatrixReps() (gens []ProjMatF2Poly, table []CartwrightStegerGenMatrixInfo) {
 	// per the example in LSV section 10, we don't need to use the
 	// normal basis of F_8; we can use the standard basis instead.
 	repB := cartwrightStegerMatrixRepB()
 	repBInv := cartwrightStegerMatrixRepBInverse()
-
-	gens := make([]ProjMatF2Poly, 0)
+ 	gens = make([]ProjMatF2Poly, 0)
+ 	table = make([]CartwrightStegerGenMatrixInfo, 0)
 	fieldElements := EnumerateF2Polynomials(2)
 	for _, u := range fieldElements {
 		if u.IsZero() {
@@ -719,8 +752,9 @@ func CartwrightStegerGeneratorsMatrixReps() []ProjMatF2Poly {
 		// b_u^{-1} = u b^{-1} u^{-1}
 		b_uInv := uRep.Mul(repBInv).Mul(uInvRep)
 		gens = append(gens, b_uInv)
+		table = append(table, CartwrightStegerGenMatrixInfo{u, b_u, b_uInv})
 	}
-	return gens
+	return gens, table
 }
 
 func cartwrightStegerMatrixRepOnePlusBetaX() MatF2Poly {

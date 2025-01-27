@@ -229,6 +229,29 @@ func (p F2Polynomial) IsZero() bool {
 	return true
 }
 
+func (p F2Polynomial) Latex(varName string) string {
+	if p.IsZero() {
+		return "0"
+	}
+	var s string
+	for i := 0; i <= p.Degree(); i++ {
+		if p.Coefficient(i) == 1 {
+			if s != "" {
+				s += "+"
+			}
+			if i == 0 {
+				s += "1"
+			} else {
+				s += varName
+				if i > 1 {
+					s += "^{" + fmt.Sprintf("%d", i) + "}"
+				}
+			}
+		}
+	}
+	return s
+}
+
 func (p F2Polynomial) Less(q F2Polynomial) bool {
 	for i := f2PolynomialSize-1; i >= 0; i-- {
 		if p.w[i] < q.w[i] {

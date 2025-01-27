@@ -400,21 +400,6 @@ func TestF2PolynomialNew(t *testing.T) {
 	}
 }
 
-// xxx DEPRECATED
-// func TestF2PolynomialOne(t *testing.T) {
-// 	f := NewF2PolynomialFromSupport(2, 3, 4)
-// 	f.One()
-// 	one := F2PolynomialOne
-// 	if !f.Equal(one) {
-// 		t.Errorf("f != one")
-// 	}
-// 	f = F2PolynomialZero
-// 	f.One()
-// 	if !f.Equal(one) {
-// 		t.Errorf("f != one")
-// 	}
-// }
-
 func TestF2PolynomialPow(t *testing.T) {
 	tests := []struct {
 		a    F2Polynomial
@@ -441,6 +426,24 @@ func TestF2PolynomialPow(t *testing.T) {
 		got := test.a.Pow(test.n)
 		if !got.Equal(test.want) {
 			t.Errorf("test %d: a=%v n=%d got=%v want=%v", i, test.a, test.n, got, test.want)
+		}
+	}
+}
+
+func TestF2PolynomialLatex(t *testing.T) {
+	tests := []struct {
+		f F2Polynomial
+		want string
+	}{
+		{F2PolynomialZero, "0"},
+		{F2PolynomialOne, "1"},
+		{F2PolynomialY, "v"},
+		{F2PolynomialOnePlusY, "1+v"},
+		{NewF2Polynomial("101"), "1+v^{2}"},
+	}
+	for n, test := range tests {
+		if got := test.f.Latex("v"); got != test.want {
+			t.Errorf("test %d: got %v want %v", n, got, test.want)
 		}
 	}
 }
