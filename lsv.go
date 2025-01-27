@@ -118,7 +118,7 @@ func (lsv *LsvContext) Generators() []MatGF {
 
 // Here we use the Cartwright-Steger generators computed ourselves.
 func (lsv *LsvContext) GeneratorsV2() []MatGF {
-	gens := CartwrightStegerGeneratorsMatrixReps()
+	gens, _ := CartwrightStegerGeneratorsMatrixReps()
 	if len(gens) != 14 {
 		log.Fatalf("unexpected number of generators: %d", len(gens))
 	}

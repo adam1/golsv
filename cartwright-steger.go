@@ -699,13 +699,18 @@ var cartwrightStegerEmbeddingY F2Polynomial = NewF2Polynomial("0101") // y(x) = 
 
 // Construct the matrix representations of the Cartwright-Steger
 // generators.  Here, we follow the notation of LSV section 10.
-func CartwrightStegerGeneratorsMatrixReps() []ProjMatF2Poly {
+type CSGenMatrixInfo struct {
+	U           F2Polynomial
+	B_u, B_uInv ProjMatF2Poly
+}
+
+func CartwrightStegerGeneratorsMatrixReps() (gens []ProjMatF2Poly, table []CSGenMatrixInfo) {
 	// per the example in LSV section 10, we don't need to use the
 	// normal basis of F_8; we can use the standard basis instead.
 	repB := cartwrightStegerMatrixRepB()
 	repBInv := cartwrightStegerMatrixRepBInverse()
-
-	gens := make([]ProjMatF2Poly, 0)
+ 	gens = make([]ProjMatF2Poly, 0)
+ 	table = make([]CSGenMatrixInfo, 0)
 	fieldElements := EnumerateF2Polynomials(2)
 	for _, u := range fieldElements {
 		if u.IsZero() {
@@ -719,8 +724,9 @@ func CartwrightStegerGeneratorsMatrixReps() []ProjMatF2Poly {
 		// b_u^{-1} = u b^{-1} u^{-1}
 		b_uInv := uRep.Mul(repBInv).Mul(uInvRep)
 		gens = append(gens, b_uInv)
+		table = append(table, CSGenMatrixInfo{u, b_u, b_uInv})
 	}
-	return gens
+	return gens, table
 }
 
 func cartwrightStegerMatrixRepOnePlusBetaX() MatF2Poly {

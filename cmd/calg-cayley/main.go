@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"golsv"
 	"log"
 )
@@ -140,6 +141,14 @@ func prepareGenerators(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial) []gol
 	}
 	b := dumpElements(gens)
 	log.Printf("prepared generators (modified=%v):\n%s", a != b, b)
+
+	if args.DumpGeneratorMatrixReps {
+		_, genInfo := golsv.CartwrightStegerGeneratorsMatrixReps()
+		log.Printf("Generator matrix reps:")
+		for _, info := range genInfo {
+			fmt.Printf("u=%v b_u=%v b_uInv=%v\n", info.U, info.B_u, info.B_uInv)
+		}
+	}
 	return gens
 }
 
@@ -155,18 +164,19 @@ func dumpElements(els []golsv.ElementCalG) string {
 }
 
 type CalGCayleyExpanderArgs struct {
-	D1File                 string
-	D2File                 string
-	EdgeBasisFile          string
-	MaxDepth               int
-	MeshFile               string
-	Modulus                string
-	Quotient               bool
-	SystolicCandidatesFile string
-	TriangleBasisFile      string
-	TruncateGenerators     int
-	Verbose                bool
-	VertexBasisFile        string
+	D1File                  string
+	D2File                  string
+	DumpGeneratorMatrixReps bool
+	EdgeBasisFile           string
+	MaxDepth                int
+	MeshFile                string
+	Modulus                 string
+	Quotient                bool
+	SystolicCandidatesFile  string
+	TriangleBasisFile       string
+	TruncateGenerators      int
+	Verbose                 bool
+	VertexBasisFile         string
 	golsv.ProfileArgs
 }
 
@@ -180,6 +190,7 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 output file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")
+	flag.BoolVar(&args.DumpGeneratorMatrixReps, "dump-generator-matrix-reps", args.DumpGeneratorMatrixReps, "print matrix representations of generators to output")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", args.EdgeBasisFile, "edge basis output file (text)")
 	flag.IntVar(&args.MaxDepth, "max-depth", args.MaxDepth, "maximum depth")
 	flag.StringVar(&args.MeshFile, "mesh", args.MeshFile, "mesh output file (OFF Object File Format text)")
