@@ -400,21 +400,6 @@ func TestF2PolynomialNew(t *testing.T) {
 	}
 }
 
-// xxx DEPRECATED
-// func TestF2PolynomialOne(t *testing.T) {
-// 	f := NewF2PolynomialFromSupport(2, 3, 4)
-// 	f.One()
-// 	one := F2PolynomialOne
-// 	if !f.Equal(one) {
-// 		t.Errorf("f != one")
-// 	}
-// 	f = F2PolynomialZero
-// 	f.One()
-// 	if !f.Equal(one) {
-// 		t.Errorf("f != one")
-// 	}
-// }
-
 func TestF2PolynomialPow(t *testing.T) {
 	tests := []struct {
 		a    F2Polynomial
