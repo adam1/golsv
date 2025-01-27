@@ -776,7 +776,7 @@ func TestCSMatrixRepBInv(t *testing.T) {
 }
 
 func TestCSGeneratorsMatrixReps(t *testing.T) {
-	gens := CartwrightStegerGeneratorsMatrixReps()
+	gens, _ := CartwrightStegerGeneratorsMatrixReps()
 	want := 14
 	if len(gens) != want {
 		t.Errorf("len(gens)=%d want=%d", len(gens), want)

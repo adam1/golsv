@@ -430,6 +430,24 @@ func TestF2PolynomialPow(t *testing.T) {
 	}
 }
 
+func TestF2PolynomialLatex(t *testing.T) {
+	tests := []struct {
+		f F2Polynomial
+		want string
+	}{
+		{F2PolynomialZero, "0"},
+		{F2PolynomialOne, "1"},
+		{F2PolynomialY, "v"},
+		{F2PolynomialOnePlusY, "1+v"},
+		{NewF2Polynomial("101"), "1+v^{2}"},
+	}
+	for n, test := range tests {
+		if got := test.f.Latex(); got != test.want {
+			t.Errorf("test %d: got %v want %v", n, got, test.want)
+		}
+	}
+}
+
 func TestF2PolynomialEnumerate(t *testing.T) {
 	d := 4
 	want := 1 << (d + 1)
