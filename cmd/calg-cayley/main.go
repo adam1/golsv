@@ -174,15 +174,14 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 	}
 	const latexTemplate = `\begin{array}{|c|c|c|}
 	\hline
-	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1}\\
+	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1})\\
 	\hline
 	{{range .}}
 	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_u "y"}} \\
 	                                        & {{.B_uInvCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_uInv "y"}} \\
 	{{end}}
 	\hline
-\end{array}
-	`
+\end{array}`
 	funcMap := template.FuncMap{
 		"F2PolyLatexWithVar": func(p golsv.F2Polynomial, varName string) string {
 			return p.Latex(varName)
