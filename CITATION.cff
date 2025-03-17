@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: golsv
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Adam
+    family-names: Marks
+    email: ajmarks@uci.edu
+    affiliation: University of California Irvine
+    orcid: 'https://orcid.org/0000-0002-8555-3303'
+repository-code: 'https://github.com/adam1/golsv'
+abstract: >-
+  Mathematical tools for working with LSV complexes
+  (high-dimensional expanders). 
+license: MIT
