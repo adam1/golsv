@@ -119,6 +119,51 @@ func TestZTriangleSetEqual(t *testing.T) {
 	}
 }
 
+func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
+	type data struct {
+		Depth int
+		Subcomplex *ZComplex[ZVertexInt]
+	}	
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		Depth int
+		Expected []data
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			0,
+			[]data{
+				{0, NewZComplexFromMaximalSimplices([][]int{{0}})},
+				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}})},
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2, 3}}),
+			0,
+			[]data{
+				{0, NewZComplexFromMaximalSimplices([][]int{{0}})},
+				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1}})},
+				{2, NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2, 3}})},
+			},
+		},
+	}
+	for n, test := range tests {
+		got := make([]data, 0)
+		test.C.DepthGradedSubcomplexes(func(depth int, subcomplex *ZComplex[ZVertexInt]) {
+			got = append(got, data{Depth: depth, Subcomplex: subcomplex})
+		})
+		if len(got) != len(test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+			continue
+		}
+		for i := range got {
+			if !reflect.DeepEqual(got[i], test.Expected[i]) {
+				t.Errorf("Test %d: got=%v, expected=%v", n, got[i], test.Expected[i])
+			}
+		}
+	}
+}
+
 func TestZComplexEdgeToTriangleIncidenceMap(t *testing.T) {
 	tests := []struct {
 		C *ZComplex[ZVertexInt]
@@ -240,6 +285,28 @@ func TestZComplexTrianglesContainingVertex(t *testing.T) {
 	}
 }
 
+func TestZComplexBFS(t *testing.T) {
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		ExpectedCount int
+	}{
+		{NewZComplexFromMaximalSimplices([][]int{{0,1,2}}), 3},
+		{NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {0,1,3}, {0,3,4}}), 5},
+		// note: the last simplex is not reachable from the first.
+		{NewZComplexFromMaximalSimplices([][]int{{0,1}, {0,2}, {0,3}, {0,4}, {5,6,7}}), 5},
+	}
+	for n, test := range tests {
+		got := 0
+		test.C.BFS(ZVertexInt(0), func(v ZVertex[ZVertexInt], depth int) (stop bool) {
+			got++
+			return false
+		})
+		if got != test.ExpectedCount {
+			t.Errorf("Test %d: got=%d, expected %d", n, got, test.ExpectedCount)
+		}
+	}
+}
+
 func TestZComplexBFTriangleWalk(t *testing.T) {
 	tests := []struct {
 		C *ZComplex[ZVertexInt]
@@ -278,6 +345,32 @@ func TestZComplexBFWalk3Cliques(t *testing.T) {
 		})
 		if got != test.ExpectedCount {
 			t.Errorf("Test %d: got=%d, expected %d", n, got, test.ExpectedCount)
+		}
+	}
+}
+
+func TestZComplexDualComplex(t *testing.T) {
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		Expected *ZComplex[ZVertexInt]
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0,1,2}}),
+			NewZComplexFromMaximalSimplices([][]int{{0}}),
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {0,1,3}}),
+			NewZComplexFromMaximalSimplices([][]int{{0,1}}),
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {0,1,3}, {0,1,4}}),
+			NewZComplexFromMaximalSimplices([][]int{{0,1,2}}),
+		},
+	}
+	for n, test := range tests {
+		got := test.C.DualComplex()
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
 		}
 	}
 }
@@ -484,6 +577,61 @@ func TestZComplexSortBasesByDistance(t *testing.T) {
 		gotTriangleBasis := test.C.TriangleBasis()
 		if !reflect.DeepEqual(gotTriangleBasis, test.expectedTriangleBasis) {
 			t.Errorf("Test %d: triangle basis: got=%v, expected=%v", n, gotTriangleBasis, test.expectedTriangleBasis)
+		}
+	}
+}
+
+func TestZComplexSubcomplexByDepth(t *testing.T) {
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		Depth int
+		Expected *ZComplex[ZVertexInt]
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			0,
+			NewZComplexFromMaximalSimplices([][]int{{0}}),
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			1,
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+		},
+	}
+	for n, test := range tests {
+		got := test.C.SubcomplexByDepth(test.Depth)
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
+func TestZComplexSubcomplexByVertices(t *testing.T) {
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		V map[int]bool
+		Expected *ZComplex[ZVertexInt]
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			map[int]bool{0: true, 1: true},
+			NewZComplexFromMaximalSimplices([][]int{{0, 1}}),
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}}),
+			map[int]bool{0: true, 1: true},
+			NewZComplexFromMaximalSimplices([][]int{{0, 1}}),
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}}),
+			map[int]bool{0: true, 1: true, 2: true},
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+		},
+	}
+	for n, test := range tests {
+		got := test.C.SubcomplexByVertices(test.V)
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
 		}
 	}
 }
