@@ -25,9 +25,9 @@ type ComplexArgs struct {
 	SubcomplexByEdgesFile              string
 	SubcomplexD1File                   string
 	SubcomplexD2File                   string
-	SubcomplexOutVertexBasisFile       string
-	SubcomplexOutEdgeBasisFile         string
-	SubcomplexOutTriangleBasisFile     string
+	OutVertexBasisFile                 string
+	OutEdgeBasisFile                   string
+	OutTriangleBasisFile               string
 	TriangleBasisFile                  string
 	Verbose                            bool
 	VertexBasisFile                    string
@@ -45,9 +45,9 @@ func parseFlags() ComplexArgs {
 	flag.StringVar(&args.SubcomplexByEdgesFile, "subcomplex-by-edges-matrix", "", "The input matrix file whose columns define edges to include in the subcomplex")
 	flag.StringVar(&args.SubcomplexD1File, "subcomplex-d1", "", "The output file for the D1 boundary matrix of the subcomplex")
 	flag.StringVar(&args.SubcomplexD2File, "subcomplex-d2", "", "The output file for the D2 boundary matrix of the subcomplex")
-	flag.StringVar(&args.SubcomplexOutVertexBasisFile, "subcomplex-out-vertex-basis", "", "The output file for the vertex basis of the subcomplex")
-	flag.StringVar(&args.SubcomplexOutEdgeBasisFile, "subcomplex-out-edge-basis", "", "The output file for the edge basis of the subcomplex")
-	flag.StringVar(&args.SubcomplexOutTriangleBasisFile, "subcomplex-out-triangle-basis", "", "The output file for the triangle basis of the subcomplex")
+	flag.StringVar(&args.OutVertexBasisFile, "out-vertex-basis", "", "The output file for the vertex basis of the subcomplex")
+	flag.StringVar(&args.OutEdgeBasisFile, "out-edge-basis", "", "The output file for the edge basis of the subcomplex")
+	flag.StringVar(&args.OutTriangleBasisFile, "out-triangle-basis", "", "The output file for the triangle basis of the subcomplex")
 	flag.StringVar(&args.TriangleBasisFile, "triangle-basis", "", "The file containing the triangle basis")
 	flag.BoolVar(&args.Verbose, "verbose", false, "Print verbose output")
 	flag.StringVar(&args.VertexBasisFile, "vertex-basis", "", "The file containing the vertex basis")
@@ -209,29 +209,29 @@ func writeSubcomplex[T any](subcomplex *golsv.ZComplex[T], args ComplexArgs) {
 			log.Printf("done writing subcomplex d_2")
 		}
 	}
-	if args.SubcomplexOutVertexBasisFile != "" {
+	if args.OutVertexBasisFile != "" {
 		if args.Verbose {
-			log.Printf("writing subcomplex vertex basis to %s", args.SubcomplexOutVertexBasisFile)
+			log.Printf("writing subcomplex vertex basis to %s", args.OutVertexBasisFile)
 		}
-		golsv.WriteStringFile(subcomplex.VertexBasis(), args.SubcomplexOutVertexBasisFile)
+		golsv.WriteStringFile(subcomplex.VertexBasis(), args.OutVertexBasisFile)
 		if args.Verbose {
 			log.Printf("done writing subcomplex vertex basis")
 		}
 	}
-	if args.SubcomplexOutEdgeBasisFile != "" {
+	if args.OutEdgeBasisFile != "" {
 		if args.Verbose {
-			log.Printf("writing subcomplex edge basis to %s", args.SubcomplexOutEdgeBasisFile)
+			log.Printf("writing subcomplex edge basis to %s", args.OutEdgeBasisFile)
 		}
-		golsv.WriteStringFile(subcomplex.EdgeBasis(), args.SubcomplexOutEdgeBasisFile)
+		golsv.WriteStringFile(subcomplex.EdgeBasis(), args.OutEdgeBasisFile)
 		if args.Verbose {
 			log.Printf("done writing subcomplex edge basis")
 		}
 	}
-	if args.SubcomplexOutTriangleBasisFile != "" {
+	if args.OutTriangleBasisFile != "" {
 		if args.Verbose {
-			log.Printf("writing subcomplex triangle basis to %s", args.SubcomplexOutTriangleBasisFile)
+			log.Printf("writing subcomplex triangle basis to %s", args.OutTriangleBasisFile)
 		}
-		golsv.WriteStringFile(subcomplex.TriangleBasis(), args.SubcomplexOutTriangleBasisFile)
+		golsv.WriteStringFile(subcomplex.TriangleBasis(), args.OutTriangleBasisFile)
 		if args.Verbose {
 			log.Printf("done writing subcomplex triangle basis")
 		}
