@@ -450,9 +450,14 @@ func (C *ZComplex[T]) SubcomplexByEdges(edgeIndicesToInclude map[int]any) *ZComp
 }
 
 // xxx test
-func (C *ZComplex[T]) SubcomplexByTriangles(n int) *ZComplex[T] {
-	truncated := C.TriangleBasis()[:n]
-	return NewZComplexFromTrianglesGeneric(truncated)
+func (C *ZComplex[T]) SubcomplexByTriangles(triangleIndicesToInclude map[int]any) *ZComplex[T] {
+	filtered := make([]ZTriangle[T], 0)
+	for i, t := range C.triangleBasis {
+		if _, ok := triangleIndicesToInclude[i]; ok {
+			filtered = append(filtered, t)
+		}
+	}	
+	return NewZComplexFromTrianglesGeneric(filtered)
 }
 
 func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
