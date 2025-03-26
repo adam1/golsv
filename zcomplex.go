@@ -221,6 +221,33 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
+// xxx test
+func (C *ZComplex[T]) DualGraph() *ZComplex[ZVertexInt] {
+	// the dual graph is the 1-skeleton of the dual complex.
+	// the dual complex is the complex whose vertices are the
+	// triangles of the original complex, and whose edges are the
+	// triangles that share an edge in the original complex.
+	// the dual graph is the 1-skeleton of the dual complex.
+	vertices := make([]ZVertex[ZVertexInt], len(C.triangleBasis))
+	for i := range C.triangleBasis {
+		vertices[i] = ZVertexInt(i)
+	}
+	edges := make([]ZEdge[ZVertexInt], 0)
+	for i := range C.EdgeBasis() {
+		T1 := C.EdgeToTriangleIncidenceMap()[i]
+		for _, t := range T1 {
+			for _, u := range T1 {
+				if t < u {
+					edges = append(edges, NewZEdge(ZVertexInt(t), ZVertexInt(u)))
+				}
+			}			
+		}
+	}
+	sortBases := false
+	verbose := C.verbose
+	return NewZComplex(vertices, edges, nil, sortBases, verbose)
+}
+
 func (C *ZComplex[T]) EdgeBasis() []ZEdge[T] {
 	return C.edgeBasis
 }
