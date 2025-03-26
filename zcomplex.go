@@ -430,11 +430,11 @@ func (C *ZComplex[T]) DumpBases() (s string) {
 }
 
 // xxx test
-func (C *ZComplex[T]) SubcomplexByEdges(edges map[int]any) *ZComplex[T] {
+func (C *ZComplex[T]) SubcomplexByEdges(edgeIndicesToInclude map[int]any) *ZComplex[T] {
 	vertices := make(map[ZVertex[T]]bool)
 	edgeBasis := make([]ZEdge[T], 0)
 	for i, e := range C.edgeBasis {
-		if _, ok := edges[i]; ok {
+		if _, ok := edgeIndicesToInclude[i]; ok {
 			edgeBasis = append(edgeBasis, e)
 			vertices[e[0]] = true
 			vertices[e[1]] = true
