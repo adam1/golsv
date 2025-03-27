@@ -141,6 +141,12 @@ type ZComplex[T any] struct {
 }
 
 func NewZComplex[T any](vertexBasis []ZVertex[T], edgeBasis []ZEdge[T], triangleBasis []ZTriangle[T], sortBases bool, verbose bool) *ZComplex[T] {
+	if edgeBasis == nil {
+		edgeBasis = make([]ZEdge[T], 0)
+	}
+	if triangleBasis == nil {
+		triangleBasis = make([]ZTriangle[T], 0)
+	}
 	if sortBases {
 		sort.Slice(triangleBasis, func(i, j int) bool {
 			return triangleBasis[i].Less(triangleBasis[j])
@@ -163,7 +169,7 @@ func NewZComplex[T any](vertexBasis []ZVertex[T], edgeBasis []ZEdge[T], triangle
 	if verbose {
 		log.Printf("Complex: %v", &C)
 	}
-	// log.Printf("xxx\n%s", C.DumpBases())
+	//log.Printf("xxx\n%s", C.DumpBases())
 	return &C
 }
 
@@ -221,20 +227,18 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
-// xxx test
 func (C *ZComplex[T]) DualGraph() *ZComplex[ZVertexInt] {
-	// the dual graph is the 1-skeleton of the dual complex.
-	// the dual complex is the complex whose vertices are the
+	// the dual graph is the complex whose vertices are the
 	// triangles of the original complex, and whose edges are the
 	// triangles that share an edge in the original complex.
-	// the dual graph is the 1-skeleton of the dual complex.
 	vertices := make([]ZVertex[ZVertexInt], len(C.triangleBasis))
 	for i := range C.triangleBasis {
 		vertices[i] = ZVertexInt(i)
 	}
 	edges := make([]ZEdge[ZVertexInt], 0)
+	edgeToTriangles := C.EdgeToTriangleIncidenceMap()
 	for i := range C.EdgeBasis() {
-		T1 := C.EdgeToTriangleIncidenceMap()[i]
+		T1 := edgeToTriangles[i]
 		for _, t := range T1 {
 			for _, u := range T1 {
 				if t < u {
@@ -343,10 +347,11 @@ func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) {
 	newVertices := make([]ZVertex[T], len(C.vertexBasis))
 	newVertexIndex := make(map[ZVertex[T]]int)
 	i := 0
-	C.BFS(base, func(v ZVertex[T]) {
+	C.BFS(base, func(v ZVertex[T], depth int) (stop bool) {
 		newVertices[i] = v
 		newVertexIndex[v] = i
 		i++
+		return false
 	})
 	C.vertexBasis = newVertices
 	C.vertexIndex = newVertexIndex
@@ -456,6 +461,19 @@ func (C *ZComplex[T]) DumpBases() (s string) {
 	return s
 }
 
+func (C *ZComplex[T]) SubcomplexByDepth(depth int) *ZComplex[T] {
+		vertexIndicesToInclude := make(map[int]bool)
+	C.BFS(C.vertexBasis[0], func(v ZVertex[T], vdepth int) (stop bool) {
+		if vdepth <= depth {
+			vertexIndicesToInclude[C.vertexIndex[v]] = true
+		} else if vdepth > depth {
+			return true
+		}
+		return false
+	})	
+	return C.SubcomplexByVertices(vertexIndicesToInclude)
+}
+
 // xxx test
 func (C *ZComplex[T]) SubcomplexByEdges(edgeIndicesToInclude map[int]any) *ZComplex[T] {
 	vertices := make(map[ZVertex[T]]bool)
@@ -485,6 +503,36 @@ func (C *ZComplex[T]) SubcomplexByTriangles(triangleIndicesToInclude map[int]any
 		}
 	}	
 	return NewZComplexFromTrianglesGeneric(filtered)
+}
+
+func (C *ZComplex[T]) SubcomplexByVertices(vertexIndicesToInclude map[int]bool) *ZComplex[T] {
+	vertices := make([]ZVertex[T], 0)
+	for i, v := range C.vertexBasis {
+		if _, ok := vertexIndicesToInclude[i]; ok {
+			vertices = append(vertices, v)
+		}
+	}
+	edges := make([]ZEdge[T], 0)
+	for _, e := range C.edgeBasis {
+		if _, ok := vertexIndicesToInclude[C.vertexIndex[e[0]]]; ok {
+			if _, ok := vertexIndicesToInclude[C.vertexIndex[e[1]]]; ok {
+				edges = append(edges, e)
+			}
+		}
+	}
+	triangles := make([]ZTriangle[T], 0)
+	for _, t := range C.triangleBasis {
+		if _, ok := vertexIndicesToInclude[C.vertexIndex[t[0]]]; ok {
+			if _, ok := vertexIndicesToInclude[C.vertexIndex[t[1]]]; ok {
+				if _, ok := vertexIndicesToInclude[C.vertexIndex[t[2]]]; ok {
+					triangles = append(triangles, t)
+				}
+			}
+		}
+	}
+	sortBases := false
+	verbose := false
+	return NewZComplex(vertices, edges, triangles, sortBases, verbose)
 }
 
 func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
@@ -527,46 +575,57 @@ func (C *ZComplex[T]) VertexToEdgeIncidenceMap() map[int][]int {
 	return m
 }
 
-func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T])) {
+func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bool)) {
 	visited := make(map[ZVertex[T]]struct{})
 	queue := NewZVertexQueue[T]()
-	queue.Enqueue(v)
-	f(v)
+	queue.Enqueue(ZVertexTask[T]{v, 0})
+	stop := f(v, 0)
+	if stop {
+		return
+	}
 	visited[v] = struct{}{}
 	for {
-		u, ok := queue.Dequeue()
+		task, ok := queue.Dequeue()
 		if !ok {
 			break
 		}
-		for _, e := range C.EdgesContainingVertex(u) {
+		for _, e := range C.EdgesContainingVertex(task.v) {
 			for _, w := range e {
 				if _, ok := visited[w]; !ok {
-					queue.Enqueue(w)
-					f(w)
+					queue.Enqueue(ZVertexTask[T]{w, task.depth + 1})
+					stop = f(w, task.depth + 1)
 					visited[w] = struct{}{}
+					if stop {
+						return
+					}
 				}
 			}
 		}
 	}
 }
 
+type ZVertexTask[T any] struct {
+	v ZVertex[T]
+	depth int
+}
+
 type ZVertexQueue[T any] struct {
-	slice []ZVertex[T]
+	slice []ZVertexTask[T]
 }
 
 func NewZVertexQueue[T any]() *ZVertexQueue[T] {
 	return &ZVertexQueue[T]{
-		slice: make([]ZVertex[T], 0),
+		slice: make([]ZVertexTask[T], 0),
 	}
 }
 
-func (Q *ZVertexQueue[T]) Enqueue(t ZVertex[T]) {
+func (Q *ZVertexQueue[T]) Enqueue(t ZVertexTask[T]) {
 	Q.slice = append(Q.slice, t)
 }
 
-func (Q *ZVertexQueue[T]) Dequeue() (ZVertex[T], bool) {
+func (Q *ZVertexQueue[T]) Dequeue() (ZVertexTask[T], bool) {
 	if len(Q.slice) == 0 {
-		return nil, false
+		return ZVertexTask[T]{}, false
 	}
 	t := Q.slice[0]
 	Q.slice = Q.slice[1:]
@@ -581,13 +640,14 @@ func (Q *ZVertexQueue[T]) Len() int {
 // start vertex.
 func (C *ZComplex[T]) BFTriangleWalk(v ZVertex[T], f func(t ZTriangle[T])) {
 	tVisited := make(map[ZTriangle[T]]struct{})
-	C.BFS(v, func(u ZVertex[T]) {
+	C.BFS(v, func(u ZVertex[T], depth int) (stop bool) {
 		for _, t := range C.TrianglesContainingVertex(u) {
 			if _, ok := tVisited[t]; !ok {
 				f(t)
 				tVisited[t] = struct{}{}
 			}
 		}
+		return false
 	})
 }
 
@@ -600,7 +660,7 @@ func (C *ZComplex[T]) BFWalk3Cliques(v ZVertex[T], f func(c [3]ZVertex[T])) {
 	// though this is not necessarily a triangle (2-simplex) in the
 	// complex C.
 	seen := make(map[ZTriangle[T]]struct{})
-	C.BFS(v, func(u ZVertex[T]) {
+	C.BFS(v, func(u ZVertex[T], depth int) (stop bool) {
 		// for each neighbor x
 		//     for each other neighbor y
 		//         check whether u-x-y is a 3-clique
@@ -621,6 +681,7 @@ func (C *ZComplex[T]) BFWalk3Cliques(v ZVertex[T], f func(c [3]ZVertex[T])) {
 				}
 			}
 		}
+		return false
 	})
 }
 
