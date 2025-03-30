@@ -227,6 +227,22 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
+func (C *ZComplex[T]) DepthGradedSubcomplexes(handler func(depth int, subcomplex *ZComplex[T])) {
+	vertexIndicesToInclude := make(map[int]bool)
+	curDepth := 0
+	C.BFS(C.vertexBasis[0], func(v ZVertex[T], vdepth int) (stop bool) {
+		if vdepth > curDepth {
+			subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
+			handler(curDepth, subcomplex)
+			curDepth = vdepth
+		}
+		vertexIndicesToInclude[C.vertexIndex[v]] = true
+		return false
+	})
+	subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
+	handler(curDepth, subcomplex)
+}
+
 func (C *ZComplex[T]) DualGraph() *ZComplex[ZVertexInt] {
 	// the dual graph is the complex whose vertices are the
 	// triangles of the original complex, and whose edges are the

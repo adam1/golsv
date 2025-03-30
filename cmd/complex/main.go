@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"golsv"
 	"log"
+	"strings"
 )
 
 // Input:
@@ -17,21 +18,22 @@ import (
 //   complex
 
 type ComplexArgs struct {
-	D1File                string
-	D2File                string
-	DualGraph             bool
-	EdgeBasisFile         string
-	GraphvizFile          string
-	SubcomplexByDepth     int
-	SubcomplexByEdgesFile string
-	OutComplexD1File      string
-	OutComplexD2File      string
-	OutVertexBasisFile    string
-	OutEdgeBasisFile      string
-	OutTriangleBasisFile  string
-	TriangleBasisFile     string
-	Verbose               bool
-	VertexBasisFile       string
+	D1File                  string
+	D2File                  string
+	DualGraph               bool
+	EdgeBasisFile           string
+	DepthGradedSubcomplexes bool
+	GraphvizFile            string
+	SubcomplexByDepth       int
+	SubcomplexByEdgesFile   string
+	OutComplexD1File        string
+	OutComplexD2File        string
+	OutVertexBasisFile      string
+	OutEdgeBasisFile        string
+	OutTriangleBasisFile    string
+	TriangleBasisFile       string
+	Verbose                 bool
+	VertexBasisFile         string
 	golsv.ProfileArgs
 }
 
@@ -42,6 +44,7 @@ func parseFlags() ComplexArgs {
 	flag.StringVar(&args.D2File, "d2", "", "The file containing the D2 boundary matrix")
 	flag.BoolVar(&args.DualGraph, "dual-graph", false, "Compute the dual graph")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", "", "The file containing the edge basis")
+	flag.BoolVar(&args.DepthGradedSubcomplexes, "depth-graded-subcomplexes", false, "Compute all graded subcomplexes by depth; output filenames will have '-d' appended with d=depth")
 	flag.StringVar(&args.GraphvizFile, "graphviz", "", "The file to write the graphviz output to")
 	flag.IntVar(&args.SubcomplexByDepth, "subcomplex-depth", -1, "The depth of the subcomplex to extract by BFS from first vertex")
 	flag.StringVar(&args.SubcomplexByEdgesFile, "subcomplex-by-edges-matrix", "", "The input matrix file whose columns define edges to include in the subcomplex")
@@ -60,7 +63,11 @@ func parseFlags() ComplexArgs {
 		flag.PrintDefaults()
 	}
 	if args.SubcomplexByDepth > 0 && args.SubcomplexByEdgesFile != "" {
-		fmt.Println("subcomplex-by-depth and subcomplex-by-edges-matrix are mutually exclusive")
+		fmt.Println("subcomplex-depth and subcomplex-by-edges-matrix are mutually exclusive")
+		flag.PrintDefaults()
+	}
+	if args.SubcomplexByDepth > 0 && args.DepthGradedSubcomplexes {
+		fmt.Println("subcomplex-depth and depth-graded-subcomplexes are mutually exclusive")
 		flag.PrintDefaults()
 	}
 	if args.SubcomplexByEdgesFile != "" && args.EdgeBasisFile == "" {
@@ -102,6 +109,14 @@ func handleComplexByBoundaryMatrices(args ComplexArgs) {
 		}
 		writeOutputComplex(subcomplex, args)
 		complex = subcomplex
+	} else if args.DepthGradedSubcomplexes {
+		if args.Verbose {
+			log.Printf("creating graded subcomplexes by depth")
+		}
+		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ZVertexInt]) {
+			writeGradedSubcomplex(subcomplex, args, depth)
+		}
+		complex.DepthGradedSubcomplexes(h)
 	}
 	if args.GraphvizFile != "" {
 		golsv.WriteComplexGraphvizFile(complex, args.GraphvizFile, args.Verbose)
@@ -132,6 +147,14 @@ func handleComplexByBases(args ComplexArgs) {
 		}
 		writeOutputComplex(subcomplex, args)
 		complex = subcomplex
+	} else if args.DepthGradedSubcomplexes {
+		if args.Verbose {
+			log.Printf("creating graded subcomplexes by depth")
+		}
+		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ElementCalG]) {
+			writeGradedSubcomplex(subcomplex, args, depth)
+		}
+		complex.DepthGradedSubcomplexes(h)
 	} else if args.DualGraph {
 		if args.Verbose {
 			log.Printf("computing dual graph")
@@ -203,7 +226,7 @@ func writeOutputComplex[T any](outComplex *golsv.ZComplex[T], args ComplexArgs) 
 		}
 		outComplex.D1().Sparse().WriteFile(args.OutComplexD1File)
 		if args.Verbose {
-			log.Printf("done writing output complex d_1")
+			log.Printf("done writing")
 		}
 	}
 	if args.OutComplexD2File != "" {
@@ -212,7 +235,7 @@ func writeOutputComplex[T any](outComplex *golsv.ZComplex[T], args ComplexArgs) 
 		}
 		outComplex.D2().Sparse().WriteFile(args.OutComplexD2File)
 		if args.Verbose {
-			log.Printf("done writing output complex d_2")
+			log.Printf("done writing")
 		}
 	}
 	if args.OutVertexBasisFile != "" {
@@ -221,7 +244,7 @@ func writeOutputComplex[T any](outComplex *golsv.ZComplex[T], args ComplexArgs) 
 		}
 		golsv.WriteStringFile(outComplex.VertexBasis(), args.OutVertexBasisFile)
 		if args.Verbose {
-			log.Printf("done writing output complex vertex basis")
+			log.Printf("done writing")
 		}
 	}
 	if args.OutEdgeBasisFile != "" {
@@ -230,7 +253,7 @@ func writeOutputComplex[T any](outComplex *golsv.ZComplex[T], args ComplexArgs) 
 		}
 		golsv.WriteStringFile(outComplex.EdgeBasis(), args.OutEdgeBasisFile)
 		if args.Verbose {
-			log.Printf("done writing output complex edge basis")
+			log.Printf("done writing")
 		}
 	}
 	if args.OutTriangleBasisFile != "" {
@@ -239,7 +262,34 @@ func writeOutputComplex[T any](outComplex *golsv.ZComplex[T], args ComplexArgs) 
 		}
 		golsv.WriteStringFile(outComplex.TriangleBasis(), args.OutTriangleBasisFile)
 		if args.Verbose {
-			log.Printf("done writing output complex triangle basis")
+			log.Printf("done writing")
 		}
 	}
+}
+
+func writeGradedSubcomplex[T any](subcomplex *golsv.ZComplex[T], args ComplexArgs, depth int) {
+	if args.Verbose {
+		log.Printf("created subcomplex %s at depth %d", subcomplex, depth)
+	}
+	cargs := args
+	if args.OutComplexD1File != "" {
+		cargs.OutComplexD1File = addTagDepthTag(args.OutComplexD1File, depth)
+	}
+	if args.OutComplexD2File != "" {
+		cargs.OutComplexD2File = addTagDepthTag(args.OutComplexD2File, depth)
+	}
+	if args.OutVertexBasisFile != "" {
+		cargs.OutVertexBasisFile = addTagDepthTag(args.OutVertexBasisFile, depth)
+	}
+	if args.OutEdgeBasisFile != "" {
+		cargs.OutEdgeBasisFile = addTagDepthTag(args.OutEdgeBasisFile, depth)
+	}
+	if args.OutTriangleBasisFile != "" {
+		cargs.OutTriangleBasisFile = addTagDepthTag(args.OutTriangleBasisFile, depth)
+	}
+	writeOutputComplex(subcomplex, cargs)
+}
+
+func addTagDepthTag(s string, d int) string {
+	return strings.Replace(s, ".txt", fmt.Sprintf("_%d.txt", d), 1)
 }

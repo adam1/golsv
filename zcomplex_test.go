@@ -119,6 +119,51 @@ func TestZTriangleSetEqual(t *testing.T) {
 	}
 }
 
+func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
+	type data struct {
+		Depth int
+		Subcomplex *ZComplex[ZVertexInt]
+	}	
+	tests := []struct {
+		C *ZComplex[ZVertexInt]
+		Depth int
+		Expected []data
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			0,
+			[]data{
+				{0, NewZComplexFromMaximalSimplices([][]int{{0}})},
+				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}})},
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2, 3}}),
+			0,
+			[]data{
+				{0, NewZComplexFromMaximalSimplices([][]int{{0}})},
+				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1}})},
+				{2, NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2, 3}})},
+			},
+		},
+	}
+	for n, test := range tests {
+		got := make([]data, 0)
+		test.C.DepthGradedSubcomplexes(func(depth int, subcomplex *ZComplex[ZVertexInt]) {
+			got = append(got, data{Depth: depth, Subcomplex: subcomplex})
+		})
+		if len(got) != len(test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+			continue
+		}
+		for i := range got {
+			if !reflect.DeepEqual(got[i], test.Expected[i]) {
+				t.Errorf("Test %d: got=%v, expected=%v", n, got[i], test.Expected[i])
+			}
+		}
+	}
+}
+
 func TestZComplexEdgeToTriangleIncidenceMap(t *testing.T) {
 	tests := []struct {
 		C *ZComplex[ZVertexInt]
