@@ -349,7 +349,7 @@ func TestZComplexBFWalk3Cliques(t *testing.T) {
 	}
 }
 
-func TestZComplexDualGraph(t *testing.T) {
+func TestZComplexDualComplex(t *testing.T) {
 	tests := []struct {
 		C *ZComplex[ZVertexInt]
 		Expected *ZComplex[ZVertexInt]
@@ -362,9 +362,13 @@ func TestZComplexDualGraph(t *testing.T) {
 			NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {0,1,3}}),
 			NewZComplexFromMaximalSimplices([][]int{{0,1}}),
 		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0,1,2}, {0,1,3}, {0,1,4}}),
+			NewZComplexFromMaximalSimplices([][]int{{0,1,2}}),
+		},
 	}
 	for n, test := range tests {
-		got := test.C.DualGraph()
+		got := test.C.DualComplex()
 		if !reflect.DeepEqual(got, test.Expected) {
 			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
 		}

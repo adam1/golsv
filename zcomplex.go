@@ -243,29 +243,59 @@ func (C *ZComplex[T]) DepthGradedSubcomplexes(handler func(depth int, subcomplex
 	handler(curDepth, subcomplex)
 }
 
-func (C *ZComplex[T]) DualGraph() *ZComplex[ZVertexInt] {
-	// the dual graph is the complex whose vertices are the
+func (C *ZComplex[T]) DualComplex() *ZComplex[ZVertexInt] {
+	// the dual complex, as we define it here, is the complex whose vertices are the
 	// triangles of the original complex, and whose edges are the
 	// triangles that share an edge in the original complex.
+	// in addition, our dual complex has a triangle for each edge in the
+	// original complex that is incident to three triangles in the original.
+	// in other words, we take the dual graph of the original complex,
+	// and where we have a triangle in the dual graph which has edges
+	// all corresponding to the same edge in the original complex, we
+	// fill that triangle in the dual complex. note that this is NOT
+	// the same as taking the clique complex of the dual complex, since
+	// in general, one could have a triangle in the dual graph corresponding
+	// to three triangles in the original complex that are not all incident to the
+	// a single edge but rather to two different edges.
 	vertices := make([]ZVertex[ZVertexInt], len(C.triangleBasis))
 	for i := range C.triangleBasis {
 		vertices[i] = ZVertexInt(i)
 	}
 	edges := make([]ZEdge[ZVertexInt], 0)
+	triangles := make([]ZTriangle[ZVertexInt], 0)
 	edgeToTriangles := C.EdgeToTriangleIncidenceMap()
 	for i := range C.EdgeBasis() {
+		toAdd := make([]ZEdge[ZVertexInt], 0)
 		T1 := edgeToTriangles[i]
 		for _, t := range T1 {
 			for _, u := range T1 {
 				if t < u {
-					edges = append(edges, NewZEdge(ZVertexInt(t), ZVertexInt(u)))
+					toAdd = append(toAdd, NewZEdge(ZVertexInt(t), ZVertexInt(u)))
 				}
-			}			
+			}
+		}
+		// if for the current edge in the original, we added three edges to
+		// the dual, which must correspond to three triangles in the original
+		// incident to the original edge, then also add a triangle to the dual.
+		// to generalize this, for n \ge 3, we could add an n-simplex for
+		// n triangles incident to the original edge.  that is not needed currently.
+		edges = append(edges, toAdd...)
+		if len(toAdd) == 3 {
+			var t, u, v ZVertex[ZVertexInt]
+			t = toAdd[0][0]
+			u = toAdd[0][1]
+			if toAdd[1][0] == t || toAdd[1][0] == u {
+				v = toAdd[1][1]
+			} else {
+				v = toAdd[1][0]
+			}
+			triangle := NewZTriangle(t, u, v)
+			triangles = append(triangles, triangle)
 		}
 	}
 	sortBases := false
 	verbose := C.verbose
-	return NewZComplex(vertices, edges, nil, sortBases, verbose)
+	return NewZComplex(vertices, edges, triangles, sortBases, verbose)
 }
 
 func (C *ZComplex[T]) EdgeBasis() []ZEdge[T] {

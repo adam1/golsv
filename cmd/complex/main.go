@@ -159,7 +159,7 @@ func handleComplexByBases(args ComplexArgs) {
 		if args.Verbose {
 			log.Printf("computing dual graph")
 		}
-		dual := complex.DualGraph()
+		dual := complex.DualComplex()
 		if args.Verbose {
 			log.Printf("computed dual graph: %s", dual)
 		}
