@@ -20,7 +20,7 @@ import (
 type ComplexArgs struct {
 	D1File                  string
 	D2File                  string
-	DualGraph               bool
+	DualComplex             bool
 	EdgeBasisFile           string
 	DepthGradedSubcomplexes bool
 	GraphvizFile            string
@@ -42,7 +42,7 @@ func parseFlags() ComplexArgs {
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", "", "The file containing the D1 boundary matrix")
 	flag.StringVar(&args.D2File, "d2", "", "The file containing the D2 boundary matrix")
-	flag.BoolVar(&args.DualGraph, "dual-graph", false, "Compute the dual graph")
+	flag.BoolVar(&args.DualComplex, "dual-complex", false, "Compute the dual complex (see zcomplex.go for precise definition)")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", "", "The file containing the edge basis")
 	flag.BoolVar(&args.DepthGradedSubcomplexes, "depth-graded-subcomplexes", false, "Compute all graded subcomplexes by depth; output filenames will have '-d' appended with d=depth")
 	flag.StringVar(&args.GraphvizFile, "graphviz", "", "The file to write the graphviz output to")
@@ -155,13 +155,13 @@ func handleComplexByBases(args ComplexArgs) {
 			writeGradedSubcomplex(subcomplex, args, depth)
 		}
 		complex.DepthGradedSubcomplexes(h)
-	} else if args.DualGraph {
+	} else if args.DualComplex {
 		if args.Verbose {
-			log.Printf("computing dual graph")
+			log.Printf("computing dual complex")
 		}
 		dual := complex.DualComplex()
 		if args.Verbose {
-			log.Printf("computed dual graph: %s", dual)
+			log.Printf("computed dual complex: %s", dual)
 		}
 		writeOutputComplex(dual, args)
 	}
@@ -291,5 +291,10 @@ func writeGradedSubcomplex[T any](subcomplex *golsv.ZComplex[T], args ComplexArg
 }
 
 func addTagDepthTag(s string, d int) string {
-	return strings.Replace(s, ".txt", fmt.Sprintf("_%d.txt", d), 1)
+	parts := strings.Split(s, "-")
+	if len(parts) == 1 {
+		return fmt.Sprintf("%s_%d.txt", parts[0], d)
+	}
+	parts[0] = fmt.Sprintf("%s_%d", parts[0], d)
+	return strings.Join(parts, "-")
 }
