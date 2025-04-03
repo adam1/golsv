@@ -341,8 +341,8 @@ d^1U^1.txt: d^1.txt U^1.txt
 	multiply -A d^1.txt -B U^1.txt -C d^1U^1.txt 2>&1 | tee d^1U^1.$(log)
 
 # This target searches for cosystolic vectors in Z^1 \setminus B^1.
-cosystoleExhaustive.txt: U^1.txt
-	systole -trials 1000 -B B^1.txt -U U^1.txt -min cosystole.txt 2>&1 | tee cosystoleExhaustive.$(log)
+cosystoleSample.txt: U^1.txt
+	systole -trials 1000 -B B^1.txt -U U^1.txt cosystole.txt 2>&1 | tee cosystoleSample.$(log)
 
 # This target searches for cosystolic vectors in Z^1 \setminus B^1 by the simplicial search algorithm.
 cosystole.txt: d1.txt d2.txt Z1.txt
