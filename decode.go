@@ -89,7 +89,13 @@ func (D *CoboundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorVe
 	lastStatTime := startTime
 	lastFWeight := fWeight
 	statIntervalSteps := 100
-	var triLocalToGlobal map[int]int // NOTE: this is persisted and modified across iterations of the outer loop here
+	// NOTE: triLocalToGlobal is persisted and modified across
+	// iterations of the outer loop here.  This is part of an
+	// optimization where we continually reduce the triangle space
+	// (and hence the length of the syndrome vector). We start with
+	// the full space and at each step remove more triangles (by
+	// projecting) that are not pertinent.
+	var triLocalToGlobal map[int]int
 	for fWeight > 0 {
 		round++
 		vertexIndices := D.chooseVertices(f, triLocalToGlobal)
@@ -135,9 +141,11 @@ func (D *CoboundaryDecoder[T]) processVertex(f BinaryVector, fWeight int, iterat
 	// triangles incident to $v$.  The triangle set $S \cup T_v$
 	// represents the set of triangles that we might be interested in
 	// for this step and this vertex in the procedure.  We project
-	// from the full edge space $\F_2^E$ down to $\F_2^{S \cup T_v}$,
-	// in order to minimize the size of bitstrings we are dealing
-	// with.
+	// from the full triangle space $\F_2^T$ down to $\F_2^{S \cup
+	// T_v}$, in order to minimize the size of bitstrings we are
+	// dealing with. Calling the full triangle space global and the
+	// smaller reduced triangle space local, the triLocalToGlobal and
+	// triGlobalToLocal maps translate indices of these two arrays.
 	var triGlobalToLocal map[int]int
 	f, triLocalToGlobal, triGlobalToLocal = D.localProjection(f, triLocalToGlobal, incidentTriangles)
 	// for each 1-cochain y entirely inside the edge-neighborhood
@@ -171,7 +179,9 @@ func (D *CoboundaryDecoder[T]) processVertex(f BinaryVector, fWeight int, iterat
 	return f, fWeight, triLocalToGlobal
 }
 
-// f is the current (projected) syndrome. 
+// f is the current syndrome in the current (reduced/projected)
+// triangle space.  chooseVertices returns the list of vertices that
+// are incident to any triangle in the support of f.
 func (D *CoboundaryDecoder[T]) chooseVertices(f BinaryVector, triLocalToGlobal map[int]int) []int {
 	res := make([]int, 0)
 	triangleBasis := D.complex.TriangleBasis()
