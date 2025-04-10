@@ -181,8 +181,8 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1})\\
 	\hline
 	{{range .}}
-	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_u "y"}} \\
-	                                        & {{.B_uInvCalG.Latex}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_uInv "y"}} \\
+	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_u "y"}} \\
+	                                        & {{.B_uInvCalG.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_uInv "y"}} \\
 	{{end}}
 	\hline
 \end{array}`

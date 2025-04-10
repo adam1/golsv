@@ -318,6 +318,23 @@ func (g ElementCalG) Latex() string {
 	return buf.String()
 }
 
+func (g ElementCalG) LatexMatrix() string {
+	var buf bytes.Buffer
+	buf.WriteString("\\begin{pmatrix}\n")
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			f := g[i*3+j]
+			if j != 0 {
+				buf.WriteString(" & ")
+			}
+			fmt.Fprint(&buf, f.Latex("y"))
+		}
+		buf.WriteString("\\\\\n")
+	}
+	buf.WriteString("\\end{pmatrix}\n")
+	return buf.String()
+}
+
 // xxx test
 func (g ElementCalG) Less(h ElementCalG) bool {
 	for i := 0; i < len(g); i++ {
