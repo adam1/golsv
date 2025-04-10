@@ -67,6 +67,23 @@ func (v ElementFqd) Mul(w ElementFqd) ElementFqd {
 	return x
 }
 
+func (w ElementFqd) ToStandardBasis() F2Polynomial {
+	sum := F2PolynomialZero
+	// w_0 \mapsto 1 + v
+	// w_1 \mapsto 1 + v^2
+	// w_2 \mapsto 1 + v + v^2
+	if w[0] == 1 {
+		sum = sum.Add(smallF2Polynomial(3))
+	}
+	if w[1] == 1 {
+		sum = sum.Add(smallF2Polynomial(5))
+	}
+	if w[2] == 1 {
+		sum = sum.Add(smallF2Polynomial(7))
+	}
+	return sum	
+}
+
 func FqdAllElements() []ElementFqd {
 	result := make([]ElementFqd, 0, 8)
 	for i := 0; i < 2; i++ {
@@ -739,11 +756,12 @@ func CartwrightStegerGeneratorsMatrixReps() (gens []ProjMatF2Poly, table []Cartw
 	repBInv := cartwrightStegerMatrixRepBInverse()
  	gens = make([]ProjMatF2Poly, 0)
  	table = make([]CartwrightStegerGenMatrixInfo, 0)
-	fieldElements := EnumerateF2Polynomials(2)
-	for _, u := range fieldElements {
-		if u.IsZero() {
+	fieldElements := FqdAllElements()
+	for _, uZeta := range fieldElements {
+		if uZeta.IsZero() {
 			continue
 		}
+		u := uZeta.ToStandardBasis()
 		uRep := ProjMatF2Poly(cartwrightStegerMatrixRepFieldElement(u))
 		uInvRep := ProjMatF2Poly(cartwrightStegerMatrixRepFieldElement(u.InverseModf(cartwrightStegerModulus)))
 		// b_u = u b u^{-1}

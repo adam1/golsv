@@ -162,6 +162,8 @@ func dumpElements(els []golsv.ElementCalG) string {
 	return s
 }
 
+// note that we implicitly assume that the generators are in the same order as
+// the matrix reps, which is true.
 func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.ElementCalG) {
 	// combine the (algebraic) generators with their matrix representations
 	// so as to produce a nice table.
@@ -169,8 +171,10 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 	log.Printf("Generator matrix reps:")
 	combined := make([]genInfo, 0)
 	for i, info := range genMatrixReps {
-		fmt.Printf("u=%v b_u=%v b_uInv=%v\n", info.U, info.B_u, info.B_uInv)
-		combined = append(combined, genInfo{info, gens[i], gens[i+1]})
+		b_uCalg := gens[2*i]
+		b_uCalgInv := gens[2*i+1]
+		fmt.Printf("u=%v b_u=%v rho(b_u)=%v\n", info.U, b_uCalg, info.B_u)
+		combined = append(combined, genInfo{info, b_uCalg, b_uCalgInv})
 	}
 	const latexTemplate = `\begin{array}{|c|c|c|}
 	\hline

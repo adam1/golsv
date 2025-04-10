@@ -47,6 +47,18 @@ func TestCSFqdNormalMultTable(t *testing.T) {
 	}
 }
 
+func TestCSFqdElementToStandardBasis(t *testing.T) {
+	all := FqdAllElements()
+	found := make(map[F2Polynomial]bool)
+	for _, a := range all {
+		b := a.ToStandardBasis()
+		found[b] = true
+	}
+	if len(found) != len(all) {
+		t.Errorf("len(found)=%d len(all)=%d", len(found), len(all))
+	}
+}
+
 func TestCSElementCalGNewFromFieldElement(t *testing.T) {
 	g := NewElementCalGFromFieldElement(ElementFqd{1,1,1})
 	if !g.Equal(NewElementCalGIdentity()) {
@@ -534,6 +546,28 @@ func TestCSElementCalGGenB(t *testing.T) {
 	c.Mul(b, bInv)
 	if !c.IsIdentity() {
 		t.Errorf("expected identity for b * bInv; got:\n%v", c)
+	}
+}
+
+func TestCSElementCalGLatex(t *testing.T) {
+	tests := []struct {
+		g    ElementCalG
+		want string
+	}{
+		{
+			NewElementCalGIdentity(),
+			"\\zeta_0 + \\zeta_1 + \\zeta_2",
+		},
+		{
+			cartwrightStegerGenB(),
+			"(1+y) \\zeta_0 + \\zeta_0 z^{2} + (1+y) \\zeta_1 + \\zeta_1 z^{2} + (1+y) \\zeta_2 + \\zeta_2 z^{2}",
+		},
+	}
+	for i, test := range tests {
+		got := test.g.Latex()
+		if got != test.want {
+			t.Errorf("test %d:\ng: %v\ngot:  %v\nwant: %v", i, test.g, got, test.want)
+		}
 	}
 }
 

@@ -74,6 +74,9 @@ calg-cayley d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.t
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
 		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee S-all.$(log)
 
+gens.tex:
+	calg-cayley -modulus `cat modulus.txt` -max-depth 1 -generators-latex-file gens.tex 2>&1 | tee gens.$(log)
+
 # This target computes a Smith normal form for the matrix d_1.
 d1smith.txt d1colops.txt: d1.txt
 	smith -in d1.txt -smith d1smith.txt -colops d1colops.txt 2>&1 | tee d1smith.$(log)
