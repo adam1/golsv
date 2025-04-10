@@ -47,6 +47,18 @@ func TestCSFqdNormalMultTable(t *testing.T) {
 	}
 }
 
+func TestCSFqdElementToStandardBasis(t *testing.T) {
+	all := FqdAllElements()
+	found := make(map[F2Polynomial]bool)
+	for _, a := range all {
+		b := a.ToStandardBasis()
+		found[b] = true
+	}
+	if len(found) != len(all) {
+		t.Errorf("len(found)=%d len(all)=%d", len(found), len(all))
+	}
+}
+
 func TestCSElementCalGNewFromFieldElement(t *testing.T) {
 	g := NewElementCalGFromFieldElement(ElementFqd{1,1,1})
 	if !g.Equal(NewElementCalGIdentity()) {
@@ -537,6 +549,28 @@ func TestCSElementCalGGenB(t *testing.T) {
 	}
 }
 
+func TestCSElementCalGLatex(t *testing.T) {
+	tests := []struct {
+		g    ElementCalG
+		want string
+	}{
+		{
+			NewElementCalGIdentity(),
+			"\\zeta_0 + \\zeta_1 + \\zeta_2",
+		},
+		{
+			cartwrightStegerGenB(),
+			"(1+y) \\zeta_0 + \\zeta_0 z^{2} + (1+y) \\zeta_1 + \\zeta_1 z^{2} + (1+y) \\zeta_2 + \\zeta_2 z^{2}",
+		},
+	}
+	for i, test := range tests {
+		got := test.g.Latex()
+		if got != test.want {
+			t.Errorf("test %d:\ng: %v\ngot:  %v\nwant: %v", i, test.g, got, test.want)
+		}
+	}
+}
+
 func TestCSElementCalGModf(t *testing.T) {
 	tests := []struct {
 		g   ElementCalG
@@ -601,6 +635,19 @@ func TestCSCartwrightStegerGeneratorsInverse(t *testing.T) {
 		p.Mul(g, gInv)
 		if !p.IsIdentity() {
 			t.Errorf("i: %d\ng: %v\ngInv: %v\ngot: %v\nwant: identity", i, g, gInv, p)
+		}
+	}
+}
+
+func TestCSCartwrightStegerGeneratorsOrderModf(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	f := F2Polynomial111
+	expectedOrder := 21
+	for i, g := range gens {
+		g = g.Modf(f)
+		order := g.OrderModf(f)
+		if order != expectedOrder {
+			t.Errorf("i: %d\ng: %v\norder: %d", i, g, order)
 		}
 	}
 }
