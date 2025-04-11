@@ -639,6 +639,19 @@ func TestCSCartwrightStegerGeneratorsInverse(t *testing.T) {
 	}
 }
 
+func TestCSCartwrightStegerGeneratorsOrderModf(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	f := F2Polynomial111
+	expectedOrder := 21
+	for i, g := range gens {
+		g = g.Modf(f)
+		order := g.OrderModf(f)
+		if order != expectedOrder {
+			t.Errorf("i: %d\ng: %v\norder: %d", i, g, order)
+		}
+	}
+}
+
 // xxx
 func DisabledTestCSCartwrightStegerExperiment(t *testing.T) {
 	gens := CartwrightStegerGenerators()

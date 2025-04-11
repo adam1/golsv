@@ -521,6 +521,19 @@ func (g ElementCalG) Order() int {
 	}
 }
 
+func (g ElementCalG) OrderModf(f F2Polynomial) int {
+	t := NewElementCalGIdentity()
+	k := 0
+	for {
+		t.Mul(t, g)
+		t = t.Modf(f)
+		k++
+		if t.IsIdentity() {
+			return k
+		}
+	}
+}
+
 // sets g = p * g; internal method, result is not normalized.
 func (g *ElementCalG) scale(p F2Polynomial) {
 	for i := 0; i < 9; i++ {
