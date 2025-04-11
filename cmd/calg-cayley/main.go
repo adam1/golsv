@@ -176,7 +176,22 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 		fmt.Printf("u=%v b_u=%v rho(b_u)=%v\n", info.U, b_uCalg, info.B_u)
 		combined = append(combined, genInfo{info, b_uCalg, b_uCalgInv})
 	}
-	const latexTemplate = `\begin{array}{|c|c|c|}
+	// xxx we currently haven't fully implemented the calculation of the matrix representation
+	// for the quotient case, as we don't use them elsewhere.  in this case, omit the corresponding column
+	// from the latex output.
+	var latexTemplate string
+	if args.Quotient {
+		latexTemplate = `\begin{array}{|c|c|}
+	\hline
+	u & b_u, \quad b_u^{-1} \\
+	\hline
+	{{range .}}
+	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.LatexMatrix}} \quad {{.B_uInvCalG.LatexMatrix}} \\
+	{{end}}
+	\hline
+\end{array}`
+	} else {
+		latexTemplate = `\begin{array}{|c|c|c|}
 	\hline
 	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1})\\
 	\hline
@@ -186,6 +201,7 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 	{{end}}
 	\hline
 \end{array}`
+	}
 	funcMap := template.FuncMap{
 		"F2PolyLatexWithVar": func(p golsv.F2Polynomial, varName string) string {
 			return p.Latex(varName)
