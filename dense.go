@@ -3,8 +3,8 @@ package golsv
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"math"
 	"strings"
+
 	"github.com/lukechampine/fastxor"
 )
 
@@ -82,6 +82,9 @@ func NewRandomDenseBinaryMatrix(rows, cols int) *DenseBinaryMatrix {
 }
 
 func NewRandomDenseBinaryMatrixWithDensity(rows, cols int, density float64) *DenseBinaryMatrix {
+	if density < 0 || density > 1 {
+		panic("density must be between 0 and 1")
+	}
 	stride, words := stride(rows, cols)
 	M := &DenseBinaryMatrix{
 		Rows: rows,
@@ -90,16 +93,19 @@ func NewRandomDenseBinaryMatrixWithDensity(rows, cols int, density float64) *Den
 		Data: make([]byte, words),
 		buf: make([]byte, stride),
 	}
-	noiseLen := rows * cols * 8
+	thresholdBytes := 1
+	noiseLen := rows * cols * thresholdBytes
 	noise := make([]byte, noiseLen)
 	_, err := rand.Read(noise)
 	if err != nil {
 		panic(err)
 	}
 	var i, j int
-	threshold := uint64(density * math.MaxUint64)
-	for k := 0; k < noiseLen; k += 8 {
-		bytes := noise[k:k+8]
+	maxInt := uint64(1)<<(thresholdBytes * 8) - 1
+	threshold := uint64(density * float64(maxInt))
+	bytes := make([]byte, 8)
+	for k := 0; k < noiseLen; k += thresholdBytes {
+		copy(bytes, noise[k:k+thresholdBytes])
 		num := binary.LittleEndian.Uint64(bytes)
 		if num <= threshold {
 			M.Set(i, j, 1)
