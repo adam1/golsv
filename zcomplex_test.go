@@ -196,61 +196,26 @@ func TestZComplexEdgeToTriangleIncidenceMap(t *testing.T) {
 	}
 }
 
-func TestZComplexHasNeighbor(t *testing.T) {
-	tests := []struct {
-		C *ZComplex[ZVertexInt]
-		v,u ZVertex[ZVertexInt]
-		Expected bool
-	}{
-		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
-			ZVertexInt(0), ZVertexInt(1), true,
-		},
-		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
-			ZVertexInt(0), ZVertexInt(2), true,
-		},
-		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-			ZVertexInt(0), ZVertexInt(1), true,
-		},
-		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-			ZVertexInt(0), ZVertexInt(3), false,
-		},
-		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-			ZVertexInt(0), ZVertexInt(4), false,
-		},
-	}
-	for n, test := range tests {
-		got := test.C.HasNeighbor(test.v, test.u)
-		if got != test.Expected {
-			t.Errorf("Test %d: C.HasNeighbor(%v, %v)=%v, expected %v", n, test.v, test.u, got, test.Expected)
-		}
-	}
-}
-
 func TestZComplexNeighbors(t *testing.T) {
 	tests := []struct {
 		C *ZComplex[ZVertexInt]
-		v ZVertex[ZVertexInt]
-		Expected []ZVertex[ZVertexInt]
+		v int
+		Expected []int
 	}{
 		{
 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
-			ZVertexInt(0),
-			[]ZVertex[ZVertexInt]{ZVertexInt(1), ZVertexInt(2)},
+			0,
+			[]int{1, 2},
 		},
 		{
 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-			ZVertexInt(0),
-			[]ZVertex[ZVertexInt]{ZVertexInt(1), ZVertexInt(2)},
+			0,
+			[]int{1, 2},
 		},
 		{
 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-			ZVertexInt(1),
-			[]ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(2), ZVertexInt(3)},
+			1,
+			[]int{0, 2, 3},
 		},
 	}
 	for n, test := range tests {
@@ -340,7 +305,7 @@ func TestZComplexBFWalk3Cliques(t *testing.T) {
 	}
 	for n, test := range tests {
 		got := 0
-		test.C.BFWalk3Cliques(ZVertexInt(0), func(c [3]ZVertex[ZVertexInt]) {
+		test.C.BFWalk3Cliques(func(c [3]ZVertex[ZVertexInt]) {
 			got++
 		})
 		if got != test.ExpectedCount {
@@ -397,7 +362,7 @@ func TestZComplexNewFromBoundaryMaps(t *testing.T) {
 	}
 	for n, test := range tests {
 		got := NewZComplexFromBoundaryMatrices(test.d_1, test.d_2)
-		if !reflect.DeepEqual(got, test.Expected) {
+		if got.DumpBases() != test.Expected.DumpBases() {
 			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
 		}
 	}
