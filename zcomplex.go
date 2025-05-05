@@ -334,6 +334,23 @@ func (C *ZComplex[T]) EdgeToTriangleIncidenceMap() map[int][]int {
 	return m
 }
 
+func (C *ZComplex[T]) Fill3Cliques() {
+	seen := make(map[ZTriangle[T]]struct{})
+	for i, v := range C.vertexBasis {
+		if C.verbose {
+			log.Printf("Filling 3-cliques for vertex %d", i)
+		}
+		C.BFWalk3Cliques(v, func(c [3]ZVertex[T]) {
+			t := NewZTriangle(c[0], c[1], c[2])
+			if _, ok := seen[t]; ok {
+				return
+			}
+			C.triangleBasis = append(C.triangleBasis, t)
+			seen[t] = struct{}{}
+		})
+	}
+}
+
 func (C *ZComplex[T]) HasNeighbor(v, u ZVertex[T]) bool {
 	for _, x := range C.Neighbors(v) {
 		if x.Equal(u.(T)) {
@@ -959,6 +976,6 @@ func NewZComplexFromBoundaryMatrices(d_1, d_2 BinaryMatrix) *ZComplex[ZVertexInt
 		triangleBasis = append(triangleBasis, NewZTriangle[ZVertexInt](v0, v1, v2))
 	}
 	sortBases := false
-	verbose := false
+	verbose := true
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }

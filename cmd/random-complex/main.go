@@ -16,13 +16,12 @@ func main() {
 	args.ProfileArgs.Start()
 	defer args.ProfileArgs.Stop()
 
-	if args.Verbose {
-		log.Printf("Generating random complex with dim C_0=%d", args.DimC0)
-	}
 	gen := golsv.NewRandomComplexGenerator(args.DimC0, args.Verbose)
 	var err error
 	var d_1, d_2 golsv.BinaryMatrix
-	if args.Simplicial {
+	if args.Clique {
+		d_1, d_2, err = gen.RandomCliqueComplex(args.ProbEdge)
+	} else if args.Simplicial {
 		d_1, d_2, err = gen.RandomSimplicialComplex()
 	} else {
 		d_1, d_2, err = gen.RandomComplex()
@@ -47,24 +46,28 @@ func main() {
 	}
 }
 
-type CalGCayleyExpanderArgs struct {
+type Args struct {
 	D1File             string
 	D2File             string
 	DimC0              int
 	Simplicial         bool
+	Clique             bool
+	ProbEdge           float64
 	Verbose            bool
 	golsv.ProfileArgs
 }
 
-func parseFlags() *CalGCayleyExpanderArgs {
-	args := CalGCayleyExpanderArgs{
+func parseFlags() *Args {
+	args := Args{
 		DimC0: 10,
 		Verbose: true,
 	}
 	args.ProfileArgs.ConfigureFlags()
+	flag.BoolVar(&args.Clique, "clique", args.Clique, "Generate a clique complex over a random graph")
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 output file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")
 	flag.IntVar(&args.DimC0, "dimC0", args.DimC0, fmt.Sprintf("dim C_0 (default %d)", args.DimC0))
+	flag.Float64Var(&args.ProbEdge, "p", args.ProbEdge, "probability of edge in random graph")
 	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "complex should be simplicial")
 	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "verbose logging")
 	flag.Parse()

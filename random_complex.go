@@ -2,6 +2,7 @@ package golsv
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"math/big"
@@ -94,6 +95,49 @@ func (R *RandomComplexGenerator) RandomSimplicialComplex() (d_1, d_2 BinaryMatri
 	})
 	verbose := false
 	C := NewZComplex(graph.VertexBasis(), graph.EdgeBasis(), triangleBasis, true, verbose)
+	return C.D1(), C.D2(), nil
+}
+
+func (R *RandomComplexGenerator ) RandomCliqueComplex(probEdge float64) (d_1, d_2 BinaryMatrix, err error) {
+	numVertices := R.dimC_0
+	if R.verbose {
+		log.Printf("Generating clique complex over %d vertices with edge probability %v", numVertices, probEdge)
+	}
+	if probEdge < 0 || probEdge > 1 {
+		panic("pEdge must be between 0 and 1")
+	}
+	entropyBytesPerBit := 1
+	entropy := make([]byte, numVertices * entropyBytesPerBit)
+	bytes := make([]byte, 8)
+	maxInt := uint64(1)<<(entropyBytesPerBit * 8) - 1
+	threshold := uint64(probEdge * float64(maxInt))
+	d_1Sparse := NewSparseBinaryMatrix(numVertices, 0).Sparse()
+	numEdges := 0
+	for i := 0; i < numVertices; i++ {
+		numCols := numVertices - i - 1
+		entropy = entropy[:numCols * entropyBytesPerBit]
+		_, err := rand.Read(entropy)
+		if err != nil {
+			panic(err)
+		}
+		for k := 0; k < len(entropy); k += entropyBytesPerBit {
+			copy(bytes, entropy[k:k+entropyBytesPerBit])
+			num := binary.LittleEndian.Uint64(bytes)
+			if num <= threshold {
+				M := NewSparseBinaryMatrix(numVertices, 1)
+				M.Set(i, 0, 1)
+				M.Set(i+k/entropyBytesPerBit+1, 0, 1)
+				d_1Sparse.AppendColumn(M)
+				numEdges++
+			}
+		}
+	}
+	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
+	if R.verbose {
+		log.Printf("Generated d_1: %v\n", d_1Sparse)
+		log.Printf("Filling cliques")
+	}
+	C.Fill3Cliques()
 	return C.D1(), C.D2(), nil
 }
 
