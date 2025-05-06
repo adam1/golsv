@@ -130,14 +130,15 @@ func TriangleSetEqual[VertexType any](S, U []ZTriangle[VertexType]) bool {
 }
 
 type ZComplex[T any] struct {
-	vertexBasis   []ZVertex[T]
-	edgeBasis     []ZEdge[T]
-	triangleBasis []ZTriangle[T]
-	d1            BinaryMatrix
-	d2            BinaryMatrix
-	edgeIndex     map[ZEdge[T]]int   // edge -> index in basis
-	vertexIndex   map[ZVertex[T]]int // vertex -> index in basis
-	verbose       bool
+	vertexBasis    []ZVertex[T]
+	edgeBasis      []ZEdge[T]
+	triangleBasis  []ZTriangle[T]
+	d1             BinaryMatrix
+	d2             BinaryMatrix
+	edgeIndex      map[ZEdge[T]]int   // edge -> index in basis
+	vertexIndex    map[ZVertex[T]]int // vertex -> index in basis
+	adjacencyIndex map[int][]int      // vertex index -> list of adjacent vertex indices
+	verbose        bool
 }
 
 func NewZComplex[T any](vertexBasis []ZVertex[T], edgeBasis []ZEdge[T], triangleBasis []ZTriangle[T], sortBases bool, verbose bool) *ZComplex[T] {
@@ -171,6 +172,44 @@ func NewZComplex[T any](vertexBasis []ZVertex[T], edgeBasis []ZEdge[T], triangle
 	}
 	//log.Printf("xxx\n%s", C.DumpBases())
 	return &C
+}
+
+func (C *ZComplex[T]) BFWalk3Cliques(f func(c [3]ZVertex[T])) {
+	// in order to avoid double-counting, we will create a temporary
+	// map to store the 3-cliques we have already seen.  since we need
+	// these keys to be unique, we use a ZTriangle[T] as the key, even
+	// though this is not necessarily a triangle (2-simplex) in the
+	// complex C.
+	seen := make(map[ZTriangle[T]]struct{})
+	for uId := range C.vertexBasis {
+		//
+		//       f     g     h
+  		//    u --- v --- w --- x
+		//
+		for _, vId := range C.Neighbors(uId) {
+			for _, wId := range C.Neighbors(vId) {
+				if wId == uId {
+					continue
+				}
+				for _, xId := range C.Neighbors(wId) {
+					if xId == vId {
+						continue
+					}
+					if xId == uId {
+						u := C.vertexBasis[uId]
+						v := C.vertexBasis[vId]
+						w := C.vertexBasis[wId]
+						t := NewZTriangle(u, v, w)
+						if _, ok := seen[t]; ok {
+							continue
+						}
+						f([3]ZVertex[T]{u, v, w})
+						seen[t] = struct{}{}
+					}
+				}
+			}
+		}
+	}
 }
 
 func (C *ZComplex[T]) computeEdgeIndex() {
@@ -304,10 +343,11 @@ func (C *ZComplex[T]) EdgeBasis() []ZEdge[T] {
 
 func (C *ZComplex[T]) EdgesContainingVertex(v ZVertex[T]) []ZEdge[T] {
 	var edges []ZEdge[T]
-	for _, t := range C.edgeBasis {
-		if t.Contains(v) {
-			edges = append(edges, t)
-		}
+	nabes := C.Neighbors(C.vertexIndex[v])
+	for _, uId := range nabes {
+		u := C.vertexBasis[uId]
+		e := NewZEdge(v, u)
+		edges = append(edges, e)
 	}
 	return edges
 }
@@ -334,37 +374,51 @@ func (C *ZComplex[T]) EdgeToTriangleIncidenceMap() map[int][]int {
 	return m
 }
 
+func (C *ZComplex[T]) ensureAdjacencyIndex() {
+	if C.adjacencyIndex != nil {
+		return
+	}
+	C.adjacencyIndex = make(map[int][]int)
+	for i := range C.vertexBasis {
+		C.adjacencyIndex[i] = make([]int, 0)
+	}
+	for _, e := range C.edgeBasis {
+		i, ok := C.vertexIndex[e[0]]
+		if !ok {
+			panic(fmt.Sprintf("vertex %v not in vertex index", e[0]))
+		}
+		j, ok := C.vertexIndex[e[1]]
+		if !ok {
+			panic(fmt.Sprintf("vertex %v not in vertex index", e[1]))
+		}
+		C.adjacencyIndex[i] = append(C.adjacencyIndex[i], j)
+		C.adjacencyIndex[j] = append(C.adjacencyIndex[j], i)
+	}
+}
+
 func (C *ZComplex[T]) Fill3Cliques() {
-	seen := make(map[ZTriangle[T]]struct{})
-	for i, v := range C.vertexBasis {
-		if C.verbose {
-			log.Printf("Filling 3-cliques for vertex %d", i)
-		}
-		C.BFWalk3Cliques(v, func(c [3]ZVertex[T]) {
-			t := NewZTriangle(c[0], c[1], c[2])
-			if _, ok := seen[t]; ok {
-				return
-			}
-			C.triangleBasis = append(C.triangleBasis, t)
-			seen[t] = struct{}{}
-		})
+	if C.verbose {
+		log.Printf("Filling 3-cliques")
 	}
+	C.BFWalk3Cliques(func(c [3]ZVertex[T]) {
+		t := NewZTriangle(c[0], c[1], c[2])
+		C.triangleBasis = append(C.triangleBasis, t)
+	})
 }
 
-func (C *ZComplex[T]) HasNeighbor(v, u ZVertex[T]) bool {
-	for _, x := range C.Neighbors(v) {
-		if x.Equal(u.(T)) {
-			return true
-		}
-	}
-	return false
-}
+// xxx deprecate
+// func (C *ZComplex[T]) HasNeighbor(v, u ZVertex[T]) bool {
+// 	for _, x := range C.Neighbors(v) {
+// 		if x.Equal(u.(T)) {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
-func (C *ZComplex[T]) Neighbors(v ZVertex[T]) (nabes []ZVertex[T]) {
-	for _, e := range C.EdgesContainingVertex(v) {
-		nabes = append(nabes, e.OtherVertex(v))
-	}
-	return
+func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
+	C.ensureAdjacencyIndex()
+	return C.adjacencyIndex[v]
 }
 
 // xxx test
@@ -714,40 +768,6 @@ func (C *ZComplex[T]) BFTriangleWalk(v ZVertex[T], f func(t ZTriangle[T])) {
 	})
 }
 
-// Note: this will only enumerate 3-cliques that are connected to the
-// start vertex.  It will generate each 3-clique exactly once.
-func (C *ZComplex[T]) BFWalk3Cliques(v ZVertex[T], f func(c [3]ZVertex[T])) {
-	// in order to avoid double-counting, we will create a temporary
-	// map to store the 3-cliques we have already seen.  since we need
-	// these keys to be unique, we use a ZTriangle[T] as the key, even
-	// though this is not necessarily a triangle (2-simplex) in the
-	// complex C.
-	seen := make(map[ZTriangle[T]]struct{})
-	C.BFS(v, func(u ZVertex[T], depth int) (stop bool) {
-		// for each neighbor x
-		//     for each other neighbor y
-		//         check whether u-x-y is a 3-clique
-		nabes := C.Neighbors(u)
-		for i, x := range nabes {
-			for j, y := range nabes {
-				if i == j {
-					continue
-				}
-				// we have u-x and u-y.  check for x-y.
-				if C.HasNeighbor(x, y) {
-					t := NewZTriangle[T](u, x, y)
-					if _, ok := seen[t]; ok {
-						continue
-					}
-					f([3]ZVertex[T]{u, x, y})
-					seen[t] = struct{}{}
-				}
-			}
-		}
-		return false
-	})
-}
-
 type ZTriangleQueue[T any] struct {
 	slice []ZTriangle[T]
 }
@@ -976,6 +996,6 @@ func NewZComplexFromBoundaryMatrices(d_1, d_2 BinaryMatrix) *ZComplex[ZVertexInt
 		triangleBasis = append(triangleBasis, NewZTriangle[ZVertexInt](v0, v1, v2))
 	}
 	sortBases := false
-	verbose := true
+	verbose := false
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }

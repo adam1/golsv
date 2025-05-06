@@ -87,7 +87,7 @@ func (R *RandomComplexGenerator) RandomSimplicialComplex() (d_1, d_2 BinaryMatri
 
 	triangleFillDensity := 0.5
 	triangleBasis := make([]ZTriangle[ZVertexInt], 0)
-	graph.BFWalk3Cliques(graph.VertexBasis()[0], func(c [3]ZVertex[ZVertexInt]) {
+	graph.BFWalk3Cliques(func(c [3]ZVertex[ZVertexInt]) {
 		if randFloat() >= triangleFillDensity {
 			t := NewZTriangle(c[0], c[1], c[2])
 			triangleBasis = append(triangleBasis, t)
