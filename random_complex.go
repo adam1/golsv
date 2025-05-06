@@ -106,11 +106,11 @@ func (R *RandomComplexGenerator ) RandomCliqueComplex(probEdge float64) (d_1, d_
 	if probEdge < 0 || probEdge > 1 {
 		panic("pEdge must be between 0 and 1")
 	}
-	entropyBytesPerBit := 1
+	entropyBytesPerBit := 2 // nb. increase if more precision is needed in probEdge
 	entropy := make([]byte, numVertices * entropyBytesPerBit)
 	bytes := make([]byte, 8)
 	maxInt := uint64(1)<<(entropyBytesPerBit * 8) - 1
-	threshold := uint64(probEdge * float64(maxInt))
+	cutoff := uint64(probEdge * float64(maxInt))
 	d_1Sparse := NewSparseBinaryMatrix(numVertices, 0).Sparse()
 	numEdges := 0
 	for i := 0; i < numVertices; i++ {
@@ -123,7 +123,7 @@ func (R *RandomComplexGenerator ) RandomCliqueComplex(probEdge float64) (d_1, d_
 		for k := 0; k < len(entropy); k += entropyBytesPerBit {
 			copy(bytes, entropy[k:k+entropyBytesPerBit])
 			num := binary.LittleEndian.Uint64(bytes)
-			if num <= threshold {
+			if num <= cutoff {
 				M := NewSparseBinaryMatrix(numVertices, 1)
 				M.Set(i, 0, 1)
 				M.Set(i+k/entropyBytesPerBit+1, 0, 1)
