@@ -406,16 +406,6 @@ func (C *ZComplex[T]) Fill3Cliques() {
 	})
 }
 
-// xxx deprecate
-// func (C *ZComplex[T]) HasNeighbor(v, u ZVertex[T]) bool {
-// 	for _, x := range C.Neighbors(v) {
-// 		if x.Equal(u.(T)) {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
-
 func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
 	C.ensureAdjacencyIndex()
 	return C.adjacencyIndex[v]

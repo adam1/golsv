@@ -196,42 +196,6 @@ func TestZComplexEdgeToTriangleIncidenceMap(t *testing.T) {
 	}
 }
 
-// xxx deprecated
-// func TestZComplexHasNeighbor(t *testing.T) {
-// 	tests := []struct {
-// 		C *ZComplex[ZVertexInt]
-// 		v,u ZVertex[ZVertexInt]
-// 		Expected bool
-// 	}{
-// 		{
-// 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
-// 			ZVertexInt(0), ZVertexInt(1), true,
-// 		},
-// 		{
-// 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
-// 			ZVertexInt(0), ZVertexInt(2), true,
-// 		},
-// 		{
-// 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-// 			ZVertexInt(0), ZVertexInt(1), true,
-// 		},
-// 		{
-// 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-// 			ZVertexInt(0), ZVertexInt(3), false,
-// 		},
-// 		{
-// 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2, 3}}),
-// 			ZVertexInt(0), ZVertexInt(4), false,
-// 		},
-// 	}
-// 	for n, test := range tests {
-// 		got := test.C.HasNeighbor(test.v, test.u)
-// 		if got != test.Expected {
-// 			t.Errorf("Test %d: C.HasNeighbor(%v, %v)=%v, expected %v", n, test.v, test.u, got, test.Expected)
-// 		}
-// 	}
-// }
-
 func TestZComplexNeighbors(t *testing.T) {
 	tests := []struct {
 		C *ZComplex[ZVertexInt]

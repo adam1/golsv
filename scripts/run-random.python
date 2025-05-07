@@ -4,12 +4,13 @@ import os
 import subprocess
 
 N = 100
-dimC0 = 20
+dimC0 = 60480
+probEdge = 0.00023149
 
 for i in range(N):
     dir = "r%00d" % i
     os.makedirs(dir, exist_ok=True)
-    command = f"cd {dir} && random-complex -dimC0 {dimC0} -d1 d1.txt -d2 d2.txt"
+    command = f"cd {dir} && random-complex -dimC0 {dimC0} -clique -p {probEdge} -d1 d1.txt -d2 d2.txt"
     subprocess.run(command, shell=True)
     command = f"cp ../Makefile {dir}"
     subprocess.run(command, shell=True)
