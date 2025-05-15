@@ -98,7 +98,7 @@ func (R *RandomComplexGenerator) RandomSimplicialComplex() (d_1, d_2 BinaryMatri
 	return C.D1(), C.D2(), nil
 }
 
-func (R *RandomComplexGenerator ) RandomCliqueComplex(probEdge float64) (d_1, d_2 BinaryMatrix, err error) {
+func (R *RandomComplexGenerator) RandomCliqueComplex(probEdge float64) (d_1, d_2 BinaryMatrix, err error) {
 	numVertices := R.dimC_0
 	if R.verbose {
 		log.Printf("Generating clique complex over %d vertices with edge probability %v", numVertices, probEdge)

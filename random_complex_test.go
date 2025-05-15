@@ -86,27 +86,28 @@ func TestRandomSimplicialComplex(t *testing.T) {
 }
 
 func TestRandom2dCliqueComplexComplete(t *testing.T) {
-	// verify that with p=1, we get the clique complex of a complete graph
-	numVertices := 10
-	verbose := false
-	R := NewRandomComplexGenerator(numVertices, verbose)
-	d_1, d_2, err := R.RandomCliqueComplex(1.0)
-	if err != nil {
-		t.Error("wanted no error, got ", err)
-	}
-	if d_1.NumRows() != numVertices {
-		t.Error("wanted d_1.NumRows() == n, got ", d_1.NumRows())
-	}
-	// Check that the number of edges equals numVertices choose 2
-	expectedEdges := numVertices * (numVertices - 1) / 2
-	if d_1.NumColumns() != expectedEdges {
-		t.Errorf("wanted %d edges (complete graph), got %d", expectedEdges, d_1.NumColumns())
-	}
+	for numVertices := 1; numVertices < 20; numVertices++ {
+		// verify that with p=1, we get the clique complex of a complete graph
+		verbose := false
+		R := NewRandomComplexGenerator(numVertices, verbose)
+		d_1, d_2, err := R.RandomCliqueComplex(1.0)
+		if err != nil {
+			t.Error("wanted no error, got ", err)
+		}
+		if d_1.NumRows() != numVertices {
+			t.Error("wanted d_1.NumRows() == n, got ", d_1.NumRows())
+		}
+		// Check that the number of edges equals numVertices choose 2
+		expectedEdges := numVertices * (numVertices - 1) / 2
+		if d_1.NumColumns() != expectedEdges {
+			t.Errorf("wanted %d edges (complete graph), got %d", expectedEdges, d_1.NumColumns())
+		}
 
-	// Check that the number of triangles equals numVertices choose 3
-	expectedTriangles := numVertices * (numVertices - 1) * (numVertices - 2) / 6
-	if d_2.NumColumns() != expectedTriangles {
-		t.Errorf("wanted %d triangles (complete 2-complex), got %d", expectedTriangles, d_2.NumColumns())
+		// Check that the number of triangles equals numVertices choose 3
+		expectedTriangles := numVertices * (numVertices - 1) * (numVertices - 2) / 6
+		if d_2.NumColumns() != expectedTriangles {
+			t.Errorf("wanted %d triangles (complete 2-complex), got %d", expectedTriangles, d_2.NumColumns())
+		}
 	}
 }
 
