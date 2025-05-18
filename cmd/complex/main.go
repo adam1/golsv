@@ -113,10 +113,10 @@ func handleComplexByBoundaryMatrices(args ComplexArgs) {
 		if args.Verbose {
 			log.Printf("creating graded subcomplexes by depth")
 		}
-		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ZVertexInt]) {
+		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ZVertexInt], verticesAtDepth []int) {
 			writeGradedSubcomplex(subcomplex, args, depth)
 		}
-		complex.DepthGradedSubcomplexes(h)
+		complex.DepthGradedSubcomplexes(0, h)
 	}
 	if args.GraphvizFile != "" {
 		golsv.WriteComplexGraphvizFile(complex, args.GraphvizFile, args.Verbose)
@@ -151,10 +151,10 @@ func handleComplexByBases(args ComplexArgs) {
 		if args.Verbose {
 			log.Printf("creating graded subcomplexes by depth")
 		}
-		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ElementCalG]) {
+		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ElementCalG], verticesAtDepth []int) {
 			writeGradedSubcomplex(subcomplex, args, depth)
 		}
-		complex.DepthGradedSubcomplexes(h)
+		complex.DepthGradedSubcomplexes(0, h)
 	} else if args.DualComplex {
 		if args.Verbose {
 			log.Printf("computing dual complex")

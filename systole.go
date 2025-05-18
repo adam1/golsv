@@ -145,3 +145,55 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
 }
+
+// xxx adding simplicial systole search
+
+type SimplicialSystoleSearch[T any] struct {
+	C       *ZComplex[T]
+	KT      BinaryMatrix
+	Verbose bool
+}
+
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], KT BinaryMatrix, verbose bool) *SimplicialSystoleSearch[T] {
+	return &SimplicialSystoleSearch[T]{
+		C:       C,
+		KT:      KT,
+		Verbose: verbose,
+	}
+}
+
+// A summary of the Simplicial Systole Search algorithm.
+//
+// Let X be the simplicial complex.
+// For each vertex v_0, consider the depth graded subcomplexes
+// induced by vertices within distance d of v_0.  Call these complexes
+// M_0 = {v_0}, M_1, ... . Alternatively, we can think of closed
+// balls of radius d in X, centered at v_0.
+//
+// For each d = 0, 1, 2, ... we work inside M_d. For each vertex v
+// at distance d from v_0, we enumerate all simple cycles incident to v_0 and v.
+// We do this by finding all simple paths \alpha from v_0 to v
+// (within M_d) and all simple paths \beta from v to v_0 that do not
+// intersect with \alpha.
+//
+// For each such simple cycle \gamma, we test whether \gamma is
+// in the image of the d_2 boundary map, i.e. is the boundary
+// of some triangles.
+func (S *SimplicialSystoleSearch[T]) Search() int {
+	min := math.MaxInt
+	for i := range S.C.VertexBasis() {
+		m := S.SimplicialSystoleSearchAtVertex(i)
+		if m < min {
+			min = m
+		}
+	}
+	return min
+}
+
+func (S *SimplicialSystoleSearch[T]) SimplicialSystoleSearchAtVertex(v int) int {
+	S.C.DepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T], verticesAtDepth []int) {
+		return
+	})
+	// xxx
+	return 0
+}

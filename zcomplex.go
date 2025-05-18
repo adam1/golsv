@@ -184,7 +184,7 @@ func (C *ZComplex[T]) BFWalk3Cliques(f func(c [3]ZVertex[T])) {
 	for uId := range C.vertexBasis {
 		//
 		//       f     g     h
-  		//    u --- v --- w --- x
+		//    u --- v --- w --- x
 		//
 		for _, vId := range C.Neighbors(uId) {
 			for _, wId := range C.Neighbors(vId) {
@@ -266,20 +266,26 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
-func (C *ZComplex[T]) DepthGradedSubcomplexes(handler func(depth int, subcomplex *ZComplex[T])) {
+func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex int,
+	handler func(depth int, subcomplex *ZComplex[T], verticesAtDepth []int)) {
 	vertexIndicesToInclude := make(map[int]bool)
 	curDepth := 0
-	C.BFS(C.vertexBasis[0], func(v ZVertex[T], vdepth int) (stop bool) {
+	verticesAtDepth := make([]int, 0)
+	//	verticesAtDepth = append(verticesAtDepth, initialVertex)
+	C.BFS(C.vertexBasis[initialVertex], func(v ZVertex[T], vdepth int) (stop bool) {
 		if vdepth > curDepth {
 			subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
-			handler(curDepth, subcomplex)
+			handler(curDepth, subcomplex, verticesAtDepth)
 			curDepth = vdepth
+			verticesAtDepth = verticesAtDepth[:0]
 		}
-		vertexIndicesToInclude[C.vertexIndex[v]] = true
+		n := C.vertexIndex[v]
+		vertexIndicesToInclude[n] = true
+		verticesAtDepth = append(verticesAtDepth, n)
 		return false
 	})
 	subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
-	handler(curDepth, subcomplex)
+	handler(curDepth, subcomplex, verticesAtDepth)
 }
 
 func (C *ZComplex[T]) DualComplex() *ZComplex[ZVertexInt] {
@@ -569,7 +575,7 @@ func (C *ZComplex[T]) DumpBases() (s string) {
 }
 
 func (C *ZComplex[T]) SubcomplexByDepth(depth int) *ZComplex[T] {
-		vertexIndicesToInclude := make(map[int]bool)
+	vertexIndicesToInclude := make(map[int]bool)
 	C.BFS(C.vertexBasis[0], func(v ZVertex[T], vdepth int) (stop bool) {
 		if vdepth <= depth {
 			vertexIndicesToInclude[C.vertexIndex[v]] = true
@@ -577,7 +583,7 @@ func (C *ZComplex[T]) SubcomplexByDepth(depth int) *ZComplex[T] {
 			return true
 		}
 		return false
-	})	
+	})
 	return C.SubcomplexByVertices(vertexIndicesToInclude)
 }
 
@@ -608,7 +614,7 @@ func (C *ZComplex[T]) SubcomplexByTriangles(triangleIndicesToInclude map[int]any
 		if _, ok := triangleIndicesToInclude[i]; ok {
 			filtered = append(filtered, t)
 		}
-	}	
+	}
 	return NewZComplexFromTrianglesGeneric(filtered)
 }
 
@@ -700,7 +706,7 @@ func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bo
 			for _, w := range e {
 				if _, ok := visited[w]; !ok {
 					queue.Enqueue(ZVertexTask[T]{w, task.depth + 1})
-					stop = f(w, task.depth + 1)
+					stop = f(w, task.depth+1)
 					visited[w] = struct{}{}
 					if stop {
 						return
@@ -712,7 +718,7 @@ func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bo
 }
 
 type ZVertexTask[T any] struct {
-	v ZVertex[T]
+	v     ZVertex[T]
 	depth int
 }
 
