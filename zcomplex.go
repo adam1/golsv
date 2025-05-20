@@ -266,13 +266,12 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
-func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex int,
-	handler func(depth int, subcomplex *ZComplex[T], verticesAtDepth []int)) {
+func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex ZVertex[T],
+	handler func(depth int, subcomplex *ZComplex[T], verticesAtDepth []ZVertex[T])) {
 	vertexIndicesToInclude := make(map[int]bool)
 	curDepth := 0
-	verticesAtDepth := make([]int, 0)
-	//	verticesAtDepth = append(verticesAtDepth, initialVertex)
-	C.BFS(C.vertexBasis[initialVertex], func(v ZVertex[T], vdepth int) (stop bool) {
+	verticesAtDepth := make([]ZVertex[T], 0)
+	C.BFS(initialVertex, func(v ZVertex[T], vdepth int) (stop bool) {
 		if vdepth > curDepth {
 			subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
 			handler(curDepth, subcomplex, verticesAtDepth)
@@ -281,11 +280,36 @@ func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex int,
 		}
 		n := C.vertexIndex[v]
 		vertexIndicesToInclude[n] = true
-		verticesAtDepth = append(verticesAtDepth, n)
+		verticesAtDepth = append(verticesAtDepth, v)
 		return false
 	})
 	subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
 	handler(curDepth, subcomplex, verticesAtDepth)
+}
+
+// DFS performs a depth-first search traversal starting from vertex v.
+// For each visited vertex, it calls f with the vertex and its depth.
+// If f returns true, the traversal stops early.
+func (C *ZComplex[T]) DFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bool)) {
+	visited := make(map[ZVertex[T]]struct{})
+	C.dfsUtil(v, 0, visited, f)
+}
+
+func (C *ZComplex[T]) dfsUtil(v ZVertex[T], depth int, visited map[ZVertex[T]]struct{}, f func(u ZVertex[T], depth int) (stop bool)) bool {
+	visited[v] = struct{}{}
+	if stop := f(v, depth); stop {
+		return true
+	}
+	vertexIdx := C.vertexIndex[v]
+	for _, neighborIdx := range C.Neighbors(vertexIdx) {
+		neighbor := C.vertexBasis[neighborIdx]
+		if _, ok := visited[neighbor]; !ok {
+			if stop := C.dfsUtil(neighbor, depth+1, visited, f); stop {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (C *ZComplex[T]) DualComplex() *ZComplex[ZVertexInt] {
@@ -402,6 +426,27 @@ func (C *ZComplex[T]) ensureAdjacencyIndex() {
 	}
 }
 
+// xxx test
+func (C *ZComplex[T]) EnumerateSimplePaths(start ZVertex[T], end ZVertex[T], h func(path ZPath[T]) (stop bool)) {
+	// curPath := []ZPath[T]{}
+	curDepth := -1
+	C.DFS(start, func(v ZVertex[T], depth int) (stop bool) {
+		if depth > curDepth {
+
+		} else if depth < curDepth {
+
+		}
+
+		// xxx if curDepth decreases, pop last element from curPath
+
+		// curPath = append(curPath, v)
+		// if v == end {
+		// 	paths = append(paths, curPath)
+		// }
+		return false
+	})
+}
+
 func (C *ZComplex[T]) Fill3Cliques() {
 	if C.verbose {
 		log.Printf("Filling 3-cliques")
@@ -417,17 +462,14 @@ func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
 	return C.adjacencyIndex[v]
 }
 
-// xxx test
 func (C *ZComplex[T]) NumEdges() int {
 	return len(C.edgeBasis)
 }
 
-// xxx test
 func (C *ZComplex[T]) NumTriangles() int {
 	return len(C.triangleBasis)
 }
 
-// xxx test
 func (C *ZComplex[T]) NumVertices() int {
 	return len(C.vertexBasis)
 }
@@ -448,6 +490,19 @@ func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
 	for _, e := range path {
 		if i, ok := C.edgeIndex[e]; ok {
 			v.Set(i, 1)
+		} else {
+			panic(fmt.Sprintf("edge %v not in edge index", e))
+		}
+	}
+	return v
+}
+
+// xxx test
+func (C *ZComplex[T]) PathToEdgeVectorSparseMatrix(path ZPath[T]) BinaryMatrix {
+	v := NewSparseBinaryMatrix(len(C.edgeBasis), 1)
+	for _, e := range path {
+		if i, ok := C.edgeIndex[e]; ok {
+			v.Set(i, 0, 1)
 		} else {
 			panic(fmt.Sprintf("edge %v not in edge index", e))
 		}

@@ -123,7 +123,7 @@ func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
 	type data struct {
 		Depth           int
 		Subcomplex      *ZComplex[ZVertexInt]
-		VerticesAtDepth []int
+		VerticesAtDepth []ZVertex[ZVertexInt]
 	}
 	tests := []struct {
 		C        *ZComplex[ZVertexInt]
@@ -132,26 +132,27 @@ func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
 		{
 			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
 			[]data{
-				{0, NewZComplexFromMaximalSimplices([][]int{{0}}), []int{0}},
-				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}), []int{1, 2}},
+				{0, NewZComplexFromMaximalSimplices([][]int{{0}}), []ZVertex[ZVertexInt]{ZVertexInt(0)}},
+				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}), []ZVertex[ZVertexInt]{ZVertexInt(1), ZVertexInt(2)}},
 			},
 		},
 		{
 			NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2, 3}}),
 			[]data{
-				{0, NewZComplexFromMaximalSimplices([][]int{{0}}), []int{0}},
-				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1}}), []int{1}},
-				{2, NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2, 3}}), []int{2, 3}},
+				{0, NewZComplexFromMaximalSimplices([][]int{{0}}), []ZVertex[ZVertexInt]{ZVertexInt(0)}},
+				{1, NewZComplexFromMaximalSimplices([][]int{{0, 1}}), []ZVertex[ZVertexInt]{ZVertexInt(1)}},
+				{2, NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2, 3}}), []ZVertex[ZVertexInt]{ZVertexInt(2), ZVertexInt(3)}},
 			},
 		},
 	}
 	for n, test := range tests {
 		got := make([]data, 0)
-		test.C.DepthGradedSubcomplexes(0, func(depth int, subcomplex *ZComplex[ZVertexInt], verticesAtDepth []int) {
+		initialVertex := test.C.VertexBasis()[0]
+		test.C.DepthGradedSubcomplexes(initialVertex, func(depth int, subcomplex *ZComplex[ZVertexInt], verticesAtDepth []ZVertex[ZVertexInt]) {
 			got = append(got, data{
 				Depth:           depth,
 				Subcomplex:      subcomplex,
-				VerticesAtDepth: append([]int(nil), verticesAtDepth...),
+				VerticesAtDepth: append([]ZVertex[ZVertexInt](nil), verticesAtDepth...),
 			})
 		})
 		if len(got) != len(test.Expected) {
@@ -192,6 +193,59 @@ func TestZComplexEdgeToTriangleIncidenceMap(t *testing.T) {
 	}
 	for n, test := range tests {
 		got := test.C.EdgeToTriangleIncidenceMap()
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
+func TestZComplexDFS(t *testing.T) {
+	type vdata struct {
+		vertex int
+		depth  int
+	}
+	tests := []struct {
+		C        *ZComplex[ZVertexInt]
+		start    int
+		Expected []vdata
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0}}),
+			0,
+			[]vdata{{0, 0}},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1}}),
+			0,
+			[]vdata{{0, 0}, {1, 1}},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			0,
+			[]vdata{{0, 0}, {1, 1}, {2, 2}},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 3}}),
+			0,
+			[]vdata{{0, 0}, {1, 1}, {2, 2}, {3, 2}},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 3}, {2, 4}}),
+			0,
+			[]vdata{{0, 0}, {1, 1}, {2, 2}, {4, 3}, {3, 2}},
+		},
+	}
+	for n, test := range tests {
+		got := make([]vdata, 0)
+		test.C.DFS(ZVertexInt(test.start), func(vertex ZVertex[ZVertexInt], depth int) (stop bool) {
+			v, ok := vertex.(ZVertexInt)
+			if !ok {
+				t.Errorf("test %d: vertex is not of type ZVertexInt", n)
+				return true
+			}
+			got = append(got, vdata{int(v), depth})
+			return false
+		})
 		if !reflect.DeepEqual(got, test.Expected) {
 			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
 		}

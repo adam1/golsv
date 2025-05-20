@@ -300,6 +300,19 @@ func (S *Sparse) Get(i, j int) uint8 {
 	return 0
 }
 
+// xxx test; move to generic?
+func (S *Sparse) Intersects(M BinaryMatrix) bool {
+	if S.Rows != M.NumRows() || S.Cols != 1 || M.NumColumns() != 1 {
+		panic("Incompatible matrices")
+	}
+	for i := 0; i < S.Rows; i++ {
+		if S.Get(i, 0) == 1 && M.Get(i, 0) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
 func (S *Sparse) IsSmithNormalForm() (is bool, rank int) {
 	d := S.Rows
 	if d > S.Cols {

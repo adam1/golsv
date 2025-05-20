@@ -146,8 +146,6 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	return SystoleExhaustiveSearch(U, B, verbose)
 }
 
-// xxx adding simplicial systole search
-
 type SimplicialSystoleSearch[T any] struct {
 	C       *ZComplex[T]
 	KT      BinaryMatrix
@@ -157,9 +155,14 @@ type SimplicialSystoleSearch[T any] struct {
 func NewSimplicialSystoleSearch[T any](C *ZComplex[T], KT BinaryMatrix, verbose bool) *SimplicialSystoleSearch[T] {
 	return &SimplicialSystoleSearch[T]{
 		C:       C,
-		KT:      KT,
+		KT:      KT.Dense(), // optimization; check boundariness with KT * v which is dense * sparse
 		Verbose: verbose,
 	}
+}
+
+// xxx test
+func (S *SimplicialSystoleSearch[T]) IsTriangleBoundary(gamma BinaryMatrix) bool {
+	return S.KT.MultiplyRight(gamma).IsZero()
 }
 
 // A summary of the Simplicial Systole Search algorithm.
@@ -178,11 +181,17 @@ func NewSimplicialSystoleSearch[T any](C *ZComplex[T], KT BinaryMatrix, verbose 
 //
 // For each such simple cycle \gamma, we test whether \gamma is
 // in the image of the d_2 boundary map, i.e. is the boundary
-// of some triangles.
+// of some triangles.  That is, we test whether \gamma is in
+// Z_1 \setminus B_1.  We call such a chain a systolic candidate.
+// Such a candidate is also a nontrivial homology generator.
+// A systolic chain is a systolic candidate of minimum length.
+//
+// Once we have found a systolic candidate of length n, we no
+// longer have to consider cycles of length n or greater.
 func (S *SimplicialSystoleSearch[T]) Search() int {
 	min := math.MaxInt
-	for i := range S.C.VertexBasis() {
-		m := S.SimplicialSystoleSearchAtVertex(i)
+	for _, v := range S.C.VertexBasis() {
+		m := S.SearchAtVertex(v)
 		if m < min {
 			min = m
 		}
@@ -190,10 +199,53 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 	return min
 }
 
-func (S *SimplicialSystoleSearch[T]) SimplicialSystoleSearchAtVertex(v int) int {
-	S.C.DepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T], verticesAtDepth []int) {
+// Note that SearchAtVertex is useful for Cayley complexes, where due
+// to group action it suffices to search from a single vertex.
+func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
+	// xxx 1. make sure we check all depth gradings.
+	//       (in general there can be a systolic candidate at depth d+1
+	//        that is shorter than a systolic candidate at depth d.)
+	//
+	// xxx 2. tbd: when a systolic candidate of length n is found, prune checks of cycles of length n or greater.
+	found := false
+	min := math.MaxInt
+	S.C.DepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T], verticesAtDepth []ZVertex[T]) {
+		for _, w := range verticesAtDepth {
+			S.EnumerateSimpleCycles(subcomplex, v, w, func(gamma BinaryMatrix) {
+				if !S.IsTriangleBoundary(gamma) {
+					found = true
+					w := gamma.ColumnWeight(0)
+					if w < min {
+						min = w
+					}
+				}
+				return
+			})
+		}
 		return
 	})
-	// xxx
+	if found {
+		log.Printf("Found systolic edge chain of weight %d", min)
+	} else {
+		log.Printf("No systolic edge chain found!")
+	}
 	return 0
+}
+
+// gamma will be a column vector representing an edge chain.
+func (S *SimplicialSystoleSearch[T]) EnumerateSimpleCycles(subcomplex *ZComplex[T], v ZVertex[T], w ZVertex[T], h func(gamma BinaryMatrix)) {
+	paths := make([]BinaryMatrix, 0)
+	subcomplex.EnumerateSimplePaths(v, w, func(path ZPath[T]) (stop bool) {
+		paths = append(paths, S.C.PathToEdgeVectorSparseMatrix(path))
+		return false
+	})
+	for _, alpha := range paths {
+		for _, beta := range paths {
+			if alpha.(*Sparse).Intersects(beta) {
+				continue
+			}
+			beta.Add(alpha)
+			h(beta)
+		}
+	}
 }
