@@ -234,6 +234,11 @@ func TestZComplexDFS(t *testing.T) {
 			0,
 			[]vdata{{0, 0}, {1, 1}, {2, 2}, {4, 3}, {3, 2}},
 		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 3}, {2, 4}, {2, 5}}),
+			0,
+			[]vdata{{0, 0}, {1, 1}, {2, 2}, {4, 3}, {5, 3}, {3, 2}},
+		},
 	}
 	for n, test := range tests {
 		got := make([]vdata, 0)
@@ -244,6 +249,57 @@ func TestZComplexDFS(t *testing.T) {
 				return true
 			}
 			got = append(got, vdata{int(v), depth})
+			return false
+		})
+		if !reflect.DeepEqual(got, test.Expected) {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
+// xxx wip - what is the testing strategy and test struct?
+func TestZComplexEnumerateSimplePaths(t *testing.T) {
+	tests := []struct {
+		C        *ZComplex[ZVertexInt]
+		start    int
+		end      int
+		Expected []ZPath[ZVertexInt]
+	}{
+		// {
+		// 	NewZComplexFromMaximalSimplices([][]int{{0, 1}}),
+		// 	0,
+		// 	1,
+		// 	[]ZPath[ZVertexInt]{{NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1))}},
+		// },
+		// {
+		// 	NewZComplexFromMaximalSimplices([][]int{{0, 1}, {0, 2}}),
+		// 	0,
+		// 	1,
+		// 	[]ZPath[ZVertexInt]{{NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1))}},
+		// },
+		// {
+		// 	NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+		// 	0,
+		// 	1,
+		// 	[]ZPath[ZVertexInt]{
+		// 		{NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1))},
+		// 		{NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(2)), NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2))},
+		// 	},
+		// },
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			0,
+			2,
+			[]ZPath[ZVertexInt]{
+				{NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(2))},
+				{NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)), NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2))},
+			},
+		},
+	}
+	for n, test := range tests {
+		got := make([]ZPath[ZVertexInt], 0)
+		test.C.EnumerateSimplePaths(ZVertexInt(test.start), ZVertexInt(test.end), func(path ZPath[ZVertexInt]) bool {
+			got = append(got, path)
 			return false
 		})
 		if !reflect.DeepEqual(got, test.Expected) {

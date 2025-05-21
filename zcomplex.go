@@ -17,6 +17,30 @@ type ZVertex[T any] interface {
 	String() string
 }
 
+type ZVertices[T any] []ZVertex[T]
+
+// xxx test
+func (S ZVertices[T]) Path() ZPath[T] {
+	// xxx fix this up again
+	path := make(ZPath[T], len(S)-1)
+	prev := S[0]
+	for i, v := range S[1:] {
+		path[i] = NewZEdge(prev, v)
+		prev = v
+	}
+	return path
+}
+
+// xxx maybe not needed
+// func (S ZVertices[T]) Contains(v ZVertex[T]) bool {
+// 	for _, x := range S {
+// 		if x.Equal(v.(T)) {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
+
 type ZEdge[T any] [2]ZVertex[T]
 
 // NOTE: it's important to always use NewZEdge to create an ZEdge,
@@ -287,6 +311,8 @@ func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex ZVertex[T],
 	handler(curDepth, subcomplex, verticesAtDepth)
 }
 
+// xxx possibly deprecate, since it appears that we may not use this approach after all?
+//
 // DFS performs a depth-first search traversal starting from vertex v.
 // For each visited vertex, it calls f with the vertex and its depth.
 // If f returns true, the traversal stops early.
@@ -427,25 +453,101 @@ func (C *ZComplex[T]) ensureAdjacencyIndex() {
 }
 
 // xxx test
+
+// xxx wip; this version does the enumeration directly, not using DFS.
 func (C *ZComplex[T]) EnumerateSimplePaths(start ZVertex[T], end ZVertex[T], h func(path ZPath[T]) (stop bool)) {
-	// curPath := []ZPath[T]{}
-	curDepth := -1
-	C.DFS(start, func(v ZVertex[T], depth int) (stop bool) {
-		if depth > curDepth {
+	C.ensureAdjacencyIndex()
+	type frame struct {
+		v    ZVertex[T]
+		next int // index of next neighbor to try
+	}
+	stack := []frame{{start, 0}}
+	visited := map[ZVertex[T]]bool{start: true}
+	vertexPath := ZVertices[T]{start}
 
-		} else if depth < curDepth {
-
+	for len(stack) > 0 {
+		top := &stack[len(stack)-1]
+		v := top.v
+		if v == end {
+			stop := h(vertexPath.Path())
+			if stop {
+				return
+			}
+			// backtrack
+			visited[v] = false
+			vertexPath = vertexPath[:len(vertexPath)-1]
+			stack = stack[:len(stack)-1]
+			continue
 		}
-
-		// xxx if curDepth decreases, pop last element from curPath
-
-		// curPath = append(curPath, v)
-		// if v == end {
-		// 	paths = append(paths, curPath)
-		// }
-		return false
-	})
+		neighbors := C.adjacencyIndex[C.vertexIndex[v]]
+		if top.next < len(neighbors) {
+			u := C.vertexBasis[neighbors[top.next]]
+			top.next++
+			if !visited[u] {
+				visited[u] = true
+				vertexPath = append(vertexPath, u)
+				stack = append(stack, frame{u, 0})
+			}
+		} else {
+			// backtrack
+			visited[v] = false
+			vertexPath = vertexPath[:len(vertexPath)-1]
+			stack = stack[:len(stack)-1]
+		}
+	}
 }
+
+// xxx take two - awkward - we want to keep the path to the current vertex on the stack
+// func (C *ZComplex[T]) EnumerateSimplePaths(start ZVertex[T], end ZVertex[T], h func(path ZPath[T]) (stop bool)) {
+// 	C.ensureAdjacencyIndex()
+// 	stack := make(ZVertices[T], 0)
+// 	stack = append(stack, start)
+// 	visited := make(map[ZVertex[T]]bool)
+// 	for len(stack) > 0 {
+// 		log.Printf("xxx stack %v", stack)
+// 		v := stack[len(stack)-1]
+// 		stack = stack[:len(stack)-1]
+// 		if visited[v] {
+// 			continue
+// 		}
+// 		visited[v] = true
+// 		if v == end {
+// 			log.Printf("xxx found path")
+// 			stop := h(stack.ToPathWithEnd(v))
+// 			if stop {
+// 				return
+// 			}
+// 		}
+// 		for _, j := range C.adjacencyIndex[C.vertexIndex[v]] {
+// 			w := C.vertexBasis[j]
+// 			stack = append(stack, w)
+// 		}
+// 	}
+// }
+
+// xxx first take
+// func (C *ZComplex[T]) xxxEnumerateSimplePaths(start ZVertex[T], end ZVertex[T], h func(path ZPath[T]) (stop bool)) {
+// 	curPath := make(ZPath[T], 0)
+// 	curDepth := -1
+// 	prevVertex := start
+// 	C.DFS(start, func(v ZVertex[T], depth int) (stop bool) {
+// 		if depth <= curDepth {
+// 			curPath = curPath[:curDepth-1]
+// 		}
+// 		if v != start {
+// 			curPath = append(curPath, NewZEdge(prevVertex, v))
+// 		}
+// 		curDepth = depth
+// 		prevVertex = v
+// 		if v == end {
+// 			stop := h(curPath)
+// 			if stop {
+// 				return true
+// 			}
+// 		}
+// 		return false
+// 	})
+// }
 
 func (C *ZComplex[T]) Fill3Cliques() {
 	if C.verbose {
