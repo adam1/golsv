@@ -1,6 +1,8 @@
 package golsv
 
 import (
+	"fmt"
+	"math/rand"
 	"reflect"
 	"testing"
 )
@@ -119,7 +121,7 @@ func TestZTriangleSetEqual(t *testing.T) {
 	}
 }
 
-func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
+func TestZComplexDepthFiltration(t *testing.T) {
 	type data struct {
 		Depth           int
 		Subcomplex      *ZComplex[ZVertexInt]
@@ -148,7 +150,7 @@ func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
 	for n, test := range tests {
 		got := make([]data, 0)
 		initialVertex := test.C.VertexBasis()[0]
-		test.C.DepthGradedSubcomplexes(initialVertex, func(depth int, subcomplex *ZComplex[ZVertexInt], verticesAtDepth []ZVertex[ZVertexInt]) {
+		test.C.DepthFiltration(initialVertex, func(depth int, subcomplex *ZComplex[ZVertexInt], verticesAtDepth []ZVertex[ZVertexInt]) {
 			got = append(got, data{
 				Depth:           depth,
 				Subcomplex:      subcomplex,
@@ -401,6 +403,57 @@ func TestZComplexDualComplex(t *testing.T) {
 	}
 }
 
+func TestZComplexMaximalSimplicesString(t *testing.T) {
+	tests := []struct {
+		C        *ZComplex[ZVertexInt]
+		Expected string
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			"[][]int{{0, 1, 2}}",
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}}),
+			"[][]int{{0, 1, 2}, {0, 1, 3}}",
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0}, {1, 2}, {0, 1, 3}}),
+			"[][]int{{0, 1, 3}, {1, 2}}",
+		},
+	}
+	for n, test := range tests {
+		got := test.C.MaximalSimplicesString()
+		if got != test.Expected {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
+func TestZComplexMaximalSimplicesStringRandom(t *testing.T) {
+	trials := 10
+	maxVertices := 10
+	verbose := false
+	for i := 0; i < trials; i++ {
+		numVertices := 3 + rand.Intn(maxVertices)
+		probEdge := 0.3
+		generator := NewRandomComplexGenerator(numVertices, verbose)
+		d1, d2, err := generator.RandomCliqueComplex(probEdge)
+		if err != nil {
+			t.Fatalf("Failed to generate random clique complex: %v", err)
+		}
+		X := NewZComplexFromBoundaryMatrices(d1, d2)
+		s := X.MaximalSimplicesString()
+		simplices, err := parseSimplicesString(s)
+		if err != nil {
+			t.Fatalf("Failed to parse simplices string: %v", err)
+		}
+		Y := NewZComplexFromMaximalSimplices(simplices)
+		if !reflect.DeepEqual(X, Y) {
+			t.Errorf("Test %d: got=%v, expected=%v", i, X, Y)
+		}
+	}
+}
+
 func TestZComplexNewFromBoundaryMaps(t *testing.T) {
 	tests := []struct {
 		d_1      BinaryMatrix
@@ -530,79 +583,143 @@ func TestZComplexNearerTriangleInNewIndex(t *testing.T) {
 
 func TestZComplexSortBasesByDistance(t *testing.T) {
 	tests := []struct {
-		C                     *ZComplex[ZVertexInt]
-		base                  int
-		expectedVertexBasis   []ZVertex[ZVertexInt]
-		expectedEdgeBasis     []ZEdge[ZVertexInt]
-		expectedTriangleBasis []ZTriangle[ZVertexInt]
+		simplices         [][]int
+		initialVertex     int
+		expectedVertices  []int
+		expectedEdges     [][2]int
+		expectedTriangles [][3]int
 	}{
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			[][]int{{0, 1, 2}},
 			0,
-			[]ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(0)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2))},
+			[]int{0, 1, 2},
+			[][2]int{{0, 1}, {2, 0}, {1, 2}},
+			[][3]int{{0, 1, 2}},
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {2, 3}}),
+			[][]int{{0, 1, 2}, {2, 3}},
 			0,
-			[]ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2), ZVertexInt(3)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(0)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(3))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2))},
+			[]int{0, 1, 2, 3},
+			[][2]int{{0, 1}, {2, 0}, {1, 2}, {2, 3}},
+			[][3]int{{0, 1, 2}},
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {2, 3, 4}}),
+			[][]int{{0, 1, 2}, {2, 3, 4}},
 			0,
-			[]ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2), ZVertexInt(3), ZVertexInt(4)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(0)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(3)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(4)),
-				NewZEdge[ZVertexInt](ZVertexInt(3), ZVertexInt(4))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)),
-				NewZTriangle[ZVertexInt](ZVertexInt(2), ZVertexInt(3), ZVertexInt(4))},
+			[]int{0, 1, 2, 3, 4},
+			[][2]int{{0, 1}, {0, 2}, {1, 2}, {2, 3}, {2, 4}, {3, 4}},
+			[][3]int{{0, 1, 2}, {2, 3, 4}},
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {2, 3, 4}}),
+			[][]int{{0, 1, 2}, {2, 3, 4}},
 			2,
-			[]ZVertex[ZVertexInt]{ZVertexInt(2), ZVertexInt(0), ZVertexInt(1), ZVertexInt(3), ZVertexInt(4)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(3)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(4)),
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(3), ZVertexInt(4))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)),
-				NewZTriangle[ZVertexInt](ZVertexInt(2), ZVertexInt(3), ZVertexInt(4))},
+			[]int{2, 0, 1, 3, 4},
+			[][2]int{{0, 2}, {1, 2}, {2, 3}, {2, 4}, {0, 1}, {3, 4}},
+			[][3]int{{0, 1, 2}, {2, 3, 4}},
+		},
+		// an example with two disconnected components
+		{
+			[][]int{{0, 1, 2}, {3, 4, 5}},
+			0,
+			[]int{0, 1, 2, 3, 4, 5},
+			[][2]int{{0, 1}, {0, 2}, {1, 2}, {3, 4}, {3, 5}, {4, 5}},
+			[][3]int{{0, 1, 2}, {3, 4, 5}},
 		},
 	}
 	for n, test := range tests {
-		test.C.SortBasesByDistance(test.base)
-		gotVertexBasis := test.C.VertexBasis()
-		if !reflect.DeepEqual(gotVertexBasis, test.expectedVertexBasis) {
-			t.Errorf("Test %d: vertex basis: got=%v, expected=%v", n, gotVertexBasis, test.expectedVertexBasis)
+		// first, convert test data from bare ints
+		X := NewZComplexFromMaximalSimplices(test.simplices)
+
+		expectedVertexBasis := make([]ZVertex[ZVertexInt], len(test.expectedVertices))
+		for i, s := range test.expectedVertices {
+			expectedVertexBasis[i] = ZVertex[ZVertexInt](ZVertexInt(s))
 		}
-		gotEdgeBasis := test.C.EdgeBasis()
-		if !reflect.DeepEqual(gotEdgeBasis, test.expectedEdgeBasis) {
-			t.Errorf("Test %d: edge basis: got=%v, expected=%v", n, gotEdgeBasis, test.expectedEdgeBasis)
+		expectedEdgeBasis := make([]ZEdge[ZVertexInt], len(test.expectedEdges))
+		for i, s := range test.expectedEdges {
+			expectedEdgeBasis[i] = NewZEdge(ZVertexInt(s[0]), ZVertexInt(s[1]))
 		}
-		gotTriangleBasis := test.C.TriangleBasis()
-		if !reflect.DeepEqual(gotTriangleBasis, test.expectedTriangleBasis) {
-			t.Errorf("Test %d: triangle basis: got=%v, expected=%v", n, gotTriangleBasis, test.expectedTriangleBasis)
+		expectedTriangleBasis := make([]ZTriangle[ZVertexInt], len(test.expectedTriangles))
+		for i, s := range test.expectedTriangles {
+			expectedTriangleBasis[i] = NewZTriangle(ZVertexInt(s[0]), ZVertexInt(s[1]), ZVertexInt(s[2]))
+		}
+
+		Y := X.SortBasesByDistance(test.initialVertex)
+		gotVertexBasis := Y.VertexBasis()
+		if !reflect.DeepEqual(gotVertexBasis, expectedVertexBasis) {
+			t.Errorf("Test %d: vertex basis: got=%v, expected=%v", n, gotVertexBasis, expectedVertexBasis)
+		}
+		gotEdgeBasis := Y.EdgeBasis()
+		if !reflect.DeepEqual(gotEdgeBasis, expectedEdgeBasis) {
+			t.Errorf("Test %d: edge basis: got=%v, expected=%v", n, gotEdgeBasis, expectedEdgeBasis)
+		}
+		gotTriangleBasis := Y.TriangleBasis()
+		if !reflect.DeepEqual(gotTriangleBasis, expectedTriangleBasis) {
+			t.Errorf("Test %d: triangle basis: got=%v, expected=%v", n, gotTriangleBasis, expectedTriangleBasis)
+		}
+	}
+}
+
+func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
+	trials := 10
+	minVertices := 5
+	maxVertices := 10
+	verbose := false
+
+	for i := 0; i < trials; i++ {
+		numVertices := rand.Intn(maxVertices-minVertices) + minVertices
+		R := NewRandomComplexGenerator(numVertices, verbose)
+		d_1, d_2, err := R.RandomCliqueComplex(0.4)
+		if err != nil {
+			t.Errorf("Failed to generate random clique complex: %v", err)
+			continue
+		}
+		Xoriginal := NewZComplexFromBoundaryMatrices(d_1, d_2)
+		//log.Printf("Xoriginal:\n%s", Xoriginal.DumpBases())
+		initialVertex := rand.Intn(len(Xoriginal.VertexBasis()))
+
+		var Xsorted *ZComplex[ZVertexInt]
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("Trial %d: Panic during SortBasesByDistance: %v\noriginal complex:\n%v", i, r, Xoriginal.DumpBases())
+				}
+			}()
+			Xsorted = Xoriginal.SortBasesByDistance(initialVertex)
+		}()
+		//log.Printf("XSorted:\n%s", Xsorted.DumpBases())
+
+		// simple check that the bases have the same elements (ignoring order)
+		resortedVertices := make([]ZVertex[ZVertexInt], len(Xsorted.VertexBasis()))
+		copy(resortedVertices, Xsorted.VertexBasis())
+
+		resortedEdges := make([]ZEdge[ZVertexInt], len(Xsorted.EdgeBasis()))
+		copy(resortedEdges, Xsorted.EdgeBasis())
+
+		resortedTriangles := make([]ZTriangle[ZVertexInt], len(Xsorted.TriangleBasis()))
+		copy(resortedTriangles, Xsorted.TriangleBasis())
+
+		Xresorted := NewZComplex(resortedVertices, resortedEdges, resortedTriangles, true, verbose)
+		//log.Printf("XResorted:\n%s", Xresorted.DumpBases())
+
+		if !reflect.DeepEqual(Xoriginal.VertexBasis(), Xresorted.VertexBasis()) {
+			t.Errorf("Trial %d: Vertex bases are not equal (ignoring order)", i)
+		}
+		if !reflect.DeepEqual(Xoriginal.EdgeBasis(), Xresorted.EdgeBasis()) {
+			t.Errorf("Trial %d: Edge bases are not equal (ignoring order)", i)
+		}
+		if !reflect.DeepEqual(Xoriginal.TriangleBasis(), Xresorted.TriangleBasis()) {
+			t.Errorf("Trial %d: Triangle bases are not equal (ignoring order)", i)
+		}
+				
+		// check that the first vertex is the initial vertex
+		firstVertex, ok := Xsorted.VertexBasis()[0].(ZVertexInt)
+		if !ok {
+			t.Errorf("Trial %d: First vertex should be of type ZVertexInt, got %T", i, Xsorted.VertexBasis()[0])
+			continue
+		}
+		if int(firstVertex) != initialVertex {
+			t.Errorf("Trial %d: First vertex should be the initial vertex %d, got %v",
+				i, initialVertex, firstVertex)
 		}
 	}
 }
@@ -658,6 +775,98 @@ func TestZComplexSubcomplexByVertices(t *testing.T) {
 		got := test.C.SubcomplexByVertices(test.V)
 		if !reflect.DeepEqual(got, test.Expected) {
 			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
+func TestZComplexTriangularDepthFiltration(t *testing.T) {
+	tests := []struct {
+		C        *ZComplex[ZVertexInt]
+		Start    int
+		Expected []*ZComplex[ZVertexInt]
+	}{
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 2, 3}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 2, 3}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 2, 3}}, false),
+			3,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{3, 1, 2}}, false),
+				// this is a bit tricky - we give all of the simplices here
+				// to completely control the ordering.
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{3}, {1}, {2}, {0}, {1, 3}, {2, 3}, {0, 1}, {1, 2}, {0, 2}, {3, 1, 2}, {0, 1, 2}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}, {3, 6}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4}, {3, 5}, {3, 6}, {3, 4, 5}}, false),
+			},
+		},
+	}
+	for n, test := range tests {
+		var got []*ZComplex[ZVertexInt]
+		test.C.TriangularDepthFiltration(test.C.VertexBasis()[test.Start], func(step int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
+			got = append(got, subcomplex)
+			return false
+		})
+		if !reflect.DeepEqual(got, test.Expected) {
+			var formatComplex = func(X *ZComplex[ZVertexInt]) string {
+				s := X.String()
+				s += "\n" + X.DumpBases()
+				return s
+			}
+			var diff string
+			for i, X := range test.Expected {
+				if reflect.DeepEqual(X, got[i]) {
+					diff += fmt.Sprintf("complex %d: equal\n\n", i)
+					continue
+				}
+				diff += fmt.Sprintf("complex %d:\n\nExpected: %s", i, formatComplex(X))
+				if len(got) >= i+1 {
+					diff += fmt.Sprintf("\nGot: %s", formatComplex(got[i]))
+				}
+			}
+			if len(got) > len(test.Expected) {
+				diff += "Got more than expected:\n"
+				for i := len(test.Expected); i < len(got); i++ {
+					Y := got[i]
+					diff += fmt.Sprintf("complex %d:\n\nGot: %s", i, formatComplex(Y))
+				}
+			}
+			t.Errorf("Test %d: diff: %s", n, diff)
 		}
 	}
 }

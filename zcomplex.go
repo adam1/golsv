@@ -2,9 +2,11 @@ package golsv
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 )
 
 // this file models a 2-d simplicial complex.  it was originally
@@ -266,7 +268,7 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
-func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex ZVertex[T],
+func (C *ZComplex[T]) DepthFiltration(initialVertex ZVertex[T],
 	handler func(depth int, subcomplex *ZComplex[T], verticesAtDepth []ZVertex[T])) {
 	vertexIndicesToInclude := make(map[int]bool)
 	curDepth := 0
@@ -436,6 +438,88 @@ func (C *ZComplex[T]) Fill3Cliques() {
 	})
 }
 
+func (C *ZComplex[T]) MaximalSimplicesString() string {
+	seenVertices := make(map[ZVertex[T]]struct{})
+	seenEdges := make(map[ZEdge[T]]struct{})
+	var buf bytes.Buffer
+	buf.WriteString("[][]int{")
+	n := 0
+	for _, t := range C.triangleBasis {
+		if n != 0 {
+			buf.WriteString(", ")
+		}
+		n++
+		buf.WriteString("{")
+		for i, v := range t {
+			seenVertices[v] = struct{}{}
+			if i != 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(v.String())
+		}
+		buf.WriteString("}")
+		for _, e := range t.Edges() {
+			seenEdges[e] = struct{}{}
+		}
+	}
+	for _, e := range C.edgeBasis {
+		if _, ok := seenEdges[e]; ok {
+			continue
+		}
+		if n != 0 {
+			buf.WriteString(", ")
+		}
+		n++
+		buf.WriteString("{")
+		for i, v := range e {
+			seenVertices[v] = struct{}{}
+			if i != 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(v.String())
+		}
+		buf.WriteString("}")
+	}
+	for _, v := range C.vertexBasis {
+		if _, ok := seenVertices[v]; ok {
+			continue
+		}
+		if n != 0 {
+			buf.WriteString(", ")
+		}
+		n++
+		buf.WriteString(fmt.Sprintf("{%s}", v.String()))
+	}
+	buf.WriteString("}")
+	return buf.String()
+}
+
+func parseSimplicesString(s string) (simplices [][]int, err error) {
+	// this is slightly weird AI code, but it is good enough.
+	// parse the string into a slice of slices of ints.
+	// the string is of the form [][]int{{1, 2}, {3, 4, 5}, {6}}
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "[][]int{") || !strings.HasSuffix(s, "}") {
+		return nil, fmt.Errorf("invalid simplices string format: expected prefix '[][]int{' and suffix '}'")
+	}
+	// Remove the "[][]int" prefix.
+	jsonStr := strings.TrimPrefix(s, "[][]int")
+	// Replace Go-style slice braces with JSON-style array brackets.
+	jsonStr = strings.ReplaceAll(jsonStr, "{", "[")
+	jsonStr = strings.ReplaceAll(jsonStr, "}", "]")
+	// Handle the case of an empty top-level list like "[][]int{}" which becomes "[]"
+	// or a list with an empty inner list like "[][]int{{}}" which becomes "[[]]"
+	if jsonStr == "" && s == "[][]int{}" { // Original string was exactly "[][]int{}"
+		jsonStr = "[]"
+	}
+	err = json.Unmarshal([]byte(jsonStr), &simplices)
+	if err != nil {
+		// Provide context for debugging
+		return nil, fmt.Errorf("failed to unmarshal JSON from transformed string '%s' (derived from '%s'): %w", jsonStr, s, err)
+	}
+	return
+}
+
 func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
 	C.ensureAdjacencyIndex()
 	return C.adjacencyIndex[v]
@@ -476,32 +560,48 @@ func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
 	return v
 }
 
-func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) {
-	base := C.vertexBasis[vertexIndex]
+// Returns a new complex with the bases sorted by distance from the given vertex.
+func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) *ZComplex[T] {
+	initialVertex := C.vertexBasis[vertexIndex]
 	newVertices := make([]ZVertex[T], len(C.vertexBasis))
 	newVertexIndex := make(map[ZVertex[T]]int)
 	i := 0
-	C.BFS(base, func(v ZVertex[T], depth int) (stop bool) {
-		newVertices[i] = v
-		newVertexIndex[v] = i
-		i++
-		return false
-	})
-	C.vertexBasis = newVertices
-	C.vertexIndex = newVertexIndex
-	sort.Slice(C.edgeBasis, func(i, j int) bool {
-		a := C.edgeBasis[i]
-		b := C.edgeBasis[j]
+	// Note that we handle each connected component of the complex.
+	nextInitialVertex := initialVertex
+	for i < len(C.vertexBasis) {
+		C.BFS(nextInitialVertex, func(v ZVertex[T], depth int) (stop bool) {
+			newVertices[i] = v
+			newVertexIndex[v] = i
+			i++
+			return false
+		})
+		if i < len(C.vertexBasis) {
+			// scan for a vertex we haven't seen yet
+			for _, v := range C.vertexBasis {
+				if _, ok := newVertexIndex[v]; !ok {
+					nextInitialVertex = v
+					break
+				}
+			}
+		}
+	}
+	newEdges := make([]ZEdge[T], len(C.edgeBasis))
+	copy(newEdges, C.edgeBasis)
+	sort.Slice(newEdges, func(i, j int) bool {
+		a := newEdges[i]
+		b := newEdges[j]
 		return nearerEdgeInNewIndex(newVertexIndex, a, b)
 	})
-	C.computeEdgeIndex()
-	sort.Slice(C.triangleBasis, func(i, j int) bool {
-		a := C.triangleBasis[i]
-		b := C.triangleBasis[j]
+	newTriangles := make([]ZTriangle[T], len(C.triangleBasis))
+	copy(newTriangles, C.triangleBasis)
+	sort.Slice(newTriangles, func(i, j int) bool {
+		a := newTriangles[i]
+		b := newTriangles[j]
 		return nearerTriangleInNewIndex(newVertexIndex, a, b)
 	})
-	C.d1 = nil
-	C.d2 = nil
+	sortBases := false
+	verbose := C.verbose
+	return NewZComplex(newVertices, newEdges, newTriangles, sortBases, verbose)
 }
 
 func nearerEdgeInNewIndex[T any](index map[ZVertex[T]]int, a ZEdge[T], b ZEdge[T]) bool {
@@ -673,6 +773,29 @@ func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 	return C.triangleBasis
 }
 
+func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
+	handler func(depth int, subcomplex *ZComplex[T]) (stop bool)) {
+	Y := C.SortBasesByDistance(C.vertexIndex[initialVertex])
+	vertexIndicesToInclude := make(map[int]bool)
+	stop := false
+	for i, t := range Y.triangleBasis {
+		vertexIndicesToInclude[Y.vertexIndex[t[0]]] = true
+		vertexIndicesToInclude[Y.vertexIndex[t[1]]] = true
+		vertexIndicesToInclude[Y.vertexIndex[t[2]]] = true
+		subcomplex := Y.SubcomplexByVertices(vertexIndicesToInclude)
+		stop = handler(i, subcomplex)
+		if stop {
+			break
+		}
+	}
+	if !stop {
+		// one last call that includes any vertices not already included
+		if len(vertexIndicesToInclude) < len(Y.vertexBasis) {
+			handler(len(Y.triangleBasis), Y)
+		}
+	}
+}
+
 func (C *ZComplex[T]) VertexBasis() []ZVertex[T] {
 	return C.vertexBasis
 }
@@ -709,6 +832,7 @@ func (C *ZComplex[T]) VertexToEdgeIncidenceMap() map[int][]int {
 	return m
 }
 
+// Note: will only enumerate the vertices in the same connected component as v.
 func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bool)) {
 	visited := make(map[ZVertex[T]]struct{})
 	queue := NewZVertexQueue[T]()
@@ -905,45 +1029,84 @@ func NewZComplexFromTrianglesGeneric[T any](S []ZTriangle[T]) *ZComplex[T] {
 }
 
 func NewZComplexFromMaximalSimplices(S [][]int) *ZComplex[ZVertexInt] {
-	vertices := make(map[ZVertex[ZVertexInt]]bool)
-	edges := make(map[ZEdge[ZVertexInt]]bool)
-	triangles := make(map[ZTriangle[ZVertexInt]]bool)
+	return NewZComplexFromMaximalSimplicesOptionalSort(S, true)
+}
+
+// If sortBases is false, preserve the order of simplices as given.
+func NewZComplexFromMaximalSimplicesOptionalSort(S [][]int, sortBases bool) *ZComplex[ZVertexInt] {
+	verticesSeen := make(map[ZVertex[ZVertexInt]]bool)
+	vertexBasis := make([]ZVertex[ZVertexInt], 0)
+	edgesSeen := make(map[ZEdge[ZVertexInt]]bool)
+	edgeBasis := make([]ZEdge[ZVertexInt], 0)
+	trianglesSeen := make(map[ZTriangle[ZVertexInt]]bool)
+	triangleBasis := make([]ZTriangle[ZVertexInt], 0)
 
 	for _, s := range S {
 		switch len(s) {
 		case 0:
 			panic("empty simplex")
 		case 1:
-			vertices[ZVertexInt(s[0])] = true
+			v := ZVertexInt(s[0])
+			if _, ok := verticesSeen[v]; !ok {
+				verticesSeen[v] = true
+				vertexBasis = append(vertexBasis, v)
+			}
 		case 2:
-			vertices[ZVertexInt(s[0])] = true
-			vertices[ZVertexInt(s[1])] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]))] = true
+			v0 := ZVertexInt(s[0])
+			v1 := ZVertexInt(s[1])
+			if _, ok := verticesSeen[v0]; !ok {
+				verticesSeen[v0] = true
+				vertexBasis = append(vertexBasis, v0)
+			}
+			if _, ok := verticesSeen[v1]; !ok {
+				verticesSeen[v1] = true
+				vertexBasis = append(vertexBasis, v1)
+			}
+			e := NewZEdge[ZVertexInt](v0, v1)
+			if _, ok := edgesSeen[e]; !ok {
+				edgesSeen[e] = true
+				edgeBasis = append(edgeBasis, e)
+			}
 		case 3:
-			vertices[ZVertexInt(s[0])] = true
-			vertices[ZVertexInt(s[1])] = true
-			vertices[ZVertexInt(s[2])] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]))] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[1]), ZVertexInt(s[2]))] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[2]), ZVertexInt(s[0]))] = true
-			triangles[NewZTriangle[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]), ZVertexInt(s[2]))] = true
+			v0 := ZVertexInt(s[0])
+			v1 := ZVertexInt(s[1])
+			v2 := ZVertexInt(s[2])
+			if _, ok := verticesSeen[v0]; !ok {
+				verticesSeen[v0] = true
+				vertexBasis = append(vertexBasis, v0)
+			}
+			if _, ok := verticesSeen[v1]; !ok {
+				verticesSeen[v1] = true
+				vertexBasis = append(vertexBasis, v1)
+			}
+			if _, ok := verticesSeen[v2]; !ok {
+				verticesSeen[v2] = true
+				vertexBasis = append(vertexBasis, v2)
+			}
+			e0 := NewZEdge[ZVertexInt](v0, v1)
+			if _, ok := edgesSeen[e0]; !ok {
+				edgesSeen[e0] = true
+				edgeBasis = append(edgeBasis, e0)
+			}
+			e1 := NewZEdge[ZVertexInt](v0, v2)
+			if _, ok := edgesSeen[e1]; !ok {
+				edgesSeen[e1] = true
+				edgeBasis = append(edgeBasis, e1)
+			}
+			e2 := NewZEdge[ZVertexInt](v1, v2)
+			if _, ok := edgesSeen[e2]; !ok {
+				edgesSeen[e2] = true
+				edgeBasis = append(edgeBasis, e2)
+			}
+			t := NewZTriangle[ZVertexInt](v0, v1, v2)
+			if _, ok := trianglesSeen[t]; !ok {
+				trianglesSeen[t] = true
+				triangleBasis = append(triangleBasis, t)
+			}
 		default:
 			panic("simplex of dimension > 3")
 		}
 	}
-	vertexBasis := make([]ZVertex[ZVertexInt], 0, len(vertices))
-	for v := range vertices {
-		vertexBasis = append(vertexBasis, v)
-	}
-	edgeBasis := make([]ZEdge[ZVertexInt], 0, len(edges))
-	for e := range edges {
-		edgeBasis = append(edgeBasis, e)
-	}
-	triangleBasis := make([]ZTriangle[ZVertexInt], 0, len(triangles))
-	for t := range triangles {
-		triangleBasis = append(triangleBasis, t)
-	}
-	sortBases := true
 	verbose := false
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }

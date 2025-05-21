@@ -8,15 +8,16 @@ import (
 	"os"
 )
 
-// Usage 1 (given matrices B and U (see systole.go for their meaning):
+// Usage 1: given matrices B and U (see systole.go for their meaning)
 //
 //   systole -trials N -B B.txt -U U.txt -systole S1.txt
 //
-// Usage 2 (given boundary matrices D1 and D2:
+// Usage 2: (given boundary matrices D1 and D2:
 //
 //   systole -d1 D1.txt -d2 D2.txt -systole S1.txt -cosystole S^1.txt
 //
-// The program reads BinaryMatrix B and U in sparse column support
+// For usage 1 and 2,
+// the program reads BinaryMatrix B and U in sparse column support
 // format.  First, it checks the weight of each column of U.  The
 // minimum weight is an upper bound for the minimum weight of a
 // nonzero vector Z_1 \setminus B_1. (see the align program.)
@@ -29,35 +30,90 @@ import (
 // measures the weight of the resulting vector.  Repeatedly doing
 // this, it records the minimum found to min.txt, which is overwritten
 // each time a new minimum is found.
+//
+// Usage 3: simplicial systole search at given vertex
+//
+//   systole -simplicial-at-vertex 0 -d1 D1.txt -d2 D2.txt -systole S1.txt
+//
+// Usage 4: simplicial systole search (global)
+//
+//   systole -simplicial -d1 D1.txt -d2 D2.txt -systole S1.txt
+//
 
 func main() {
 	args := parseFlags()
 	args.ProfileArgs.Start()
 	defer args.ProfileArgs.Stop()
 
-	if args.D1File != "" {
-		log.Printf("reading matrix d_1 from %s", args.D1File)
-		var D1 golsv.BinaryMatrix
-		D1 = golsv.ReadSparseBinaryMatrixFile(args.D1File)
-		log.Printf("done; read %s", D1)
-
-		log.Printf("reading matrix d_2 from %s", args.D2File)
-		var D2 golsv.BinaryMatrix
-		D2 = golsv.ReadSparseBinaryMatrixFile(args.D2File)
-		log.Printf("done; read %s", D2)
-
-		systole, _, _, _ := golsv.ComputeFirstSystole(D1, D2, args.verbose)
-		log.Printf("systole=%d", systole)
-		if args.SystoleFile != "" {
-			writeMinWeight(systole, args.SystoleFile)
-		}
-		cosystole := golsv.ComputeFirstCosystole(D1, D2, args.verbose)
-		log.Printf("cosystole=%d", systole)
-		if args.CosystoleFile != "" {
-			writeMinWeight(cosystole, args.CosystoleFile)
-		}
-		return
+	if args.UFile != "" {
+		doSystoleSearchFromUB(args)
+	} else if args.SimplicialAtVertex >= 0 {
+		doSimplicialSystoleSearchAtVertex(args)
+	} else if args.Simplicial {
+		doSimplicialSystoleSearch(args)
+	} else {
+		doExhaustiveSystoleAndCosystoleSearchFromComplex(args)
 	}
+}
+
+func doExhaustiveSystoleAndCosystoleSearchFromComplex(args *Args) {
+	D1, D2 := readBoundaryMatrices(args)
+	systole, _, _, _ := golsv.ComputeFirstSystole(D1, D2, args.Verbose)
+	log.Printf("systole=%d", systole)
+	if args.SystoleFile != "" {
+		writeIntegerFile(systole, args.SystoleFile)
+	}
+	cosystole := golsv.ComputeFirstCosystole(D1, D2, args.Verbose)
+	log.Printf("cosystole=%d", cosystole)
+	if args.CosystoleFile != "" {
+		writeIntegerFile(cosystole, args.CosystoleFile)
+	}
+}
+
+func doSimplicialSystoleSearch(args *Args) {
+	X := complexFromBoundaryMatrices(args)
+	S := golsv.NewSimplicialSystoleSearch(X, args.SimplicialStopNonzero, args.Verbose)
+	weight := S.Search()
+	if args.SystoleFile != "" {
+		writeIntegerFile(weight, args.SystoleFile)
+	}
+	log.Printf("done; minimum weight found is %d", weight)
+}
+
+func doSimplicialSystoleSearchAtVertex(args *Args) {
+	X := complexFromBoundaryMatrices(args)
+	S := golsv.NewSimplicialSystoleSearch(X, args.SimplicialStopNonzero, args.Verbose)
+	weight := S.SearchAtVertex(X.VertexBasis()[args.SimplicialAtVertex])
+	if args.SystoleFile != "" {
+		writeIntegerFile(weight, args.SystoleFile)
+	}
+	log.Printf("done; minimum weight found is %d", weight)
+}
+
+func complexFromBoundaryMatrices(args *Args) *golsv.ZComplex[golsv.ZVertexInt] {
+	D1, D2 := readBoundaryMatrices(args)
+	return golsv.NewZComplexFromBoundaryMatrices(D1, D2)
+}
+
+func readBoundaryMatrices(args *Args) (D1, D2 golsv.BinaryMatrix) {
+	if args.Verbose {
+		log.Printf("reading matrix d_1 from %s", args.D1File)
+	}
+	D1 = golsv.ReadSparseBinaryMatrixFile(args.D1File)
+	if args.Verbose {
+		log.Printf("done; read %s", D1)
+	}
+	if args.Verbose {
+		log.Printf("reading matrix d_2 from %s", args.D2File)
+	}
+	D2 = golsv.ReadSparseBinaryMatrixFile(args.D2File)
+	if args.Verbose {
+		log.Printf("done; read %s", D2)
+	}
+	return
+}
+
+func doSystoleSearchFromUB(args *Args) {
 	log.Printf("reading matrix B from %s", args.BFile)
 	var B golsv.BinaryMatrix
 	B = golsv.ReadSparseBinaryMatrixFile(args.BFile)
@@ -78,19 +134,19 @@ func main() {
 
 	var minWeight int
 	if args.Trials <= 0 {
-		minWeight = golsv.SystoleExhaustiveSearch(Udense, Bdense, args.verbose)
+		minWeight = golsv.SystoleExhaustiveSearch(Udense, Bdense, args.Verbose)
 	} else {
-		minWeight = golsv.SystoleRandomSearch(Udense, Bdense, args.Trials, args.verbose)
+		minWeight = golsv.SystoleRandomSearch(Udense, Bdense, args.Trials, args.Verbose)
 	}
 	if args.SystoleFile != "" {
-		writeMinWeight(minWeight, args.SystoleFile)
+		writeIntegerFile(minWeight, args.SystoleFile)
 	}
 	log.Printf("done; minimum nonzero weight found is %d", minWeight)
 }
 
-func writeMinWeight(minWeight int, minFile string) {
+func writeIntegerFile(n int, path string) {
 	// log.Printf("writing min weight to %s", minFile)
-	err := os.WriteFile(minFile, []byte(fmt.Sprintf("%d\n", minWeight)), 0644)
+	err := os.WriteFile(path, []byte(fmt.Sprintf("%d\n", n)), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -98,29 +154,36 @@ func writeMinWeight(minWeight int, minFile string) {
 
 type Args struct {
 	golsv.ProfileArgs
-	BFile         string
-	UFile         string
-	D1File        string
-	D2File        string
-	SystoleFile   string
-	CosystoleFile string
-	Trials        int
-	verbose       bool
+	BFile                 string
+	CosystoleFile         string
+	D1File                string
+	D2File                string
+	Simplicial            bool
+	SimplicialAtVertex    int
+	SimplicialStopNonzero bool
+	SystoleFile           string
+	Trials                int
+	UFile                 string
+	Verbose               bool
 }
 
 func parseFlags() *Args {
 	args := Args{
-		verbose: true,
+		SimplicialAtVertex: -1,
+		Verbose:            true,
 	}
 	args.ProfileArgs.ConfigureFlags()
-	flag.BoolVar(&args.verbose, "verbose", args.verbose, "verbose logging")
-	flag.StringVar(&args.BFile, "B", args.BFile, "matrix B input file (sparse column support txt format)")
-	flag.StringVar(&args.UFile, "U", args.UFile, "matrix U input file (sparse column support txt format)")
+	flag.StringVar(&args.CosystoleFile, "cosystole", args.CosystoleFile, "cosystole output file (text)")
 	flag.StringVar(&args.D1File, "d1", args.D1File, "boundary matrix d_1 input file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "boundary matrix d_2 input file (sparse column support txt format)")
+	flag.StringVar(&args.BFile, "B", args.BFile, "matrix B input file (sparse column support txt format)")
+	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "do simplicial systole search (global)")
+	flag.IntVar(&args.SimplicialAtVertex, "simplicial-at-vertex", args.SimplicialAtVertex, "do simplicial systole search starting at given vertex index")
+	flag.BoolVar(&args.SimplicialStopNonzero, "simplicial-stop-nonzero", args.SimplicialStopNonzero, "stop simplicial systole search at first nonzero finding")
 	flag.StringVar(&args.SystoleFile, "systole", args.SystoleFile, "systole output file (text)")
-	flag.StringVar(&args.CosystoleFile, "cosystole", args.CosystoleFile, "cosystole output file (text)")
 	flag.IntVar(&args.Trials, "trials", args.Trials, "number of samples of minimum weight search (0=exhaustive search)")
+	flag.StringVar(&args.UFile, "U", args.UFile, "matrix U input file (sparse column support txt format)")
+	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "verbose logging")
 	flag.Parse()
 	if (args.D1File != "" && args.D2File == "") || (args.D1File == "" && args.D2File != "") {
 		flag.Usage()

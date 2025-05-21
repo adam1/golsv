@@ -107,8 +107,8 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 			if weight < minWeight {
 				minWeight = weight
 				if verbose {
-					log.Printf("new min weight: %d", minWeight)
-					log.Printf("xxx c: %s", sum.ColumnVector(0).SupportString())
+					log.Printf("exhaustive search; new min weight: %d", minWeight)
+					//log.Printf("c: %s", sum.ColumnVector(0).SupportString())
 				}
 			}
 			return true
@@ -144,4 +144,72 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	U, B, _, _, _, _ := UBDecomposition(delta1, delta0, verbose)
 	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
+}
+
+// The simplicial systole search algorithm is not guaranteed to find
+// the global systole in all cases.  See thesis for details.  NB: The
+// thesis describes "local" systoles where we restrict our attention
+// to cycles incident to some vertex.  That is different in general to
+// what is implemented here, which uses the ordinary exhaustive linear
+// algebra search on subcomplexes for expediency. The two are thought
+// to be equivalent in the case of Cayley complexes.
+type SimplicialSystoleSearch[T any] struct {
+	C           *ZComplex[T]
+	StopNonzero bool
+	Verbose     bool
+}
+
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
+	return &SimplicialSystoleSearch[T]{
+		C:           C,
+		StopNonzero: stopNonzero,
+		Verbose:     verbose,
+	}
+}
+
+func (S *SimplicialSystoleSearch[T]) Search() int {
+	minWeight := 0
+	for i, v := range S.C.VertexBasis() {
+		if S.Verbose {
+			log.Printf("Complex: %s\ndoing simplicial search at vertex %d", S.C, i)
+		}
+		w := S.SearchAtVertex(v)
+		if w > 0 && (w < minWeight || minWeight == 0) {
+			minWeight = w
+		}
+		if S.Verbose {
+			log.Printf("finished simplicial search at vertex %d; min weight: %d", i, minWeight)
+		}
+	}
+	return minWeight
+}
+
+// xxx potential optimization? reuse/extend UB from one filtration step to the next
+func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
+	minWeight := 0
+	S.C.TriangularDepthFiltration(v, func(step int, subcomplex *ZComplex[T]) (stop bool) {
+		if S.Verbose {
+			//log.Printf("checking subcomplex of triangle depth filtration step %d", step)
+			//log.Printf("subcomplex: %s", subcomplex.MaximalSimplicesString())
+		}
+		ubVerbose := false
+		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
+		if S.Verbose {
+			log.Printf("step=%d dimZ1=%d dimB1=%d dimH1=%d", step, dimZ1, dimB1, dimH1)
+		}
+		U, B = U.Dense(), B.Dense()
+		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
+		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
+			minWeight = localSystole
+			if S.StopNonzero {
+				if S.Verbose {
+					log.Printf("stopping at triangle step %d", step)
+				}
+				return true
+			}
+		}
+
+		return false
+	})
+	return minWeight
 }
