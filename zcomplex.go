@@ -502,6 +502,7 @@ func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) {
 	})
 	C.d1 = nil
 	C.d2 = nil
+	C.adjacencyIndex = nil
 }
 
 func nearerEdgeInNewIndex[T any](index map[ZVertex[T]]int, a ZEdge[T], b ZEdge[T]) bool {
@@ -671,6 +672,26 @@ func (C *ZComplex[T]) SubcomplexByVertices(vertexIndicesToInclude map[int]bool) 
 
 func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 	return C.triangleBasis
+}
+
+func (C *ZComplex[T]) TriangularDepthGradedSubcomplexes(initialVertex ZVertex[T],
+	handler func(depth int, subcomplex *ZComplex[T]) (stop bool)) {
+	C.SortBasesByDistance(C.vertexIndex[initialVertex])
+	vertexIndicesToInclude := make(map[int]bool)
+	for i, t := range C.triangleBasis {
+		vertexIndicesToInclude[C.vertexIndex[t[0]]] = true
+		vertexIndicesToInclude[C.vertexIndex[t[1]]] = true
+		vertexIndicesToInclude[C.vertexIndex[t[2]]] = true
+		subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
+		stop := handler(i, subcomplex)
+		if stop {
+			break
+		}
+	}
+	// one last call that includes any vertices not already included
+	if len(vertexIndicesToInclude) < len(C.vertexBasis) {
+		handler(len(C.triangleBasis), C)
+	}
 }
 
 func (C *ZComplex[T]) VertexBasis() []ZVertex[T] {
@@ -905,45 +926,84 @@ func NewZComplexFromTrianglesGeneric[T any](S []ZTriangle[T]) *ZComplex[T] {
 }
 
 func NewZComplexFromMaximalSimplices(S [][]int) *ZComplex[ZVertexInt] {
-	vertices := make(map[ZVertex[ZVertexInt]]bool)
-	edges := make(map[ZEdge[ZVertexInt]]bool)
-	triangles := make(map[ZTriangle[ZVertexInt]]bool)
+	return NewZComplexFromMaximalSimplicesOptionalSort(S, true)
+}
+
+// If sortBases is false, preserve the order of simplices as given.
+func NewZComplexFromMaximalSimplicesOptionalSort(S [][]int, sortBases bool) *ZComplex[ZVertexInt] {
+	verticesSeen := make(map[ZVertex[ZVertexInt]]bool)
+	vertexBasis := make([]ZVertex[ZVertexInt], 0)
+	edgesSeen := make(map[ZEdge[ZVertexInt]]bool)
+	edgeBasis := make([]ZEdge[ZVertexInt], 0)
+	trianglesSeen := make(map[ZTriangle[ZVertexInt]]bool)
+	triangleBasis := make([]ZTriangle[ZVertexInt], 0)
 
 	for _, s := range S {
 		switch len(s) {
 		case 0:
 			panic("empty simplex")
 		case 1:
-			vertices[ZVertexInt(s[0])] = true
+			v := ZVertexInt(s[0])
+			if _, ok := verticesSeen[v]; !ok {
+				verticesSeen[v] = true
+				vertexBasis = append(vertexBasis, v)
+			}
 		case 2:
-			vertices[ZVertexInt(s[0])] = true
-			vertices[ZVertexInt(s[1])] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]))] = true
+			v0 := ZVertexInt(s[0])
+			v1 := ZVertexInt(s[1])
+			if _, ok := verticesSeen[v0]; !ok {
+				verticesSeen[v0] = true
+				vertexBasis = append(vertexBasis, v0)
+			}
+			if _, ok := verticesSeen[v1]; !ok {
+				verticesSeen[v1] = true
+				vertexBasis = append(vertexBasis, v1)
+			}
+			e := NewZEdge[ZVertexInt](v0, v1)
+			if _, ok := edgesSeen[e]; !ok {
+				edgesSeen[e] = true
+				edgeBasis = append(edgeBasis, e)
+			}
 		case 3:
-			vertices[ZVertexInt(s[0])] = true
-			vertices[ZVertexInt(s[1])] = true
-			vertices[ZVertexInt(s[2])] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]))] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[1]), ZVertexInt(s[2]))] = true
-			edges[NewZEdge[ZVertexInt](ZVertexInt(s[2]), ZVertexInt(s[0]))] = true
-			triangles[NewZTriangle[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]), ZVertexInt(s[2]))] = true
+			v0 := ZVertexInt(s[0])
+			v1 := ZVertexInt(s[1])
+			v2 := ZVertexInt(s[2])
+			if _, ok := verticesSeen[v0]; !ok {
+				verticesSeen[v0] = true
+				vertexBasis = append(vertexBasis, v0)
+			}
+			if _, ok := verticesSeen[v1]; !ok {
+				verticesSeen[v1] = true
+				vertexBasis = append(vertexBasis, v1)
+			}
+			if _, ok := verticesSeen[v2]; !ok {
+				verticesSeen[v2] = true
+				vertexBasis = append(vertexBasis, v2)
+			}
+			e0 := NewZEdge[ZVertexInt](v0, v1)
+			if _, ok := edgesSeen[e0]; !ok {
+				edgesSeen[e0] = true
+				edgeBasis = append(edgeBasis, e0)
+			}
+			e1 := NewZEdge[ZVertexInt](v0, v2)
+			if _, ok := edgesSeen[e1]; !ok {
+				edgesSeen[e1] = true
+				edgeBasis = append(edgeBasis, e1)
+			}
+			e2 := NewZEdge[ZVertexInt](v1, v2)
+			if _, ok := edgesSeen[e2]; !ok {
+				edgesSeen[e2] = true
+				edgeBasis = append(edgeBasis, e2)
+			}
+			t := NewZTriangle[ZVertexInt](v0, v1, v2)
+			if _, ok := trianglesSeen[t]; !ok {
+				trianglesSeen[t] = true
+				triangleBasis = append(triangleBasis, t)
+			}
 		default:
 			panic("simplex of dimension > 3")
 		}
 	}
-	vertexBasis := make([]ZVertex[ZVertexInt], 0, len(vertices))
-	for v := range vertices {
-		vertexBasis = append(vertexBasis, v)
-	}
-	edgeBasis := make([]ZEdge[ZVertexInt], 0, len(edges))
-	for e := range edges {
-		edgeBasis = append(edgeBasis, e)
-	}
-	triangleBasis := make([]ZTriangle[ZVertexInt], 0, len(triangles))
-	for t := range triangles {
-		triangleBasis = append(triangleBasis, t)
-	}
-	sortBases := true
 	verbose := false
 	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
 }

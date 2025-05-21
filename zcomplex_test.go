@@ -1,6 +1,7 @@
 package golsv
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -658,6 +659,98 @@ func TestZComplexSubcomplexByVertices(t *testing.T) {
 		got := test.C.SubcomplexByVertices(test.V)
 		if !reflect.DeepEqual(got, test.Expected) {
 			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
+func TestZComplexTriangularDepthGradedSubcomplexes(t *testing.T) {
+	tests := []struct {
+		C        *ZComplex[ZVertexInt]
+		Start    int
+		Expected []*ZComplex[ZVertexInt]
+	}{
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 2, 3}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 2, 3}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 2, 3}}, false),
+			3,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{3, 1, 2}}, false),
+				// this is a bit tricky - we give all of the simplices here
+				// to completely control the ordering.
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{3}, {1}, {2}, {0}, {1, 3}, {2, 3}, {0, 1}, {1, 2}, {0, 2}, {3, 1, 2}, {0, 1, 2}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}}, false),
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}, {3, 6}}, false),
+			0,
+			[]*ZComplex[ZVertexInt]{
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4, 5}}, false),
+				NewZComplexFromMaximalSimplicesOptionalSort([][]int{{0, 1, 2}, {1, 3}, {3, 4}, {3, 5}, {3, 6}, {3, 4, 5}}, false),
+			},
+		},
+	}
+	for n, test := range tests {
+		var got []*ZComplex[ZVertexInt]
+		test.C.TriangularDepthGradedSubcomplexes(test.C.VertexBasis()[test.Start], func(depth int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
+			got = append(got, subcomplex)
+			return false
+		})
+		if !reflect.DeepEqual(got, test.Expected) {
+			var formatComplex = func(X *ZComplex[ZVertexInt]) string {
+				s := X.String()
+				s += "\n" + X.DumpBases()
+				return s
+			}
+			var diff string
+			for i, X := range test.Expected {
+				if reflect.DeepEqual(X, got[i]) {
+					diff += fmt.Sprintf("complex %d: equal\n\n", i)
+					continue
+				}
+				diff += fmt.Sprintf("complex %d:\n\nExpected: %s", i, formatComplex(X))
+				if len(got) >= i+1 {
+					diff += fmt.Sprintf("\nGot: %s", formatComplex(got[i]))
+				}
+			}
+			if len(got) > len(test.Expected) {
+				diff += "Got more than expected:\n"
+				for i := len(test.Expected); i < len(got); i++ {
+					Y := got[i]
+					diff += fmt.Sprintf("complex %d:\n\nGot: %s", i, formatComplex(Y))
+				}
+			}
+			t.Errorf("Test %d: diff: %s", n, diff)
 		}
 	}
 }

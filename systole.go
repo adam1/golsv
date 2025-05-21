@@ -108,7 +108,7 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 				minWeight = weight
 				if verbose {
 					log.Printf("new min weight: %d", minWeight)
-					log.Printf("xxx c: %s", sum.ColumnVector(0).SupportString())
+					//log.Printf("xxx c: %s", sum.ColumnVector(0).SupportString())
 				}
 			}
 			return true
@@ -144,4 +144,34 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	U, B, _, _, _, _ := UBDecomposition(delta1, delta0, verbose)
 	U, B = U.Dense(), B.Dense()
 	return SystoleExhaustiveSearch(U, B, verbose)
+}
+
+type SimplicialSystoleSearch[T any] struct {
+	C       *ZComplex[T]
+	Verbose bool
+}
+
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], verbose bool) *SimplicialSystoleSearch[T] {
+	return &SimplicialSystoleSearch[T]{
+		C:       C,
+		Verbose: verbose,
+	}
+}
+
+func (S *SimplicialSystoleSearch[T]) Systole() int {
+	minWeight := math.MaxInt
+	// do this as the initial vertex for now; later over all vertices
+	S.C.TriangularDepthGradedSubcomplexes(S.C.VertexBasis()[0], func(depth int, subcomplex *ZComplex[T]) (stop bool) {
+		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), S.Verbose)
+		if S.Verbose {
+			log.Printf("UBDecomposition: dimZ1=%d, dimB1=%d, dimH1=%d", dimZ1, dimB1, dimH1)
+		}
+		systole := SystoleExhaustiveSearch(U, B, S.Verbose)
+		if systole < minWeight {
+			minWeight = systole
+			return true
+		}
+		return false
+	})
+	return minWeight
 }
