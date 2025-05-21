@@ -184,7 +184,7 @@ func (C *ZComplex[T]) BFWalk3Cliques(f func(c [3]ZVertex[T])) {
 	for uId := range C.vertexBasis {
 		//
 		//       f     g     h
-  		//    u --- v --- w --- x
+		//    u --- v --- w --- x
 		//
 		for _, vId := range C.Neighbors(uId) {
 			for _, wId := range C.Neighbors(vId) {
@@ -266,20 +266,50 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
-func (C *ZComplex[T]) DepthGradedSubcomplexes(handler func(depth int, subcomplex *ZComplex[T])) {
+func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex ZVertex[T],
+	handler func(depth int, subcomplex *ZComplex[T], verticesAtDepth []ZVertex[T])) {
 	vertexIndicesToInclude := make(map[int]bool)
 	curDepth := 0
-	C.BFS(C.vertexBasis[0], func(v ZVertex[T], vdepth int) (stop bool) {
+	verticesAtDepth := make([]ZVertex[T], 0)
+	C.BFS(initialVertex, func(v ZVertex[T], vdepth int) (stop bool) {
 		if vdepth > curDepth {
 			subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
-			handler(curDepth, subcomplex)
+			handler(curDepth, subcomplex, verticesAtDepth)
 			curDepth = vdepth
+			verticesAtDepth = verticesAtDepth[:0]
 		}
-		vertexIndicesToInclude[C.vertexIndex[v]] = true
+		n := C.vertexIndex[v]
+		vertexIndicesToInclude[n] = true
+		verticesAtDepth = append(verticesAtDepth, v)
 		return false
 	})
 	subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
-	handler(curDepth, subcomplex)
+	handler(curDepth, subcomplex, verticesAtDepth)
+}
+
+// DFS performs a depth-first search traversal starting from vertex v.
+// For each visited vertex, it calls f with the vertex and its depth.
+// If f returns true, the traversal stops early.
+func (C *ZComplex[T]) DFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bool)) {
+	visited := make(map[ZVertex[T]]struct{})
+	C.dfsUtil(v, 0, visited, f)
+}
+
+func (C *ZComplex[T]) dfsUtil(v ZVertex[T], depth int, visited map[ZVertex[T]]struct{}, f func(u ZVertex[T], depth int) (stop bool)) bool {
+	visited[v] = struct{}{}
+	if stop := f(v, depth); stop {
+		return true
+	}
+	vertexIdx := C.vertexIndex[v]
+	for _, neighborIdx := range C.Neighbors(vertexIdx) {
+		neighbor := C.vertexBasis[neighborIdx]
+		if _, ok := visited[neighbor]; !ok {
+			if stop := C.dfsUtil(neighbor, depth+1, visited, f); stop {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (C *ZComplex[T]) DualComplex() *ZComplex[ZVertexInt] {
@@ -411,17 +441,14 @@ func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
 	return C.adjacencyIndex[v]
 }
 
-// xxx test
 func (C *ZComplex[T]) NumEdges() int {
 	return len(C.edgeBasis)
 }
 
-// xxx test
 func (C *ZComplex[T]) NumTriangles() int {
 	return len(C.triangleBasis)
 }
 
-// xxx test
 func (C *ZComplex[T]) NumVertices() int {
 	return len(C.vertexBasis)
 }
@@ -569,7 +596,7 @@ func (C *ZComplex[T]) DumpBases() (s string) {
 }
 
 func (C *ZComplex[T]) SubcomplexByDepth(depth int) *ZComplex[T] {
-		vertexIndicesToInclude := make(map[int]bool)
+	vertexIndicesToInclude := make(map[int]bool)
 	C.BFS(C.vertexBasis[0], func(v ZVertex[T], vdepth int) (stop bool) {
 		if vdepth <= depth {
 			vertexIndicesToInclude[C.vertexIndex[v]] = true
@@ -577,7 +604,7 @@ func (C *ZComplex[T]) SubcomplexByDepth(depth int) *ZComplex[T] {
 			return true
 		}
 		return false
-	})	
+	})
 	return C.SubcomplexByVertices(vertexIndicesToInclude)
 }
 
@@ -608,7 +635,7 @@ func (C *ZComplex[T]) SubcomplexByTriangles(triangleIndicesToInclude map[int]any
 		if _, ok := triangleIndicesToInclude[i]; ok {
 			filtered = append(filtered, t)
 		}
-	}	
+	}
 	return NewZComplexFromTrianglesGeneric(filtered)
 }
 
@@ -700,7 +727,7 @@ func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bo
 			for _, w := range e {
 				if _, ok := visited[w]; !ok {
 					queue.Enqueue(ZVertexTask[T]{w, task.depth + 1})
-					stop = f(w, task.depth + 1)
+					stop = f(w, task.depth+1)
 					visited[w] = struct{}{}
 					if stop {
 						return
@@ -712,7 +739,7 @@ func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bo
 }
 
 type ZVertexTask[T any] struct {
-	v ZVertex[T]
+	v     ZVertex[T]
 	depth int
 }
 
