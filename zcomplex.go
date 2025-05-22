@@ -476,33 +476,48 @@ func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
 	return v
 }
 
-func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) {
-	base := C.vertexBasis[vertexIndex]
+// Returns a new complex with the bases sorted by distance from the given vertex.
+func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) *ZComplex[T] {
+	initialVertex := C.vertexBasis[vertexIndex]
 	newVertices := make([]ZVertex[T], len(C.vertexBasis))
 	newVertexIndex := make(map[ZVertex[T]]int)
 	i := 0
-	C.BFS(base, func(v ZVertex[T], depth int) (stop bool) {
-		newVertices[i] = v
-		newVertexIndex[v] = i
-		i++
-		return false
-	})
-	C.vertexBasis = newVertices
-	C.vertexIndex = newVertexIndex
-	sort.Slice(C.edgeBasis, func(i, j int) bool {
-		a := C.edgeBasis[i]
-		b := C.edgeBasis[j]
+	// Note that we handle each connected component of the complex.
+	nextInitialVertex := initialVertex
+	for i < len(C.vertexBasis) {
+		C.BFS(nextInitialVertex, func(v ZVertex[T], depth int) (stop bool) {
+			newVertices[i] = v
+			newVertexIndex[v] = i
+			i++
+			return false
+		})
+		if i < len(C.vertexBasis) {
+			// scan for a vertex we haven't seen yet
+			for _, v := range C.vertexBasis {
+				if _, ok := newVertexIndex[v]; !ok {
+					nextInitialVertex = v
+					break
+				}
+			}
+		}
+	}
+	newEdges := make([]ZEdge[T], len(C.edgeBasis))
+	copy(newEdges, C.edgeBasis)
+	sort.Slice(newEdges, func(i, j int) bool {
+		a := newEdges[i]
+		b := newEdges[j]
 		return nearerEdgeInNewIndex(newVertexIndex, a, b)
 	})
-	C.computeEdgeIndex()
-	sort.Slice(C.triangleBasis, func(i, j int) bool {
-		a := C.triangleBasis[i]
-		b := C.triangleBasis[j]
+	newTriangles := make([]ZTriangle[T], len(C.triangleBasis))
+	copy(newTriangles, C.triangleBasis)
+	sort.Slice(newTriangles, func(i, j int) bool {
+		a := newTriangles[i]
+		b := newTriangles[j]
 		return nearerTriangleInNewIndex(newVertexIndex, a, b)
 	})
-	C.d1 = nil
-	C.d2 = nil
-	C.adjacencyIndex = nil
+	sortBases := false
+	verbose := C.verbose
+	return NewZComplex(newVertices, newEdges, newTriangles, sortBases, verbose)
 }
 
 func nearerEdgeInNewIndex[T any](index map[ZVertex[T]]int, a ZEdge[T], b ZEdge[T]) bool {
@@ -734,6 +749,7 @@ func (C *ZComplex[T]) VertexToEdgeIncidenceMap() map[int][]int {
 	return m
 }
 
+// Note: will only enumerate the vertices in the same connected component as v.
 func (C *ZComplex[T]) BFS(v ZVertex[T], f func(u ZVertex[T], depth int) (stop bool)) {
 	visited := make(map[ZVertex[T]]struct{})
 	queue := NewZVertexQueue[T]()

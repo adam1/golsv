@@ -2,6 +2,7 @@ package golsv
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"testing"
 )
@@ -565,6 +566,14 @@ func TestZComplexSortBasesByDistance(t *testing.T) {
 			[][2]int{{0, 2}, {1, 2}, {2, 3}, {2, 4}, {0, 1}, {3, 4}},
 			[][3]int{{0, 1, 2}, {2, 3, 4}},
 		},
+		// an example with two disconnected components
+		{
+			[][]int{{0, 1, 2}, {3, 4, 5}},
+			0,
+			[]int{0, 1, 2, 3, 4, 5},
+			[][2]int{{0, 1}, {0, 2}, {1, 2}, {3, 4}, {3, 5}, {4, 5}},
+			[][3]int{{0, 1, 2}, {3, 4, 5}},
+		},
 	}
 	for n, test := range tests {
 		// first, convert test data from bare ints
@@ -576,25 +585,90 @@ func TestZComplexSortBasesByDistance(t *testing.T) {
 		}
 		expectedEdgeBasis := make([]ZEdge[ZVertexInt], len(test.expectedEdges))
 		for i, s := range test.expectedEdges {
-			expectedEdgeBasis[i] = NewZEdge[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]))
+			expectedEdgeBasis[i] = NewZEdge(ZVertexInt(s[0]), ZVertexInt(s[1]))
 		}
 		expectedTriangleBasis := make([]ZTriangle[ZVertexInt], len(test.expectedTriangles))
 		for i, s := range test.expectedTriangles {
-			expectedTriangleBasis[i] = NewZTriangle[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]), ZVertexInt(s[2]))
+			expectedTriangleBasis[i] = NewZTriangle(ZVertexInt(s[0]), ZVertexInt(s[1]), ZVertexInt(s[2]))
 		}
 
-		X.SortBasesByDistance(test.initialVertex)
-		gotVertexBasis := X.VertexBasis()
+		Y := X.SortBasesByDistance(test.initialVertex)
+		gotVertexBasis := Y.VertexBasis()
 		if !reflect.DeepEqual(gotVertexBasis, expectedVertexBasis) {
 			t.Errorf("Test %d: vertex basis: got=%v, expected=%v", n, gotVertexBasis, expectedVertexBasis)
 		}
-		gotEdgeBasis := X.EdgeBasis()
+		gotEdgeBasis := Y.EdgeBasis()
 		if !reflect.DeepEqual(gotEdgeBasis, expectedEdgeBasis) {
 			t.Errorf("Test %d: edge basis: got=%v, expected=%v", n, gotEdgeBasis, expectedEdgeBasis)
 		}
-		gotTriangleBasis := X.TriangleBasis()
+		gotTriangleBasis := Y.TriangleBasis()
 		if !reflect.DeepEqual(gotTriangleBasis, expectedTriangleBasis) {
 			t.Errorf("Test %d: triangle basis: got=%v, expected=%v", n, gotTriangleBasis, expectedTriangleBasis)
+		}
+	}
+}
+
+func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
+	trials := 10
+	minVertices := 5
+	maxVertices := 10
+	verbose := false
+
+	for i := 0; i < trials; i++ {
+		numVertices := rand.Intn(maxVertices-minVertices) + minVertices
+		R := NewRandomComplexGenerator(numVertices, verbose)
+		d_1, d_2, err := R.RandomCliqueComplex(0.4)
+		if err != nil {
+			t.Errorf("Failed to generate random clique complex: %v", err)
+			continue
+		}
+		Xoriginal := NewZComplexFromBoundaryMatrices(d_1, d_2)
+		//log.Printf("xxx Xoriginal:\n%s", Xoriginal.DumpBases())
+		initialVertex := rand.Intn(len(Xoriginal.VertexBasis()))
+
+		var Xsorted *ZComplex[ZVertexInt]
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("Trial %d: Panic during SortBasesByDistance: %v\noriginal complex:\n%v", i, r, Xoriginal.DumpBases())
+				}
+			}()
+			Xsorted = Xoriginal.SortBasesByDistance(initialVertex)
+		}()
+		//log.Printf("xxx XSorted:\n%s", Xsorted.DumpBases())
+
+		// simple check that the bases have the same elements (ignoring order)
+		resortedVertices := make([]ZVertex[ZVertexInt], len(Xsorted.VertexBasis()))
+		copy(resortedVertices, Xsorted.VertexBasis())
+
+		resortedEdges := make([]ZEdge[ZVertexInt], len(Xsorted.EdgeBasis()))
+		copy(resortedEdges, Xsorted.EdgeBasis())
+
+		resortedTriangles := make([]ZTriangle[ZVertexInt], len(Xsorted.TriangleBasis()))
+		copy(resortedTriangles, Xsorted.TriangleBasis())
+
+		Xresorted := NewZComplex(resortedVertices, resortedEdges, resortedTriangles, true, verbose)
+		//log.Printf("xxx XResorted:\n%s", Xresorted.DumpBases())
+
+		if !reflect.DeepEqual(Xoriginal.VertexBasis(), Xresorted.VertexBasis()) {
+			t.Errorf("Trial %d: Vertex bases are not equal (ignoring order)", i)
+		}
+		if !reflect.DeepEqual(Xoriginal.EdgeBasis(), Xresorted.EdgeBasis()) {
+			t.Errorf("Trial %d: Edge bases are not equal (ignoring order)", i)
+		}
+		if !reflect.DeepEqual(Xoriginal.TriangleBasis(), Xresorted.TriangleBasis()) {
+			t.Errorf("Trial %d: Triangle bases are not equal (ignoring order)", i)
+		}
+				
+		// check that the first vertex is the initial vertex
+		firstVertex, ok := Xsorted.VertexBasis()[0].(ZVertexInt)
+		if !ok {
+			t.Errorf("Trial %d: First vertex should be of type ZVertexInt, got %T", i, Xsorted.VertexBasis()[0])
+			continue
+		}
+		if int(firstVertex) != initialVertex {
+			t.Errorf("Trial %d: First vertex should be the initial vertex %d, got %v",
+				i, initialVertex, firstVertex)
 		}
 	}
 }
