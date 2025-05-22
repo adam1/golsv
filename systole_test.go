@@ -155,12 +155,16 @@ func TestSystoleKernelBasis(t *testing.T) {
 	}
 }
 
-func TestSystolePlanarTwoHoles(t *testing.T) {
-	verbose := false
-	X := NewZComplexFromMaximalSimplices([][]int{
+func SheetWithTwoHoles() *ZComplex[ZVertexInt] {
+	return NewZComplexFromMaximalSimplices([][]int{
 		{0, 3, 4}, {0, 6, 7}, {0, 1, 8},
 		{1, 2, 3}, {4, 5, 6},
 	})
+}
+
+func TestSystolePlanarTwoHoles(t *testing.T) {
+	verbose := false
+	X := SheetWithTwoHoles()
 	D1, D2 := X.D1(), X.D2()
 	systole, dimZ1, dimB1, dimH1 := ComputeFirstSystole(D1, D2, verbose)
 	wantSystole := 3
@@ -182,5 +186,19 @@ func TestSystolePlanarTwoHoles(t *testing.T) {
 	cosystole := ComputeFirstCosystole(D1, D2, verbose)
 	if verbose {
 		log.Printf("systole=%d cosystole=%d", systole, cosystole)
+	}
+}
+
+// xxx first idea: like above, compute some known systoles using the simplicial method
+//
+// xxx construct example where scanning from single vertex gives wrong result
+func TestSimplicialSystoleSearchSheetWithTwoHoles(t *testing.T) {
+	verbose := false
+	X := SheetWithTwoHoles()
+	S := NewSimplicialSystoleSearch(X, verbose)
+	gotSystole := S.Systole()
+	wantSystole := 3
+	if gotSystole != wantSystole {
+		t.Errorf("systole: got=%d want=%d", gotSystole, wantSystole)
 	}
 }

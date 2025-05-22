@@ -158,17 +158,24 @@ func NewSimplicialSystoleSearch[T any](C *ZComplex[T], verbose bool) *Simplicial
 	}
 }
 
+// xxx could potentially take UBDecomp from whole complex and downsample for each grade?
 func (S *SimplicialSystoleSearch[T]) Systole() int {
 	minWeight := math.MaxInt
-	// do this as the initial vertex for now; later over all vertices
+	// xxx do this as the initial vertex for now; later over all vertices
 	S.C.TriangularDepthGradedSubcomplexes(S.C.VertexBasis()[0], func(depth int, subcomplex *ZComplex[T]) (stop bool) {
+		if S.Verbose {
+			log.Printf("handling subcomplex of triangle grade %d", depth)
+		}
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), S.Verbose)
 		if S.Verbose {
 			log.Printf("UBDecomposition: dimZ1=%d, dimB1=%d, dimH1=%d", dimZ1, dimB1, dimH1)
 		}
+		U, B = U.Dense(), B.Dense()
 		systole := SystoleExhaustiveSearch(U, B, S.Verbose)
-		if systole < minWeight {
+		//log.Printf("xxx exhaustive search returned %d", systole)
+		if systole > 0 && systole < minWeight {
 			minWeight = systole
+			//log.Printf("xxx stopping")
 			return true
 		}
 		return false

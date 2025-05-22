@@ -679,6 +679,7 @@ func (C *ZComplex[T]) TriangularDepthGradedSubcomplexes(initialVertex ZVertex[T]
 	C.SortBasesByDistance(C.vertexIndex[initialVertex])
 	vertexIndicesToInclude := make(map[int]bool)
 	for i, t := range C.triangleBasis {
+		// log.Printf("xxx TGDS i=%d", i)
 		vertexIndicesToInclude[C.vertexIndex[t[0]]] = true
 		vertexIndicesToInclude[C.vertexIndex[t[1]]] = true
 		vertexIndicesToInclude[C.vertexIndex[t[2]]] = true
