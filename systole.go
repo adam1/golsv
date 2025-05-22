@@ -158,12 +158,25 @@ func NewSimplicialSystoleSearch[T any](C *ZComplex[T], verbose bool) *Simplicial
 	}
 }
 
-// xxx could potentially take UBDecomp from whole complex and downsample for each grade?
-func (S *SimplicialSystoleSearch[T]) Systole() int {
+func (S *SimplicialSystoleSearch[T]) Search() int {
+	minWeight := math.MaxInt
+	for i, v := range S.C.VertexBasis() {
+		if S.Verbose {
+			log.Printf("handling vertex %d", i)
+		}
+		w := S.SearchAtVertex(v)
+		if w < minWeight {
+			minWeight = w
+		}
+	}
+	return minWeight
+}
+
+// xxx optimization - reuse/extend UB from one grade to the next?
+func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 	found := false
 	minWeight := math.MaxInt
-	// xxx do this as the initial vertex for now; later over all vertices
-	S.C.TriangularDepthGradedSubcomplexes(S.C.VertexBasis()[0], func(depth int, subcomplex *ZComplex[T]) (stop bool) {
+	S.C.TriangularDepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T]) (stop bool) {
 		if S.Verbose {
 			log.Printf("handling subcomplex of triangle grade %d", depth)
 		}
@@ -177,7 +190,9 @@ func (S *SimplicialSystoleSearch[T]) Systole() int {
 		if systole > 0 && systole < minWeight {
 			minWeight = systole
 			found = true
-			//log.Printf("xxx stopping")
+			if S.Verbose {
+				log.Printf("stopping at triangle depth %d", depth)
+			}
 			return true
 		}
 		return false

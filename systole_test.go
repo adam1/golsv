@@ -193,8 +193,6 @@ func TestSystolePlanarTwoHoles(t *testing.T) {
 	}
 }
 
-// xxx construct example where scanning from single vertex gives wrong result
-
 func TestSimplicialSystoleSearchSmallExamples(t *testing.T) {
 	tests := []struct {
 		X               *ZComplex[ZVertexInt]
@@ -208,7 +206,7 @@ func TestSimplicialSystoleSearchSmallExamples(t *testing.T) {
 	for i, test := range tests {
 		verbose := false
 		S := NewSimplicialSystoleSearch(test.X, verbose)
-		gotSystole := S.Systole()
+		gotSystole := S.Search()
 		if gotSystole != test.ExpectedSystole {
 			t.Errorf("test %d: got=%d expected=%d", i, gotSystole, test.ExpectedSystole)
 		}
@@ -229,9 +227,40 @@ func TestSimplicialSystoleSearchCyclicGraphs(t *testing.T) {
 	for i := 3; i < maxLength; i++ {
 		X := cyclicGraphComplex(i)
 		S := NewSimplicialSystoleSearch(X, verbose)
-		gotSystole := S.Systole()
+		gotSystole := S.Search()
 		if gotSystole != i {
 			t.Errorf("test %d: got=%d expected=%d", i, gotSystole, i)
+		}
+	}
+}
+
+func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
+	verbose := false
+	// in this example, starting at vertex 0 finds a systole of 4,
+	// whereas starting at 2 finds a systole of 3.
+	X := NewZComplexFromMaximalSimplices([][]int{{0, 1, 4}, {1, 2, 5}, {2, 3, 6}, {0, 3, 7}, {2, 6, 8}, {2, 5, 9}, {5, 8, 9}})
+	{
+		S := NewSimplicialSystoleSearch(X, verbose)
+		got := S.SearchAtVertex(ZVertexInt(0))
+		expected := 4
+		if got != expected {
+			t.Errorf("test: got=%d expected=%d", got, expected)
+		}
+	}
+	{
+		S := NewSimplicialSystoleSearch(X, verbose)
+		got := S.SearchAtVertex(ZVertexInt(2))
+		expected := 3
+		if got != expected {
+			t.Errorf("test: got=%d expected=%d", got, expected)
+		}
+	}
+	{
+		S := NewSimplicialSystoleSearch(X, verbose)
+		got := S.Search()
+		expected := 3
+		if got != expected {
+			t.Errorf("test: got=%d expected=%d", got, expected)
 		}
 	}
 }
