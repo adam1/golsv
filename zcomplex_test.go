@@ -531,79 +531,70 @@ func TestZComplexNearerTriangleInNewIndex(t *testing.T) {
 
 func TestZComplexSortBasesByDistance(t *testing.T) {
 	tests := []struct {
-		C                     *ZComplex[ZVertexInt]
-		base                  int
-		expectedVertexBasis   []ZVertex[ZVertexInt]
-		expectedEdgeBasis     []ZEdge[ZVertexInt]
-		expectedTriangleBasis []ZTriangle[ZVertexInt]
+		simplices         [][]int
+		initialVertex     int
+		expectedVertices  []int
+		expectedEdges     [][2]int
+		expectedTriangles [][3]int
 	}{
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			[][]int{{0, 1, 2}},
 			0,
-			[]ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(0)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2))},
+			[]int{0, 1, 2},
+			[][2]int{{0, 1}, {2, 0}, {1, 2}},
+			[][3]int{{0, 1, 2}},
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {2, 3}}),
+			[][]int{{0, 1, 2}, {2, 3}},
 			0,
-			[]ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2), ZVertexInt(3)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(0)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(3))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2))},
+			[]int{0, 1, 2, 3},
+			[][2]int{{0, 1}, {2, 0}, {1, 2}, {2, 3}},
+			[][3]int{{0, 1, 2}},
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {2, 3, 4}}),
+			[][]int{{0, 1, 2}, {2, 3, 4}},
 			0,
-			[]ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2), ZVertexInt(3), ZVertexInt(4)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(0)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(3)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(4)),
-				NewZEdge[ZVertexInt](ZVertexInt(3), ZVertexInt(4))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)),
-				NewZTriangle[ZVertexInt](ZVertexInt(2), ZVertexInt(3), ZVertexInt(4))},
+			[]int{0, 1, 2, 3, 4},
+			[][2]int{{0, 1}, {0, 2}, {1, 2}, {2, 3}, {2, 4}, {3, 4}},
+			[][3]int{{0, 1, 2}, {2, 3, 4}},
 		},
 		{
-			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {2, 3, 4}}),
+			[][]int{{0, 1, 2}, {2, 3, 4}},
 			2,
-			[]ZVertex[ZVertexInt]{ZVertexInt(2), ZVertexInt(0), ZVertexInt(1), ZVertexInt(3), ZVertexInt(4)},
-			[]ZEdge[ZVertexInt]{
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(1), ZVertexInt(2)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(3)),
-				NewZEdge[ZVertexInt](ZVertexInt(2), ZVertexInt(4)),
-				NewZEdge[ZVertexInt](ZVertexInt(0), ZVertexInt(1)),
-				NewZEdge[ZVertexInt](ZVertexInt(3), ZVertexInt(4))},
-			[]ZTriangle[ZVertexInt]{
-				NewZTriangle[ZVertexInt](ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)),
-				NewZTriangle[ZVertexInt](ZVertexInt(2), ZVertexInt(3), ZVertexInt(4))},
+			[]int{2, 0, 1, 3, 4},
+			[][2]int{{0, 2}, {1, 2}, {2, 3}, {2, 4}, {0, 1}, {3, 4}},
+			[][3]int{{0, 1, 2}, {2, 3, 4}},
 		},
 	}
 	for n, test := range tests {
-		test.C.SortBasesByDistance(test.base)
-		gotVertexBasis := test.C.VertexBasis()
-		if !reflect.DeepEqual(gotVertexBasis, test.expectedVertexBasis) {
-			t.Errorf("Test %d: vertex basis: got=%v, expected=%v", n, gotVertexBasis, test.expectedVertexBasis)
+		// first, convert test data from bare ints
+		X := NewZComplexFromMaximalSimplices(test.simplices)
+
+		expectedVertexBasis := make([]ZVertex[ZVertexInt], len(test.expectedVertices))
+		for i, s := range test.expectedVertices {
+			expectedVertexBasis[i] = ZVertex[ZVertexInt](ZVertexInt(s))
 		}
-		gotEdgeBasis := test.C.EdgeBasis()
-		if !reflect.DeepEqual(gotEdgeBasis, test.expectedEdgeBasis) {
-			t.Errorf("Test %d: edge basis: got=%v, expected=%v", n, gotEdgeBasis, test.expectedEdgeBasis)
+		expectedEdgeBasis := make([]ZEdge[ZVertexInt], len(test.expectedEdges))
+		for i, s := range test.expectedEdges {
+			expectedEdgeBasis[i] = NewZEdge[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]))
 		}
-		gotTriangleBasis := test.C.TriangleBasis()
-		if !reflect.DeepEqual(gotTriangleBasis, test.expectedTriangleBasis) {
-			t.Errorf("Test %d: triangle basis: got=%v, expected=%v", n, gotTriangleBasis, test.expectedTriangleBasis)
+		expectedTriangleBasis := make([]ZTriangle[ZVertexInt], len(test.expectedTriangles))
+		for i, s := range test.expectedTriangles {
+			expectedTriangleBasis[i] = NewZTriangle[ZVertexInt](ZVertexInt(s[0]), ZVertexInt(s[1]), ZVertexInt(s[2]))
+		}
+
+		X.SortBasesByDistance(test.initialVertex)
+		gotVertexBasis := X.VertexBasis()
+		if !reflect.DeepEqual(gotVertexBasis, expectedVertexBasis) {
+			t.Errorf("Test %d: vertex basis: got=%v, expected=%v", n, gotVertexBasis, expectedVertexBasis)
+		}
+		gotEdgeBasis := X.EdgeBasis()
+		if !reflect.DeepEqual(gotEdgeBasis, expectedEdgeBasis) {
+			t.Errorf("Test %d: edge basis: got=%v, expected=%v", n, gotEdgeBasis, expectedEdgeBasis)
+		}
+		gotTriangleBasis := X.TriangleBasis()
+		if !reflect.DeepEqual(gotTriangleBasis, expectedTriangleBasis) {
+			t.Errorf("Test %d: triangle basis: got=%v, expected=%v", n, gotTriangleBasis, expectedTriangleBasis)
 		}
 	}
 }

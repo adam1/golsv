@@ -202,6 +202,8 @@ func TestSimplicialSystoleSearchSmallExamples(t *testing.T) {
 		{NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}), 0},
 		{sheetWithTwoHoles(), 3},
 		{torus(), 3},
+		{NewZComplexFromMaximalSimplices([][]int{{0}, {1}}), 0},       // disconnected
+		{NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {3}}), 0}, // disconnected
 	}
 	for i, test := range tests {
 		verbose := false
@@ -261,6 +263,47 @@ func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 		expected := 3
 		if got != expected {
 			t.Errorf("test: got=%d expected=%d", got, expected)
+		}
+	}
+}
+
+// TestSimplicialSystoleSearchRandomCliqueComplex creates random clique complexes,
+// computes the systole using both exhaustive search and simplicial search methods,
+// then verifies that both methods produce the same result.
+func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
+	trials := 1
+	maxVertices := 7
+	verbose := false
+
+	for trial := 0; trial < trials; trial++ {
+		numVertices := 4 + (trial % (maxVertices - 3))
+		// Use different edge probabilities for different trials
+		probEdge := 0.3 + 0.05*float64(trial)
+		if probEdge > 0.8 {
+			probEdge = 0.8
+		}
+		generator := NewRandomComplexGenerator(numVertices, verbose)
+		d1, d2, err := generator.RandomCliqueComplex(probEdge)
+		if err != nil {
+			t.Fatalf("Failed to generate random clique complex: %v", err)
+		}
+		X := NewZComplexFromBoundaryMatrices(d1, d2)
+		log.Printf("random clique complex: %s", X)
+
+		exhaustiveSystole, _, _, _ := ComputeFirstSystole(d1, d2, verbose)
+
+		S := NewSimplicialSystoleSearch(X, verbose)
+		simplicialSystole := S.Search()
+
+		if exhaustiveSystole != simplicialSystole {
+			t.Errorf("Trial %d: Mismatch between systole calculation methods - exhaustive=%d, simplicial=%d",
+				trial, exhaustiveSystole, simplicialSystole)
+			if verbose {
+				log.Printf("Complex with %d vertices, edge probability %.2f:",
+					numVertices, probEdge)
+				log.Printf("d1: %v", d1)
+				log.Printf("d2: %v", d2)
+			}
 		}
 	}
 }
