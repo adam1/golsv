@@ -691,15 +691,15 @@ func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 
 func (C *ZComplex[T]) TriangularDepthGradedSubcomplexes(initialVertex ZVertex[T],
 	handler func(depth int, subcomplex *ZComplex[T]) (stop bool)) {
-	C.SortBasesByDistance(C.vertexIndex[initialVertex])
+	Y := C.SortBasesByDistance(C.vertexIndex[initialVertex])
 	vertexIndicesToInclude := make(map[int]bool)
 	stop := false
-	for i, t := range C.triangleBasis {
+	for i, t := range Y.triangleBasis {
 		// log.Printf("xxx TGDS i=%d", i)
-		vertexIndicesToInclude[C.vertexIndex[t[0]]] = true
-		vertexIndicesToInclude[C.vertexIndex[t[1]]] = true
-		vertexIndicesToInclude[C.vertexIndex[t[2]]] = true
-		subcomplex := C.SubcomplexByVertices(vertexIndicesToInclude)
+		vertexIndicesToInclude[Y.vertexIndex[t[0]]] = true
+		vertexIndicesToInclude[Y.vertexIndex[t[1]]] = true
+		vertexIndicesToInclude[Y.vertexIndex[t[2]]] = true
+		subcomplex := Y.SubcomplexByVertices(vertexIndicesToInclude)
 		stop = handler(i, subcomplex)
 		if stop {
 			break
@@ -707,8 +707,8 @@ func (C *ZComplex[T]) TriangularDepthGradedSubcomplexes(initialVertex ZVertex[T]
 	}
 	if !stop {
 		// one last call that includes any vertices not already included
-		if len(vertexIndicesToInclude) < len(C.vertexBasis) {
-			handler(len(C.triangleBasis), C)
+		if len(vertexIndicesToInclude) < len(Y.vertexBasis) {
+			handler(len(Y.triangleBasis), Y)
 		}
 	}
 }

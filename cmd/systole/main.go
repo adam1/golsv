@@ -35,14 +35,14 @@ func main() {
 	args.ProfileArgs.Start()
 	defer args.ProfileArgs.Stop()
 
-	if args.D1File != "" {
-		doExhaustiveSystoleAndCosystoleSearchFromComplex(args)
+	if args.UFile != "" {
+		doSystoleSearchFromUB(args)
 	} else if args.SimplicialAtVertex >= 0 {
 		doSimplicialSystoleSearchAtFirstVertex(args)
 	} else if args.Simplicial {
 		doSimplicialSystoleSearch(args)
 	} else {
-		doSystoleSearchFromUB(args)
+		doExhaustiveSystoleAndCosystoleSearchFromComplex(args)
 	}
 }
 
