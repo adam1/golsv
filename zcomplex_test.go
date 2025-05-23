@@ -403,6 +403,57 @@ func TestZComplexDualComplex(t *testing.T) {
 	}
 }
 
+func TestZComplexMaximalSimplicesString(t *testing.T) {
+	tests := []struct {
+		C        *ZComplex[ZVertexInt]
+		Expected string
+	}{
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}),
+			"[][]int{{0, 1, 2}}",
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}}),
+			"[][]int{{0, 1, 2}, {0, 1, 3}}",
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0}, {1, 2}, {0, 1, 3}}),
+			"[][]int{{0, 1, 3}, {1, 2}}",
+		},
+	}
+	for n, test := range tests {
+		got := test.C.MaximalSimplicesString()
+		if got != test.Expected {
+			t.Errorf("Test %d: got=%v, expected=%v", n, got, test.Expected)
+		}
+	}
+}
+
+func TestZComplexMaximalSimplicesStringRandom(t *testing.T) {
+	trials := 10
+	maxVertices := 10
+	verbose := false
+	for i := 0; i < trials; i++ {
+		numVertices := 3 + rand.Intn(maxVertices)
+		probEdge := 0.3
+		generator := NewRandomComplexGenerator(numVertices, verbose)
+		d1, d2, err := generator.RandomCliqueComplex(probEdge)
+		if err != nil {
+			t.Fatalf("Failed to generate random clique complex: %v", err)
+		}
+		X := NewZComplexFromBoundaryMatrices(d1, d2)
+		s := X.MaximalSimplicesString()
+		simplices, err := parseSimplicesString(s)
+		if err != nil {
+			t.Fatalf("Failed to parse simplices string: %v", err)
+		}
+		Y := NewZComplexFromMaximalSimplices(simplices)
+		if !reflect.DeepEqual(X, Y) {
+			t.Errorf("Test %d: got=%v, expected=%v", i, X, Y)
+		}
+	}
+}
+
 func TestZComplexNewFromBoundaryMaps(t *testing.T) {
 	tests := []struct {
 		d_1      BinaryMatrix

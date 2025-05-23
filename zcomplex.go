@@ -2,9 +2,11 @@ package golsv
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 )
 
 // this file models a 2-d simplicial complex.  it was originally
@@ -434,6 +436,88 @@ func (C *ZComplex[T]) Fill3Cliques() {
 		t := NewZTriangle(c[0], c[1], c[2])
 		C.triangleBasis = append(C.triangleBasis, t)
 	})
+}
+
+func (C *ZComplex[T]) MaximalSimplicesString() string {
+	seenVertices := make(map[ZVertex[T]]struct{})
+	seenEdges := make(map[ZEdge[T]]struct{})
+	var buf bytes.Buffer
+	buf.WriteString("[][]int{")
+	n := 0
+	for _, t := range C.triangleBasis {
+		if n != 0 {
+			buf.WriteString(", ")
+		}
+		n++
+		buf.WriteString("{")
+		for i, v := range t {
+			seenVertices[v] = struct{}{}
+			if i != 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(v.String())
+		}
+		buf.WriteString("}")
+		for _, e := range t.Edges() {
+			seenEdges[e] = struct{}{}
+		}
+	}
+	for _, e := range C.edgeBasis {
+		if _, ok := seenEdges[e]; ok {
+			continue
+		}
+		if n != 0 {
+			buf.WriteString(", ")
+		}
+		n++
+		buf.WriteString("{")
+		for i, v := range e {
+			seenVertices[v] = struct{}{}
+			if i != 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(v.String())
+		}
+		buf.WriteString("}")
+	}
+	for _, v := range C.vertexBasis {
+		if _, ok := seenVertices[v]; ok {
+			continue
+		}
+		if n != 0 {
+			buf.WriteString(", ")
+		}
+		n++
+		buf.WriteString(fmt.Sprintf("{%s}", v.String()))
+	}
+	buf.WriteString("}")
+	return buf.String()
+}
+
+func parseSimplicesString(s string) (simplices [][]int, err error) {
+	// this is slightly weird AI code, but it is good enough.
+	// parse the string into a slice of slices of ints.
+	// the string is of the form [][]int{{1, 2}, {3, 4, 5}, {6}}
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "[][]int{") || !strings.HasSuffix(s, "}") {
+		return nil, fmt.Errorf("invalid simplices string format: expected prefix '[][]int{' and suffix '}'")
+	}
+	// Remove the "[][]int" prefix.
+	jsonStr := strings.TrimPrefix(s, "[][]int")
+	// Replace Go-style slice braces with JSON-style array brackets.
+	jsonStr = strings.ReplaceAll(jsonStr, "{", "[")
+	jsonStr = strings.ReplaceAll(jsonStr, "}", "]")
+	// Handle the case of an empty top-level list like "[][]int{}" which becomes "[]"
+	// or a list with an empty inner list like "[][]int{{}}" which becomes "[[]]"
+	if jsonStr == "" && s == "[][]int{}" { // Original string was exactly "[][]int{}"
+		jsonStr = "[]"
+	}
+	err = json.Unmarshal([]byte(jsonStr), &simplices)
+	if err != nil {
+		// Provide context for debugging
+		return nil, fmt.Errorf("failed to unmarshal JSON from transformed string '%s' (derived from '%s'): %w", jsonStr, s, err)
+	}
+	return
 }
 
 func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
