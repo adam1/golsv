@@ -199,15 +199,17 @@ func TestSimplicialSystoleSearchSmallExamples(t *testing.T) {
 		X               *ZComplex[ZVertexInt]
 		ExpectedSystole int
 	}{
-		{NewZComplexFromMaximalSimplices([][]int{{0, 1}, {0, 2}, {1, 2}}), 3},
-		{NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}), 0},
-		{sheetWithTwoHoles(), 3},
-		{torus(), 3},
-		{NewZComplexFromMaximalSimplices([][]int{{0}, {1}}), 0},       // disconnected
-		{NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {3}}), 0}, // disconnected
+		// {NewZComplexFromMaximalSimplices([][]int{{0, 1}, {0, 2}, {1, 2}}), 3},
+		// {NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}), 0},
+		// {sheetWithTwoHoles(), 3},
+		// {torus(), 3},
+		// {NewZComplexFromMaximalSimplices([][]int{{0}, {1}}), 0},       // disconnected
+		// {NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {3}}), 0}, // disconnected
+		// xxx this one triggers a bug either in the exhaustive search or the simplicial search, TBD which is correct, if either.
+		{NewZComplexFromMaximalSimplices([][]int{{0, 3, 7}, {0, 6, 9}, {2, 6, 9}, {3, 5, 7}, {1, 2}, {2, 5}, {3, 4}, {4, 6}, {8, 9}}), 4},
 	}
 	for i, test := range tests {
-		verbose := false
+		verbose := true
 		S := NewSimplicialSystoleSearch(test.X, verbose)
 		gotSystole := S.Search()
 		if gotSystole != test.ExpectedSystole {
@@ -272,7 +274,7 @@ func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 // computes the systole using both exhaustive search and simplicial search methods,
 // then verifies that both methods produce the same result.
 func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
-	trials := 10
+	trials := 100
 	maxVertices := 10
 	verbose := false
 
@@ -292,12 +294,12 @@ func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 		S := NewSimplicialSystoleSearch(X, verbose)
 		simplicialSystole := S.Search()
 
+		// xxx TBD resolving errors here.  the simplicial systole search
+		// is only guaranteed to find the systole under certain conditions.
 		if exhaustiveSystole != simplicialSystole {
 			t.Errorf("Trial %d: Mismatch between systole search methods - exhaustive=%d, simplicial=%d",
 				trial, exhaustiveSystole, simplicialSystole)
-			log.Printf("Complex with %d vertices, edge probability %.2f:", numVertices, probEdge)
-			log.Printf("d1: %v", d1)
-			log.Printf("d2: %v", d2)
+			log.Printf("complex: %s", X.MaximalSimplicesString())
 		}
 	}
 }

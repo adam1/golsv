@@ -107,7 +107,7 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 			if weight < minWeight {
 				minWeight = weight
 				if verbose {
-					log.Printf("new min weight: %d", minWeight)
+					log.Printf("exhaustive search; new min weight: %d", minWeight)
 					//log.Printf("xxx c: %s", sum.ColumnVector(0).SupportString())
 				}
 			}
@@ -159,14 +159,17 @@ func NewSimplicialSystoleSearch[T any](C *ZComplex[T], verbose bool) *Simplicial
 }
 
 func (S *SimplicialSystoleSearch[T]) Search() int {
-	minWeight := math.MaxInt
+	minWeight := 0
 	for i, v := range S.C.VertexBasis() {
 		if S.Verbose {
-			log.Printf("handling vertex %d", i)
+			log.Printf("doing simplicial search at vertex %d", i)
 		}
 		w := S.SearchAtVertex(v)
-		if w < minWeight {
+		if w > 0 && (w < minWeight || minWeight == 0) {
 			minWeight = w
+		}
+		if S.Verbose {
+			log.Printf("finished simplicial search at vertex %d; min weight: %d", i, minWeight)
 		}
 	}
 	return minWeight
@@ -174,31 +177,29 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 
 // xxx optimization - reuse/extend UB from one grade to the next?
 func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
-	found := false
-	minWeight := math.MaxInt
+	minWeight := 0
 	S.C.TriangularDepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T]) (stop bool) {
 		if S.Verbose {
-			log.Printf("handling subcomplex of triangle grade %d", depth)
+			log.Printf("checking subcomplex of triangle grade %d", depth)
+			//log.Printf("xxx subcomplex: %s", subcomplex.MaximalSimplicesString())
 		}
-		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), S.Verbose)
+		ubVerbose := false
+		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
 		if S.Verbose {
-			log.Printf("UBDecomposition: dimZ1=%d, dimB1=%d, dimH1=%d", dimZ1, dimB1, dimH1)
+			log.Printf("dimZ1=%d dimB1=%d dimH1=%d", dimZ1, dimB1, dimH1)
 		}
 		U, B = U.Dense(), B.Dense()
-		systole := SystoleExhaustiveSearch(U, B, S.Verbose)
-		//log.Printf("xxx exhaustive search returned %d", systole)
-		if systole > 0 && systole < minWeight {
-			minWeight = systole
-			found = true
+		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
+		//log.Printf("xxx exhaustive search returned %d; minWeight=%d", localSystole, minWeight)
+		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
+			minWeight = localSystole
+			//log.Printf("xxx here min weight %d", minWeight)
 			if S.Verbose {
-				log.Printf("stopping at triangle depth %d", depth)
+				log.Printf("stopping at triangle grade %d", depth)
 			}
 			return true
 		}
 		return false
 	})
-	if found {
-		return minWeight
-	}
-	return 0
+	return minWeight
 }
