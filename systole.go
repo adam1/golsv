@@ -178,28 +178,52 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 // xxx optimization - reuse/extend UB from one grade to the next?
 func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 	minWeight := 0
+	var nprev, mprev int
+	nmDeltas := make(map[string]int)
 	S.C.TriangularDepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T]) (stop bool) {
 		if S.Verbose {
-			log.Printf("checking subcomplex of triangle grade %d", depth)
+			//log.Printf("checking subcomplex of triangle grade %d", depth)
 			//log.Printf("xxx subcomplex: %s", subcomplex.MaximalSimplicesString())
 		}
-		ubVerbose := false
-		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
-		if S.Verbose {
-			log.Printf("dimZ1=%d dimB1=%d dimH1=%d", dimZ1, dimB1, dimH1)
+
+		// xxx experimental: take note of the number of vertices and edges added at each stage.  call it (n, m).
+		n, m := subcomplex.NumVertices(), subcomplex.NumEdges()
+		ndelta, mdelta := n-nprev, m-mprev
+		//log.Printf("xxx added (n, m) vertices and edges: (%d, %d)", ndelta, mdelta)
+		tag := fmt.Sprintf("%d,%d", ndelta, mdelta)
+		if _, ok := nmDeltas[tag]; !ok {
+			log.Printf("xxx first time seeing (n, m) delta (%s); at depth %d", tag, depth)
 		}
-		U, B = U.Dense(), B.Dense()
-		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
-		//log.Printf("xxx exhaustive search returned %d; minWeight=%d", localSystole, minWeight)
-		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
-			minWeight = localSystole
-			//log.Printf("xxx here min weight %d", minWeight)
+		nmDeltas[tag]++
+		nprev, mprev = n, m
+
+		// xxx temporarily disabled
+		if false {
+			ubVerbose := false
+			U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
 			if S.Verbose {
-				log.Printf("stopping at triangle grade %d", depth)
+				log.Printf("dimZ1=%d dimB1=%d dimH1=%d", dimZ1, dimB1, dimH1)
 			}
-			return true
+			U, B = U.Dense(), B.Dense()
+			localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
+			//log.Printf("xxx exhaustive search returned %d; minWeight=%d", localSystole, minWeight)
+			if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
+				minWeight = localSystole
+				//log.Printf("xxx here min weight %d", minWeight)
+				if S.Verbose {
+					log.Printf("stopping at triangle grade %d", depth)
+				}
+				return true
+			}
 		}
 		return false
 	})
+	// xxx dump nmDeltas
+	if S.Verbose {
+		log.Printf("xxx number of (n, m) deltas: %d", len(nmDeltas))
+		for k, v := range nmDeltas {
+			log.Printf("xxx (n, m) delta %s: %d", k, v)
+		}
+	}
 	return minWeight
 }

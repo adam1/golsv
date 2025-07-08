@@ -8,15 +8,16 @@ import (
 	"os"
 )
 
-// Usage 1 (given matrices B and U (see systole.go for their meaning):
+// Usage 1: given matrices B and U (see systole.go for their meaning)
 //
 //   systole -trials N -B B.txt -U U.txt -systole S1.txt
 //
-// Usage 2 (given boundary matrices D1 and D2:
+// Usage 2: (given boundary matrices D1 and D2:
 //
 //   systole -d1 D1.txt -d2 D2.txt -systole S1.txt -cosystole S^1.txt
 //
-// The program reads BinaryMatrix B and U in sparse column support
+// For usage 1 and 2,
+// the program reads BinaryMatrix B and U in sparse column support
 // format.  First, it checks the weight of each column of U.  The
 // minimum weight is an upper bound for the minimum weight of a
 // nonzero vector Z_1 \setminus B_1. (see the align program.)
@@ -29,6 +30,15 @@ import (
 // measures the weight of the resulting vector.  Repeatedly doing
 // this, it records the minimum found to min.txt, which is overwritten
 // each time a new minimum is found.
+//
+// Usage 3: simplicial systole search at given vertex
+//
+//   systole -simplicial-at-vertex 0 -d1 D1.txt -d2 D2.txt -systole S1.txt
+//
+// Usage 4: simplicial systole search (global)
+//
+//   systole -simplicial -d1 D1.txt -d2 D2.txt -systole S1.txt
+//
 
 func main() {
 	args := parseFlags()
@@ -38,7 +48,7 @@ func main() {
 	if args.UFile != "" {
 		doSystoleSearchFromUB(args)
 	} else if args.SimplicialAtVertex >= 0 {
-		doSimplicialSystoleSearchAtFirstVertex(args)
+		doSimplicialSystoleSearchAtVertex(args)
 	} else if args.Simplicial {
 		doSimplicialSystoleSearch(args)
 	} else {
@@ -70,10 +80,10 @@ func doSimplicialSystoleSearch(args *Args) {
 	log.Printf("done; minimum weight found is %d", weight)
 }
 
-func doSimplicialSystoleSearchAtFirstVertex(args *Args) {
+func doSimplicialSystoleSearchAtVertex(args *Args) {
 	X := complexFromBoundaryMatrices(args)
 	S := golsv.NewSimplicialSystoleSearch(X, args.Verbose)
-	weight := S.SearchAtVertex(X.VertexBasis()[0])
+	weight := S.SearchAtVertex(X.VertexBasis()[args.SimplicialAtVertex])
 	if args.SystoleFile != "" {
 		writeIntegerFile(weight, args.SystoleFile)
 	}
