@@ -108,7 +108,7 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 				minWeight = weight
 				if verbose {
 					log.Printf("exhaustive search; new min weight: %d", minWeight)
-					//log.Printf("xxx c: %s", sum.ColumnVector(0).SupportString())
+					//log.Printf("c: %s", sum.ColumnVector(0).SupportString())
 				}
 			}
 			return true
@@ -190,7 +190,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 	S.C.TriangularDepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T]) (stop bool) {
 		if S.Verbose {
 			//log.Printf("checking subcomplex of triangle grade %d", depth)
-			//log.Printf("xxx subcomplex: %s", subcomplex.MaximalSimplicesString())
+			//log.Printf("subcomplex: %s", subcomplex.MaximalSimplicesString())
 		}
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)

@@ -674,7 +674,7 @@ func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
 			continue
 		}
 		Xoriginal := NewZComplexFromBoundaryMatrices(d_1, d_2)
-		//log.Printf("xxx Xoriginal:\n%s", Xoriginal.DumpBases())
+		//log.Printf("Xoriginal:\n%s", Xoriginal.DumpBases())
 		initialVertex := rand.Intn(len(Xoriginal.VertexBasis()))
 
 		var Xsorted *ZComplex[ZVertexInt]
@@ -686,7 +686,7 @@ func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
 			}()
 			Xsorted = Xoriginal.SortBasesByDistance(initialVertex)
 		}()
-		//log.Printf("xxx XSorted:\n%s", Xsorted.DumpBases())
+		//log.Printf("XSorted:\n%s", Xsorted.DumpBases())
 
 		// simple check that the bases have the same elements (ignoring order)
 		resortedVertices := make([]ZVertex[ZVertexInt], len(Xsorted.VertexBasis()))
@@ -699,7 +699,7 @@ func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
 		copy(resortedTriangles, Xsorted.TriangleBasis())
 
 		Xresorted := NewZComplex(resortedVertices, resortedEdges, resortedTriangles, true, verbose)
-		//log.Printf("xxx XResorted:\n%s", Xresorted.DumpBases())
+		//log.Printf("XResorted:\n%s", Xresorted.DumpBases())
 
 		if !reflect.DeepEqual(Xoriginal.VertexBasis(), Xresorted.VertexBasis()) {
 			t.Errorf("Trial %d: Vertex bases are not equal (ignoring order)", i)

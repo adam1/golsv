@@ -310,7 +310,7 @@ func DisabledTestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 			t.Fatalf("Failed to generate random clique complex: %v", err)
 		}
 		X := NewZComplexFromBoundaryMatrices(d1, d2)
-		//log.Printf("xxx random clique complex: %s", X)
+		//log.Printf("random clique complex: %s", X)
 
 		exhaustiveSystole, _, _, _ := ComputeFirstSystole(d1, d2, verbose)
 
