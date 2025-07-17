@@ -121,7 +121,7 @@ func TestZTriangleSetEqual(t *testing.T) {
 	}
 }
 
-func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
+func TestZComplexDepthFiltration(t *testing.T) {
 	type data struct {
 		Depth           int
 		Subcomplex      *ZComplex[ZVertexInt]
@@ -150,7 +150,7 @@ func TestZComplexDepthGradedSubcomplexes(t *testing.T) {
 	for n, test := range tests {
 		got := make([]data, 0)
 		initialVertex := test.C.VertexBasis()[0]
-		test.C.DepthGradedSubcomplexes(initialVertex, func(depth int, subcomplex *ZComplex[ZVertexInt], verticesAtDepth []ZVertex[ZVertexInt]) {
+		test.C.DepthFiltration(initialVertex, func(depth int, subcomplex *ZComplex[ZVertexInt], verticesAtDepth []ZVertex[ZVertexInt]) {
 			got = append(got, data{
 				Depth:           depth,
 				Subcomplex:      subcomplex,

@@ -268,7 +268,7 @@ func (C *ZComplex[T]) D2() BinaryMatrix {
 	return C.d2
 }
 
-func (C *ZComplex[T]) DepthGradedSubcomplexes(initialVertex ZVertex[T],
+func (C *ZComplex[T]) DepthFiltration(initialVertex ZVertex[T],
 	handler func(depth int, subcomplex *ZComplex[T], verticesAtDepth []ZVertex[T])) {
 	vertexIndicesToInclude := make(map[int]bool)
 	curDepth := 0

@@ -18,22 +18,22 @@ import (
 //   complex
 
 type ComplexArgs struct {
-	D1File                  string
-	D2File                  string
-	DualComplex             bool
-	EdgeBasisFile           string
-	DepthGradedSubcomplexes bool
-	GraphvizFile            string
-	SubcomplexByDepth       int
-	SubcomplexByEdgesFile   string
-	OutComplexD1File        string
-	OutComplexD2File        string
-	OutVertexBasisFile      string
-	OutEdgeBasisFile        string
-	OutTriangleBasisFile    string
-	TriangleBasisFile       string
-	Verbose                 bool
-	VertexBasisFile         string
+	D1File                string
+	D2File                string
+	DualComplex           bool
+	EdgeBasisFile         string
+	DepthFiltration       bool
+	GraphvizFile          string
+	SubcomplexByDepth     int
+	SubcomplexByEdgesFile string
+	OutComplexD1File      string
+	OutComplexD2File      string
+	OutVertexBasisFile    string
+	OutEdgeBasisFile      string
+	OutTriangleBasisFile  string
+	TriangleBasisFile     string
+	Verbose               bool
+	VertexBasisFile       string
 	golsv.ProfileArgs
 }
 
@@ -44,7 +44,7 @@ func parseFlags() ComplexArgs {
 	flag.StringVar(&args.D2File, "d2", "", "The file containing the D2 boundary matrix")
 	flag.BoolVar(&args.DualComplex, "dual-complex", false, "Compute the dual complex (see zcomplex.go for precise definition)")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", "", "The file containing the edge basis")
-	flag.BoolVar(&args.DepthGradedSubcomplexes, "depth-graded-subcomplexes", false, "Compute all graded subcomplexes by depth; output filenames will have '-d' appended with d=depth")
+	flag.BoolVar(&args.DepthFiltration, "depth-filtration", false, "Compute filtration subcomplexes by depth; output filenames will have '-d' appended with d=depth")
 	flag.StringVar(&args.GraphvizFile, "graphviz", "", "The file to write the graphviz output to")
 	flag.IntVar(&args.SubcomplexByDepth, "subcomplex-depth", -1, "The depth of the subcomplex to extract by BFS from first vertex")
 	flag.StringVar(&args.SubcomplexByEdgesFile, "subcomplex-by-edges-matrix", "", "The input matrix file whose columns define edges to include in the subcomplex")
@@ -66,8 +66,8 @@ func parseFlags() ComplexArgs {
 		fmt.Println("subcomplex-depth and subcomplex-by-edges-matrix are mutually exclusive")
 		flag.PrintDefaults()
 	}
-	if args.SubcomplexByDepth > 0 && args.DepthGradedSubcomplexes {
-		fmt.Println("subcomplex-depth and depth-graded-subcomplexes are mutually exclusive")
+	if args.SubcomplexByDepth > 0 && args.DepthFiltration {
+		fmt.Println("subcomplex-depth and depth-filtration are mutually exclusive")
 		flag.PrintDefaults()
 	}
 	if args.SubcomplexByEdgesFile != "" && args.EdgeBasisFile == "" {
@@ -109,14 +109,14 @@ func handleComplexByBoundaryMatrices(args ComplexArgs) {
 		}
 		writeOutputComplex(subcomplex, args)
 		complex = subcomplex
-	} else if args.DepthGradedSubcomplexes {
+	} else if args.DepthFiltration {
 		if args.Verbose {
-			log.Printf("creating graded subcomplexes by depth")
+			log.Printf("creating depth filtration subcomplexes")
 		}
 		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ZVertexInt], verticesAtDepth []golsv.ZVertex[golsv.ZVertexInt]) {
-			writeGradedSubcomplex(subcomplex, args, depth)
+			writeDepthSubcomplex(subcomplex, args, depth)
 		}
-		complex.DepthGradedSubcomplexes(complex.VertexBasis()[0], h)
+		complex.DepthFiltration(complex.VertexBasis()[0], h)
 	}
 	if args.GraphvizFile != "" {
 		golsv.WriteComplexGraphvizFile(complex, args.GraphvizFile, args.Verbose)
@@ -147,14 +147,14 @@ func handleComplexByBases(args ComplexArgs) {
 		}
 		writeOutputComplex(subcomplex, args)
 		complex = subcomplex
-	} else if args.DepthGradedSubcomplexes {
+	} else if args.DepthFiltration {
 		if args.Verbose {
-			log.Printf("creating graded subcomplexes by depth")
+			log.Printf("creating depth filtration subcomplexes")
 		}
 		h := func(depth int, subcomplex *golsv.ZComplex[golsv.ElementCalG], verticesAtDepth []golsv.ZVertex[golsv.ElementCalG]) {
-			writeGradedSubcomplex(subcomplex, args, depth)
+			writeDepthSubcomplex(subcomplex, args, depth)
 		}
-		complex.DepthGradedSubcomplexes(complex.VertexBasis()[0], h)
+		complex.DepthFiltration(complex.VertexBasis()[0], h)
 	} else if args.DualComplex {
 		if args.Verbose {
 			log.Printf("computing dual complex")
@@ -267,7 +267,7 @@ func writeOutputComplex[T any](outComplex *golsv.ZComplex[T], args ComplexArgs) 
 	}
 }
 
-func writeGradedSubcomplex[T any](subcomplex *golsv.ZComplex[T], args ComplexArgs, depth int) {
+func writeDepthSubcomplex[T any](subcomplex *golsv.ZComplex[T], args ComplexArgs, depth int) {
 	if args.Verbose {
 		log.Printf("created subcomplex %s at depth %d", subcomplex, depth)
 	}
