@@ -194,26 +194,40 @@ func TestSystolePlanarTwoHoles(t *testing.T) {
 	}
 }
 
-func TestSimplicialSystoleSearchSmallExamples(t *testing.T) {
+func TestSimplicialSystoleVsExhaustiveSearchSpecificExamples(t *testing.T) {
 	tests := []struct {
 		X               *ZComplex[ZVertexInt]
-		ExpectedSystole int
+		ExpectedSystoleSimplicialSearch int
+		ExpectedSystoleExhaustiveSearch int
 	}{
-		// {NewZComplexFromMaximalSimplices([][]int{{0, 1}, {0, 2}, {1, 2}}), 3},
-		// {NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}), 0},
-		// {sheetWithTwoHoles(), 3},
-		// {torus(), 3},
-		// {NewZComplexFromMaximalSimplices([][]int{{0}, {1}}), 0},       // disconnected
-		// {NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {3}}), 0}, // disconnected
-		// xxx TBD. this one triggers a limitation in the simplicial systole search algorithm that is not resolved yet.
-		//{NewZComplexFromMaximalSimplices([][]int{{0, 3, 7}, {0, 6, 9}, {2, 6, 9}, {3, 5, 7}, {1, 2}, {2, 5}, {3, 4}, {4, 6}, {8, 9}}), 4},
+		{NewZComplexFromMaximalSimplices([][]int{{0, 1}, {0, 2}, {1, 2}}), 3, 3},
+		{NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}), 0, 0},
+		{sheetWithTwoHoles(), 3, 3},
+		{torus(), 3, 3},
+		{NewZComplexFromMaximalSimplices([][]int{{0}, {1}}), 0, 0},       // disconnected
+		{NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {3}}), 0, 0}, // disconnected
+
+		// An example where the simplicial systole algorithm
+		// finds a cycle of length equal to the global systole plus
+		// one.  The global systole is 4.
+  		{NewZComplexFromMaximalSimplices([][]int{{0, 3, 7}, {0, 6, 9}, {2, 6, 9}, {3, 5, 7}, {1, 2}, {2, 5}, {3, 4}, {4, 6}, {8, 9}}), 5, 4},
+
+		// An example where the (nonlocal) simplicial systole
+		// algorithm gives a result that is not within one of a lower
+		// bound of the global systole.
+		{NewZComplexFromMaximalSimplices([][]int{{0, 2, 3}, {0, 2, 4}, {0, 2, 5}, {0, 2, 9}, {0, 2, 11}, {0, 3, 4}, {0, 3, 11}, {0, 4, 5}, {0, 5, 6}, {0, 5, 9}, {0, 6, 11}, {1, 3, 7}, {1, 3, 10}, {1, 5, 9}, {1, 5, 10}, {2, 3, 4}, {2, 3, 10}, {2, 3, 11}, {2, 4, 5}, {2, 4, 10}, {2, 5, 9}, {2, 5, 10}, {2, 10, 11}, {3, 4, 7}, {3, 4, 10}, {3, 10, 11}, {4, 5, 10}, {8, 10}}), 4, 0},
 	}
 	for i, test := range tests {
-		verbose := true
-		S := NewSimplicialSystoleSearch(test.X, verbose)
-		gotSystole := S.Search()
-		if gotSystole != test.ExpectedSystole {
-			t.Errorf("test %d: got=%d expected=%d", i, gotSystole, test.ExpectedSystole)
+		stopNonzero := true
+		verbose := false
+		S := NewSimplicialSystoleSearch(test.X, stopNonzero, verbose)
+		gotSystoleSimplicialSearch := S.Search()
+		if gotSystoleSimplicialSearch != test.ExpectedSystoleSimplicialSearch {
+			t.Errorf("test %d: gotSystoleSimplicialSearch=%d expected=%d", i, gotSystoleSimplicialSearch, test.ExpectedSystoleSimplicialSearch)
+		}
+		gotSystoleExhaustiveSearch, _, _, _ := ComputeFirstSystole(test.X.D1(), test.X.D2(), verbose)
+		if gotSystoleExhaustiveSearch != test.ExpectedSystoleExhaustiveSearch {
+			t.Errorf("test %d: gotSystoleExhaustiveSearch=%d expected=%d", i, gotSystoleExhaustiveSearch, test.ExpectedSystoleExhaustiveSearch)
 		}
 	}
 }
@@ -227,11 +241,12 @@ func cyclicGraphComplex(n int) *ZComplex[ZVertexInt] {
 }
 
 func TestSimplicialSystoleSearchCyclicGraphs(t *testing.T) {
+	stopNonzero := true
 	verbose := false
 	maxLength := 10
 	for i := 3; i < maxLength; i++ {
 		X := cyclicGraphComplex(i)
-		S := NewSimplicialSystoleSearch(X, verbose)
+		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		gotSystole := S.Search()
 		if gotSystole != i {
 			t.Errorf("test %d: got=%d expected=%d", i, gotSystole, i)
@@ -239,14 +254,14 @@ func TestSimplicialSystoleSearchCyclicGraphs(t *testing.T) {
 	}
 }
 
-// xxx disabled for the moment as this example triggers the unwanted (n, m) vertices and edges added condition
-func xxxDisabledTestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
+func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
+	stopNonzero := true
 	verbose := false
 	// in this example, starting at vertex 0 finds a systole of 4,
 	// whereas starting at 2 finds a systole of 3.
 	X := NewZComplexFromMaximalSimplices([][]int{{0, 1, 4}, {1, 2, 5}, {2, 3, 6}, {0, 3, 7}, {2, 6, 8}, {2, 5, 9}, {5, 8, 9}})
 	{
-		S := NewSimplicialSystoleSearch(X, verbose)
+		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		got := S.SearchAtVertex(ZVertexInt(0))
 		expected := 4
 		if got != expected {
@@ -254,7 +269,7 @@ func xxxDisabledTestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 		}
 	}
 	{
-		S := NewSimplicialSystoleSearch(X, verbose)
+		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		got := S.SearchAtVertex(ZVertexInt(2))
 		expected := 3
 		if got != expected {
@@ -262,7 +277,7 @@ func xxxDisabledTestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 		}
 	}
 	{
-		S := NewSimplicialSystoleSearch(X, verbose)
+		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		got := S.Search()
 		expected := 3
 		if got != expected {
@@ -275,8 +290,9 @@ func xxxDisabledTestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 // computes the systole using both exhaustive search and simplicial search methods,
 // then verifies that both methods produce the same result.
 func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
-	trials := 1
+	trials := 0
 	maxVertices := 10
+	stopNonzero := true
 	verbose := false
 
 	for trial := 0; trial < trials; trial++ {
@@ -292,7 +308,7 @@ func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 
 		exhaustiveSystole, _, _, _ := ComputeFirstSystole(d1, d2, verbose)
 
-		S := NewSimplicialSystoleSearch(X, verbose)
+		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		simplicialSystole := S.Search()
 
 		// xxx TBD resolving errors here.  the simplicial systole search

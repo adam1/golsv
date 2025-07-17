@@ -146,15 +146,19 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	return SystoleExhaustiveSearch(U, B, verbose)
 }
 
+// The simplicial systole search algorithm is not guaranteed to find
+// the global systole in all cases.  See thesis for details.
 type SimplicialSystoleSearch[T any] struct {
-	C       *ZComplex[T]
-	Verbose bool
+	C           *ZComplex[T]
+	StopNonzero bool
+	Verbose     bool
 }
 
-func NewSimplicialSystoleSearch[T any](C *ZComplex[T], verbose bool) *SimplicialSystoleSearch[T] {
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
 	return &SimplicialSystoleSearch[T]{
-		C:       C,
-		Verbose: verbose,
+		C:           C,
+		StopNonzero: stopNonzero,
+		Verbose:     verbose,
 	}
 }
 
@@ -162,7 +166,7 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 	minWeight := 0
 	for i, v := range S.C.VertexBasis() {
 		if S.Verbose {
-			log.Printf("doing simplicial search at vertex %d", i)
+			log.Printf("Complex: %s\ndoing simplicial search at vertex %d", S.C, i)
 		}
 		w := S.SearchAtVertex(v)
 		if w > 0 && (w < minWeight || minWeight == 0) {
@@ -186,19 +190,20 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
 		if S.Verbose {
-			log.Printf("dimZ1=%d dimB1=%d dimH1=%d", dimZ1, dimB1, dimH1)
+			log.Printf("depth=%d dimZ1=%d dimB1=%d dimH1=%d", depth, dimZ1, dimB1, dimH1)
 		}
 		U, B = U.Dense(), B.Dense()
 		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
-		//log.Printf("xxx exhaustive search returned %d; minWeight=%d", localSystole, minWeight)
 		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
 			minWeight = localSystole
-			//log.Printf("xxx here min weight %d", minWeight)
-			if S.Verbose {
-				log.Printf("stopping at triangle grade %d", depth)
+			if S.StopNonzero {
+				if S.Verbose {
+					log.Printf("stopping at triangle grade %d", depth)
+				}
+				return true
 			}
-			return true
 		}
+
 		return false
 	})
 	return minWeight

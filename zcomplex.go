@@ -773,6 +773,7 @@ func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 	return C.triangleBasis
 }
 
+// xxx rename TriangularDepthFiltration
 func (C *ZComplex[T]) TriangularDepthGradedSubcomplexes(initialVertex ZVertex[T],
 	handler func(depth int, subcomplex *ZComplex[T]) (stop bool)) {
 	Y := C.SortBasesByDistance(C.vertexIndex[initialVertex])
