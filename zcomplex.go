@@ -773,14 +773,12 @@ func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 	return C.triangleBasis
 }
 
-// xxx rename TriangularDepthFiltration
-func (C *ZComplex[T]) TriangularDepthGradedSubcomplexes(initialVertex ZVertex[T],
+func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
 	handler func(depth int, subcomplex *ZComplex[T]) (stop bool)) {
 	Y := C.SortBasesByDistance(C.vertexIndex[initialVertex])
 	vertexIndicesToInclude := make(map[int]bool)
 	stop := false
 	for i, t := range Y.triangleBasis {
-		// log.Printf("xxx TGDS i=%d", i)
 		vertexIndicesToInclude[Y.vertexIndex[t[0]]] = true
 		vertexIndicesToInclude[Y.vertexIndex[t[1]]] = true
 		vertexIndicesToInclude[Y.vertexIndex[t[2]]] = true

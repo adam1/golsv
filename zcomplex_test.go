@@ -779,7 +779,7 @@ func TestZComplexSubcomplexByVertices(t *testing.T) {
 	}
 }
 
-func TestZComplexTriangularDepthGradedSubcomplexes(t *testing.T) {
+func TestZComplexTriangularDepthFiltration(t *testing.T) {
 	tests := []struct {
 		C        *ZComplex[ZVertexInt]
 		Start    int
@@ -838,7 +838,7 @@ func TestZComplexTriangularDepthGradedSubcomplexes(t *testing.T) {
 	}
 	for n, test := range tests {
 		var got []*ZComplex[ZVertexInt]
-		test.C.TriangularDepthGradedSubcomplexes(test.C.VertexBasis()[test.Start], func(depth int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
+		test.C.TriangularDepthFiltration(test.C.VertexBasis()[test.Start], func(step int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
 			got = append(got, subcomplex)
 			return false
 		})

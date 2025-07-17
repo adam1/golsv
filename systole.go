@@ -184,18 +184,18 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 	return minWeight
 }
 
-// xxx potential optimization? reuse/extend UB from one grade to the next
+// xxx potential optimization? reuse/extend UB from one filtration step to the next
 func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 	minWeight := 0
-	S.C.TriangularDepthGradedSubcomplexes(v, func(depth int, subcomplex *ZComplex[T]) (stop bool) {
+	S.C.TriangularDepthFiltration(v, func(step int, subcomplex *ZComplex[T]) (stop bool) {
 		if S.Verbose {
-			//log.Printf("checking subcomplex of triangle grade %d", depth)
+			//log.Printf("checking subcomplex of triangle depth filtration step %d", step)
 			//log.Printf("subcomplex: %s", subcomplex.MaximalSimplicesString())
 		}
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
 		if S.Verbose {
-			log.Printf("depth=%d dimZ1=%d dimB1=%d dimH1=%d", depth, dimZ1, dimB1, dimH1)
+			log.Printf("step=%d dimZ1=%d dimB1=%d dimH1=%d", step, dimZ1, dimB1, dimH1)
 		}
 		U, B = U.Dense(), B.Dense()
 		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
@@ -203,7 +203,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 			minWeight = localSystole
 			if S.StopNonzero {
 				if S.Verbose {
-					log.Printf("stopping at triangle grade %d", depth)
+					log.Printf("stopping at triangle step %d", step)
 				}
 				return true
 			}
