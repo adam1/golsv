@@ -286,10 +286,16 @@ func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 	}
 }
 
-// TestSimplicialSystoleSearchRandomCliqueComplex creates random clique complexes,
-// computes the systole using both exhaustive search and simplicial search methods,
-// then verifies that both methods produce the same result.
-func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
+// TestSimplicialSystoleSearchRandomCliqueComplex creates random
+// clique complexes, computes the systole using both exhaustive search
+// and simplicial search methods, then verifies that both methods
+// produce the same result.  This is currently disabled because the
+// implemented algorithm does not guarantee correctness in the general
+// case. An improvement would be to generate random finite Cayley
+// complexes, since in this case we can guarantee that the implemented
+// algorithm produces a value that is the global systole plus zero or
+// one. See thesis for details.
+func DisabledTestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 	trials := 0
 	maxVertices := 10
 	stopNonzero := true
@@ -311,8 +317,6 @@ func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		simplicialSystole := S.Search()
 
-		// xxx TBD resolving errors here.  the simplicial systole search
-		// is only guaranteed to find the systole under certain conditions.
 		if exhaustiveSystole != simplicialSystole {
 			t.Errorf("Trial %d: Mismatch between systole search methods - exhaustive=%d, simplicial=%d",
 				trial, exhaustiveSystole, simplicialSystole)

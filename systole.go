@@ -147,7 +147,12 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 }
 
 // The simplicial systole search algorithm is not guaranteed to find
-// the global systole in all cases.  See thesis for details.
+// the global systole in all cases.  See thesis for details.  NB: The
+// thesis describes "local" systoles where we restrict our attention
+// to cycles incident to some vertex.  That is different in general to
+// what is implemented here, which uses the ordinary exhaustive linear
+// algebra search on subcomplexes for expediency. The two are thought
+// to be equivalent in the case of Cayley complexes.
 type SimplicialSystoleSearch[T any] struct {
 	C           *ZComplex[T]
 	StopNonzero bool
