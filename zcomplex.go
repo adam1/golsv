@@ -215,6 +215,9 @@ func (C *ZComplex[T]) BFWalk3Cliques(f func(c [3]ZVertex[T])) {
 }
 
 func (C *ZComplex[T]) computeEdgeIndex() {
+	if C.verbose {
+		log.Printf("creating edge index; edges=%d", len(C.edgeBasis))
+	}
 	C.edgeIndex = make(map[ZEdge[T]]int)
 	for i, edge := range C.edgeBasis {
 		C.edgeIndex[edge] = i
@@ -222,6 +225,9 @@ func (C *ZComplex[T]) computeEdgeIndex() {
 }
 
 func (C *ZComplex[T]) computeVertexIndex() {
+	if C.verbose {
+		log.Printf("creating vertex index; vertices=%d", len(C.vertexBasis))
+	}
 	C.vertexIndex = make(map[ZVertex[T]]int)
 	for i, vertex := range C.vertexBasis {
 		C.vertexIndex[vertex] = i
@@ -229,6 +235,9 @@ func (C *ZComplex[T]) computeVertexIndex() {
 }
 
 func (C *ZComplex[T]) computeD1() {
+	if C.verbose {
+		log.Printf("computing d1 boundary matrix")
+	}
 	C.d1 = NewSparseBinaryMatrix(len(C.vertexBasis), len(C.edgeBasis))
 	for j, edge := range C.edgeBasis {
 		for _, v := range edge {
@@ -242,6 +251,9 @@ func (C *ZComplex[T]) computeD1() {
 }
 
 func (C *ZComplex[T]) computeD2() {
+	if C.verbose {
+		log.Printf("computing d2 boundary matrix")
+	}
 	C.d2 = NewSparseBinaryMatrix(len(C.edgeBasis), len(C.triangleBasis))
 	for j, t := range C.triangleBasis {
 		for _, e := range t.Edges() {

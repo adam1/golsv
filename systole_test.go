@@ -214,7 +214,8 @@ func TestSimplicialSystoleVsExhaustiveSearchSpecificExamples(t *testing.T) {
 
 		// An example where the (nonlocal) simplicial systole
 		// algorithm gives a result that is not within one of a lower
-		// bound of the global systole.
+		// bound of the global systole.  This can happen
+		// if the global systole is zero.
 		{NewZComplexFromMaximalSimplices([][]int{{0, 2, 3}, {0, 2, 4}, {0, 2, 5}, {0, 2, 9}, {0, 2, 11}, {0, 3, 4}, {0, 3, 11}, {0, 4, 5}, {0, 5, 6}, {0, 5, 9}, {0, 6, 11}, {1, 3, 7}, {1, 3, 10}, {1, 5, 9}, {1, 5, 10}, {2, 3, 4}, {2, 3, 10}, {2, 3, 11}, {2, 4, 5}, {2, 4, 10}, {2, 5, 9}, {2, 5, 10}, {2, 10, 11}, {3, 4, 7}, {3, 4, 10}, {3, 10, 11}, {4, 5, 10}, {8, 10}}), 4, 0},
 	}
 	for i, test := range tests {
@@ -289,14 +290,11 @@ func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 // TestSimplicialSystoleSearchRandomCliqueComplex creates random
 // clique complexes, computes the systole using both exhaustive search
 // and simplicial search methods, then verifies that both methods
-// produce the same result.  This is currently disabled because the
-// implemented algorithm does not guarantee correctness in the general
-// case. An improvement would be to generate random finite Cayley
-// complexes, since in this case we can guarantee that the implemented
-// algorithm produces a value that is the global systole plus zero or
-// one. See thesis for details.
-func DisabledTestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
-	trials := 0
+// produce compatible results.  The specific guarantee (see the thesis
+// for proofs) is that if the global systole is nonzero, then the
+// global systole is no less than the simplicial systole minus one.
+func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
+	trials := 10
 	maxVertices := 10
 	stopNonzero := true
 	verbose := false
@@ -317,10 +315,14 @@ func DisabledTestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		simplicialSystole := S.Search()
 
-		if exhaustiveSystole != simplicialSystole {
-			t.Errorf("Trial %d: Mismatch between systole search methods - exhaustive=%d, simplicial=%d",
-				trial, exhaustiveSystole, simplicialSystole)
-			log.Printf("complex: %s", X.MaximalSimplicesString())
+		if exhaustiveSystole == 0 {
+			// we make no claim here
+		} else {
+			if exhaustiveSystole < simplicialSystole - 1 {
+				log.Printf("complex: %s", X.MaximalSimplicesString())
+				t.Fatalf("Trial %d: Mismatch between systole search methods - exhaustive=%d, simplicial=%d",
+					trial, exhaustiveSystole, simplicialSystole)
+			}
 		}
 	}
 }

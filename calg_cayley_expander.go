@@ -79,7 +79,7 @@ type calGNeighborsTask struct {
 	depth int
 }
 
-func (E *CalGCayleyExpander) Expand() {
+func (E *CalGCayleyExpander) Graph() *ZComplex[ElementCalG] {
 	if E.verbose {
 		log.Printf("expanding Cayley graph with %d generators; modulus=%v quotient=%v maxDepth=%d",
 			len(E.gens), E.modulus, E.quotient, E.maxDepth)
@@ -97,31 +97,21 @@ func (E *CalGCayleyExpander) Expand() {
 	if E.observer != nil {
 		E.observer.EndVertices()
 	}
-	// xxx experimental for debugging;
-	// 	checkCongruenceConsistency1 := true
-	// 	if checkCongruenceConsistency1 {
-	// 		log.Printf("checking for multiple congruence subgroup identities")
-	// 		for g, id := range E.attendance {
-	// 			if g.IsIdentityModf(*E.modulus) {
-	// 				log.Printf("found congruence subgroup identity: g=(%v) id=%d", g, id)
-	// 			}
-	// 		}
-	// 	}
-}
-
-func (E *CalGCayleyExpander) Complex() *ZComplex[ElementCalG] {
 	E.sortEdgeBasis()
-	triangleBasis := E.triangleBasis()
-	if E.observer != nil {
-		E.observer.Edges(E.edgeBasis)
-		E.observer.Triangles(triangleBasis)
-		E.observer.End()
-	}
 	// We don't want ZComplex to lexically sort the bases using the
 	// ZVertex[T] interface, because we have already sorted them in
 	// the order we want, namely, by distance to the origin.
 	resortBases := false
-	return NewZComplex(E.vertexBasis, E.edgeBasis, triangleBasis, resortBases, E.verbose)
+	return NewZComplex(E.vertexBasis, E.edgeBasis, nil, resortBases, E.verbose)
+}
+
+func (E *CalGCayleyExpander) Complex() *ZComplex[ElementCalG] {
+	edgeChecks := false
+	if E.maxDepth > 0 {
+		edgeChecks = true
+	}
+	F := NewCalGTriangleFiller(E.vertexBasis, E.edgeBasis, E.gens, E.verbose, E.modulus, E.quotient, edgeChecks)
+	return F.Complex()
 }
 
 func (E *CalGCayleyExpander) initialVertex() (hId int, hRep ElementCalG) {
@@ -131,8 +121,6 @@ func (E *CalGCayleyExpander) initialVertex() (hId int, hRep ElementCalG) {
 }
 
 func (E *CalGCayleyExpander) getOrSetVertex(u ElementCalG, genIndex int, uDepth int) (uId int, added bool) {
-	// log.Printf("xxx getOrSetVertex; u=%v genIndex=%d", u, genIndex)
-
 	wrapper, ok := E.attendance[u]
 	if ok {
 		return wrapper.id, false
@@ -163,7 +151,6 @@ func (E *CalGCayleyExpander) elementInverse(u ElementCalG) (ElementCalG, ZPath[E
 	// walk the edges back to the identity, calculating the inverse as
 	// a cumulative product of inverses of the generators for each
 	// edge.
-	// log.Printf("xxx computing inverse path for u=%v", u)
 	v := u.Dup()
 	p := NewElementCalGIdentity()
 	tmp := NewElementCalGIdentity()
@@ -178,7 +165,6 @@ func (E *CalGCayleyExpander) elementInverse(u ElementCalG) (ElementCalG, ZPath[E
 			break
 		}
 		gInv := CartwrightStegerGeneratorsInverse(E.gens, wrapper.generator)
-		// log.Printf("xxx inverse: i=%d v=%v gen=%d gInv=%v", i, v, wrapper.generator, gInv)
 		tmp.Mul(p, gInv)
 		p.Copy(tmp)
 		// now p = p * gInv
@@ -194,7 +180,6 @@ func (E *CalGCayleyExpander) elementInverse(u ElementCalG) (ElementCalG, ZPath[E
 		// now v = v * gInv
 		i++
 	}
-	// log.Printf("xxx inverse: path=%v", inverseEdges)
 	return p, inverseEdges
 }
 
@@ -274,7 +259,6 @@ func (E *CalGCayleyExpander) Project(path ZPath[ElementCalG]) ZPath[ElementCalG]
 }
 
 func (E *CalGCayleyExpander) setEdge(h, u ElementCalG) {
-	// log.Printf("xxx edge: %v -- %v", hRep, uRep)
 	e := NewZEdge[ElementCalG](h, u)
 	if _, ok := E.edgeSet[e]; !ok {
 		E.edgeSet[e] = true
@@ -297,6 +281,9 @@ func (E *CalGCayleyExpander) SystolicCandidateLifts() []ZPath[ElementCalG] {
 }
 
 func (E *CalGCayleyExpander) sortEdgeBasis() {
+	if E.verbose {
+		log.Printf("sorting basis of %d edges", len(E.edgeBasis))
+	}
 	sort.Slice(E.edgeBasis, func(i, j int) bool {
 		return E.edgeLessByVertexAttendance(E.edgeBasis[i], E.edgeBasis[j])
 	})
@@ -326,100 +313,6 @@ func (E *CalGCayleyExpander) edgeToSortedVertexIndices(e ZEdge[ElementCalG]) [2]
 		}
 	}
 	return x
-}
-
-func (E *CalGCayleyExpander) triangleLessByVertexAttendance(s, t ZTriangle[ElementCalG]) bool {
-	sx := E.triangleToSortedVertexIndices(s)
-	tx := E.triangleToSortedVertexIndices(t)
-	if sx[0] < tx[0] {
-		return true
-	} else if sx[0] > tx[0] {
-		return false
-	} else if sx[1] < tx[1] {
-		return true
-	} else if sx[1] > tx[1] {
-		return false
-	} else if sx[2] < tx[2] {
-		return true
-	} else {
-		return false
-	}
-}
-
-func (E *CalGCayleyExpander) triangleToSortedVertexIndices(t ZTriangle[ElementCalG]) [3]int {
-	x := [3]int{}
-	for i := 0; i < 3; i++ {
-		if w, ok := E.attendance[t[i].(ElementCalG)]; ok {
-			x[i] = w.id
-		} else {
-			panic(fmt.Sprintf("vertex %v not found", t[i]))
-		}
-	}
-	return x
-}
-
-func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
-	if E.verbose {
-		log.Printf("computing triangle basis")
-	}
-	//
-	//       f     g     h
-	//    u --- v --- w --- x
-	//
-	basis := make([]ZTriangle[ElementCalG], 0)
-	triangleSet := make(map[ZTriangle[ElementCalG]]any)
-	for _, u := range E.vertexBasis {
-		u := u.(ElementCalG)
-		for _, f := range E.gens {
-			v := NewElementCalGIdentity()
-			v.Mul(u, f)
-			if E.quotient {
-				v = v.Modf(*E.modulus)
-			}
-			uv := NewZEdge[ElementCalG](u, v)
-			if _, ok := E.edgeSet[uv]; !ok {
-				continue
-			}
-			for _, g := range E.gens {
-				w := NewElementCalGIdentity()
-				w.Mul(v, g)
-				if E.quotient {
-					w = w.Modf(*E.modulus)
-				}
-				if w.Equal(u) {
-					continue
-				}
-				vw := NewZEdge[ElementCalG](v, w)
-				if _, ok := E.edgeSet[vw]; !ok {
-					continue
-				}
-				for _, h := range E.gens {
-					x := NewElementCalGIdentity()
-					x.Mul(w, h)
-					if E.quotient {
-						x = x.Modf(*E.modulus)
-					}
-					if x.Equal(v) {
-						continue
-					} else if x.Equal(u) {
-						wu := NewZEdge[ElementCalG](w, u)
-						if _, ok := E.edgeSet[wu]; !ok {
-							continue
-						}
-						triangle := NewZTriangle[ElementCalG](u, v, w)
-						if _, ok := triangleSet[triangle]; !ok {
-							triangleSet[triangle] = nil
-							basis = append(basis, triangle)
-						}
-					}
-				}
-			}
-		}
-	}
-	sort.Slice(basis, func(i, j int) bool {
-		return E.triangleLessByVertexAttendance(basis[i], basis[j])
-	})
-	return basis
 }
 
 type calGTodoQueue interface {
@@ -455,6 +348,7 @@ func (S *calGTodoQueueSlice) Len() int {
 	return len(S.slice)
 }
 
+// xxx awkward place for this
 func NewZComplexElementCalGFromBasisFiles(vertexBasisFile, edgeBasisFile, triangleBasisFile string, verbose bool) *ZComplex[ElementCalG] {
 	if verbose {
 		log.Printf("reading vertex basis file %s", vertexBasisFile)

@@ -11,7 +11,7 @@ func TestCalGCayleyExpanderInverse(t *testing.T) {
 	var modulus *F2Polynomial = nil
 	quotient := false
 	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil)
-	E.Expand()
+	E.Graph()
 
 	pathLenCounts := make([]int, maxDepth+1)
 	
@@ -50,7 +50,7 @@ func TestCalGCayleyExpanderInverseModf(t *testing.T) {
 	var modulus F2Polynomial = NewF2Polynomial("111")
 	quotient := true
 	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, nil)
-	E.Expand()
+	E.Graph()
 
 	pathLenCounts := make([]int, maxDepth+1)
 
@@ -89,18 +89,18 @@ func TestCalGCayleyExpanderComplex(t *testing.T) {
 	var modulus *F2Polynomial = nil
 	quotient := false
 	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil)
-	E.Expand()
-	C := E.Complex()
-	vertices := C.VertexBasis()
+	graph := E.Graph()
+	vertices := graph.VertexBasis()
 	expectedVertices := 15
 	if len(vertices) != expectedVertices {
 		t.Errorf("Vertices: got=%d expected=%d", len(vertices), expectedVertices)
 	}
-	edges := C.EdgeBasis()
+	edges := graph.EdgeBasis()
 	expectedEdges := 17
 	if len(edges) != expectedEdges {
 		t.Errorf("Edges: got=%d expected=%d", len(edges), expectedEdges)
 	}
+	C := E.Complex()
 	triangles := C.TriangleBasis()
 	expectedTriangles := 3
 	if len(triangles) != expectedTriangles {
@@ -116,9 +116,8 @@ func TestCalGCayleyExpanderEdgeOrder(t *testing.T) {
 	quotient := true
 	var observer CalGObserver
 	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer)
-	E.Expand()
-	C := E.Complex()
-	edges := C.EdgeBasis()
+	graph := E.Graph()
+	edges := graph.EdgeBasis()
 
 	for i, e := range edges {
 		if i == len(edges)-1 {
@@ -127,29 +126,6 @@ func TestCalGCayleyExpanderEdgeOrder(t *testing.T) {
 		f := edges[i+1]
 		if !E.edgeLessByVertexAttendance(e, f) {
 			t.Errorf("Edge order failed: e=%v f=%v", e, f)
-		}
-	}
-}
-
-func TestCalGCayleyExpanderTriangleOrder(t *testing.T) {
-	gens := CartwrightStegerGenerators()
-	maxDepth := 2
-	verbose := false
-	var modulus F2Polynomial = NewF2Polynomial("111")
-	quotient := true
-	var observer CalGObserver
-	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer)
-	E.Expand()
-	C := E.Complex()
-	triangles := C.TriangleBasis()
-
-	for i, r := range triangles {
-		if i == len(triangles)-1 {
-			break
-		}
-		s := triangles[i+1]
-		if !E.triangleLessByVertexAttendance(r, s) {
-			t.Errorf("Triangle order failed: r=%v s=%v", r, s)
 		}
 	}
 }

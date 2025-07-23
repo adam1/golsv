@@ -74,7 +74,7 @@ func NewDiagonalReducer(verbose bool) *DiagonalReducer {
 		switchToDensePredicate: defaultSwitchToDensePredicate,
 		verbose:                verbose,
 	}
-	gob.Register(&AddOp{})
+	gob.Register(&AddOp{}) // xxx remove the gob stuff
 	gob.Register(&SwapOp{})
 	return R
 }
