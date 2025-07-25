@@ -362,6 +362,10 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	if E.verbose {
 		log.Printf("computing triangle basis")
 	}
+	edgeChecks := false
+	if E.maxDepth > 0 {
+		edgeChecks = true
+	}
 	//
 	//       f     g     h
 	//    u --- v --- w --- x
@@ -376,9 +380,11 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 			if E.quotient {
 				v = v.Modf(*E.modulus)
 			}
-			uv := NewZEdge[ElementCalG](u, v)
-			if _, ok := E.edgeSet[uv]; !ok {
-				continue
+			if edgeChecks {
+				uv := NewZEdge[ElementCalG](u, v)
+				if _, ok := E.edgeSet[uv]; !ok {
+					continue
+				}
 			}
 			for _, g := range E.gens {
 				w := NewElementCalGIdentity()
@@ -389,9 +395,11 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 				if w.Equal(u) {
 					continue
 				}
-				vw := NewZEdge[ElementCalG](v, w)
-				if _, ok := E.edgeSet[vw]; !ok {
-					continue
+				if edgeChecks {
+					vw := NewZEdge[ElementCalG](v, w)
+					if _, ok := E.edgeSet[vw]; !ok {
+						continue
+					}
 				}
 				for _, h := range E.gens {
 					x := NewElementCalGIdentity()
@@ -402,9 +410,11 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 					if x.Equal(v) {
 						continue
 					} else if x.Equal(u) {
-						wu := NewZEdge[ElementCalG](w, u)
-						if _, ok := E.edgeSet[wu]; !ok {
-							continue
+						if edgeChecks {
+							wu := NewZEdge[ElementCalG](w, u)
+							if _, ok := E.edgeSet[wu]; !ok {
+								continue
+							}
 						}
 						triangle := NewZTriangle[ElementCalG](u, v, w)
 						if _, ok := triangleSet[triangle]; !ok {
