@@ -5,6 +5,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"time"
 )
 
 // xxx rename CalGCayleyComplex?
@@ -372,8 +373,29 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	//
 	basis := make([]ZTriangle[ElementCalG], 0)
 	triangleSet := make(map[ZTriangle[ElementCalG]]any)
-	for _, u := range E.vertexBasis {
+	
+	// Progress reporting setup
+	statIntervalSteps := 1000
+	startTime := time.Now()
+	lastStatTime := startTime
+	
+	for i, u := range E.vertexBasis {
 		u := u.(ElementCalG)
+		
+		// Progress reporting
+		if E.verbose && i > 0 && i%statIntervalSteps == 0 {
+			now := time.Now()
+			elapsed := now.Sub(lastStatTime)
+			lastStatTime = now
+			rate := float64(statIntervalSteps) / elapsed.Seconds()
+			estimatedHoursRemaining := float64(len(E.vertexBasis)-i) / rate / 3600.0
+			totalElapsed := now.Sub(startTime)
+			totalRate := float64(i) / totalElapsed.Seconds()
+			msg := fmt.Sprintf("triangleBasis; i=%d/%d triangles=%d rate=%1.3f trate=%1.3f ehr=%1.2f",
+				i, len(E.vertexBasis), len(basis), rate, totalRate, estimatedHoursRemaining)
+			log.Println(msg)
+		}
+		
 		for _, f := range E.gens {
 			v := NewElementCalGIdentity()
 			v.Mul(u, f)
@@ -426,9 +448,16 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 			}
 		}
 	}
+	if E.verbose {
+		log.Printf("done computing triangle basis; found %d triangles", len(basis))
+		log.Printf("sorting triangles")
+	}
 	sort.Slice(basis, func(i, j int) bool {
 		return E.triangleLessByVertexAttendance(basis[i], basis[j])
 	})
+	if E.verbose {
+		log.Printf("done sorting triangles")
+	}
 	return basis
 }
 
