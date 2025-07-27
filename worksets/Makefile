@@ -72,7 +72,12 @@ pgl-cayley-F16:
 calg-cayley d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt:
 	calg-cayley -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
-		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee S-all.$(log)
+		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee calg-cayley.$(log)
+
+calg-cayley-no-systole d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt:
+	calg-cayley -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
+		-triangle-basis triangle-basis.txt 2>&1 | tee calg-cayley-no-systole.$(log)
 
 gens-global.tex:
 	calg-cayley -modulus `cat modulus.txt` -max-depth 1 -generators-latex-file gens-global.tex 2>&1 | tee gens-global.$(log)
