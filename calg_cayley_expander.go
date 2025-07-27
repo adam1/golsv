@@ -3,8 +3,10 @@ package golsv
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -359,6 +361,22 @@ func (E *CalGCayleyExpander) triangleToSortedVertexIndices(t ZTriangle[ElementCa
 	return x
 }
 
+type triangleWorkerData struct {
+	startIdx   int
+	endIdx     int
+	triangles  []ZTriangle[ElementCalG]
+	currentIdx int
+}
+
+func (E *CalGCayleyExpander) triangleWorker(worker *triangleWorkerData, edgeChecks bool) {
+	for i := worker.startIdx; i < worker.endIdx; i++ {
+		worker.currentIdx = i
+		u := E.vertexBasis[i]
+		localTriangles := E.trianglesAtVertex(u, edgeChecks)
+		worker.triangles = append(worker.triangles, localTriangles...)
+	}
+}
+
 func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	if E.verbose {
 		log.Printf("computing triangle basis")
@@ -367,6 +385,29 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	if E.maxDepth > 0 {
 		edgeChecks = true
 	}
+	
+	numWorkers := runtime.NumCPU()
+	numVertices := len(E.vertexBasis)
+	verticesPerWorker := numVertices / numWorkers
+	
+	workers := make([]triangleWorkerData, numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		workers[i].startIdx = i * verticesPerWorker
+		if i == numWorkers-1 {
+			workers[i].endIdx = numVertices
+		} else {
+			workers[i].endIdx = (i + 1) * verticesPerWorker
+		}
+		workers[i].triangles = make([]ZTriangle[ElementCalG], 0)
+		workers[i].currentIdx = workers[i].startIdx
+	}
+	
+	if E.verbose {
+		for i, worker := range workers {
+			log.Printf("worker %d: vertices [%d:%d)", i, worker.startIdx, worker.endIdx)
+		}
+	}
+	
 	//
 	//       f     g     h
 	//    u --- v --- w --- x
@@ -374,28 +415,57 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	basis := make([]ZTriangle[ElementCalG], 0)
 	triangleSet := make(map[ZTriangle[ElementCalG]]any)
 	
-	statIntervalSteps := 1000
-	startTime := time.Now()
-	lastStatTime := startTime
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func(workerIdx int) {
+			defer wg.Done()
+			E.triangleWorker(&workers[workerIdx], edgeChecks)
+		}(i)
+	}
 	
-	for i, u := range E.vertexBasis {
-		if E.verbose && i > 0 && i%statIntervalSteps == 0 {
-			now := time.Now()
-			elapsed := now.Sub(lastStatTime)
-			lastStatTime = now
-			rate := float64(statIntervalSteps) / elapsed.Seconds()
-			estimatedHoursRemaining := float64(len(E.vertexBasis)-i) / rate / 3600.0
-			totalElapsed := now.Sub(startTime)
-			totalRate := float64(i) / totalElapsed.Seconds()
-			msg := fmt.Sprintf("triangleBasis; i=%d/%d triangles=%d rate=%1.3f trate=%1.3f ehr=%1.2f",
-				i, len(E.vertexBasis), len(basis), rate, totalRate, estimatedHoursRemaining)
-			log.Println(msg)
+	// Progress reporting with select/timer pattern
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	
+	startTime := time.Now()
+	statInterval := 5 * time.Second
+	ticker := time.NewTicker(statInterval)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-done:
+			// Workers finished
+			goto workersComplete
+		case <-ticker.C:
+			// Time for progress update
+			if E.verbose {
+				totalProgress := 0
+				for _, worker := range workers {
+					totalProgress += worker.currentIdx - worker.startIdx
+				}
+				now := time.Now()
+				rate := float64(totalProgress) / now.Sub(startTime).Seconds()
+				estimatedSecondsRemaining := float64(numVertices-totalProgress) / rate
+				msg := fmt.Sprintf("triangleBasis; progress=%d/%d rate=%1.3f esr=%1.1f",
+					totalProgress, numVertices, rate, estimatedSecondsRemaining)
+				log.Println(msg)
+			}
 		}
-		localTriangles := E.trianglesAtVertex(u, edgeChecks)
-		if E.verbose && i == 0 {
-			log.Printf("triangles at origin: %d", len(localTriangles))
+	}
+	
+workersComplete:
+	
+	// Aggregate results from all workers
+	for workerIdx, worker := range workers {
+		if E.verbose && workerIdx == 0 {
+			log.Printf("triangles at origin: %d", len(worker.triangles))
 		}
-		for _, triangle := range localTriangles {
+		for _, triangle := range worker.triangles {
 			if _, ok := triangleSet[triangle]; !ok {
 				triangleSet[triangle] = nil
 				basis = append(basis, triangle)
