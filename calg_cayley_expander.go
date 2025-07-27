@@ -374,15 +374,11 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	basis := make([]ZTriangle[ElementCalG], 0)
 	triangleSet := make(map[ZTriangle[ElementCalG]]any)
 	
-	// Progress reporting setup
 	statIntervalSteps := 1000
 	startTime := time.Now()
 	lastStatTime := startTime
 	
 	for i, u := range E.vertexBasis {
-		u := u.(ElementCalG)
-		
-		// Progress reporting
 		if E.verbose && i > 0 && i%statIntervalSteps == 0 {
 			now := time.Now()
 			elapsed := now.Sub(lastStatTime)
@@ -395,56 +391,14 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 				i, len(E.vertexBasis), len(basis), rate, totalRate, estimatedHoursRemaining)
 			log.Println(msg)
 		}
-		
-		for _, f := range E.gens {
-			v := NewElementCalGIdentity()
-			v.Mul(u, f)
-			if E.quotient {
-				v = v.Modf(*E.modulus)
-			}
-			if edgeChecks {
-				uv := NewZEdge[ElementCalG](u, v)
-				if _, ok := E.edgeSet[uv]; !ok {
-					continue
-				}
-			}
-			for _, g := range E.gens {
-				w := NewElementCalGIdentity()
-				w.Mul(v, g)
-				if E.quotient {
-					w = w.Modf(*E.modulus)
-				}
-				if w.Equal(u) {
-					continue
-				}
-				if edgeChecks {
-					vw := NewZEdge[ElementCalG](v, w)
-					if _, ok := E.edgeSet[vw]; !ok {
-						continue
-					}
-				}
-				for _, h := range E.gens {
-					x := NewElementCalGIdentity()
-					x.Mul(w, h)
-					if E.quotient {
-						x = x.Modf(*E.modulus)
-					}
-					if x.Equal(v) {
-						continue
-					} else if x.Equal(u) {
-						if edgeChecks {
-							wu := NewZEdge[ElementCalG](w, u)
-							if _, ok := E.edgeSet[wu]; !ok {
-								continue
-							}
-						}
-						triangle := NewZTriangle[ElementCalG](u, v, w)
-						if _, ok := triangleSet[triangle]; !ok {
-							triangleSet[triangle] = nil
-							basis = append(basis, triangle)
-						}
-					}
-				}
+		localTriangles := E.trianglesAtVertex(u, edgeChecks)
+		if E.verbose && i == 0 {
+			log.Printf("triangles at origin: %d", len(localTriangles))
+		}
+		for _, triangle := range localTriangles {
+			if _, ok := triangleSet[triangle]; !ok {
+				triangleSet[triangle] = nil
+				basis = append(basis, triangle)
 			}
 		}
 	}
@@ -459,6 +413,59 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 		log.Printf("done sorting triangles")
 	}
 	return basis
+}
+
+func (E *CalGCayleyExpander) trianglesAtVertex(uVertex ZVertex[ElementCalG], edgeChecks bool) (triangles []ZTriangle[ElementCalG]) {
+	u := uVertex.(ElementCalG)
+	for _, f := range E.gens {
+		v := NewElementCalGIdentity()
+		v.Mul(u, f)
+		if E.quotient {
+			v = v.Modf(*E.modulus)
+		}
+		if edgeChecks {
+			uv := NewZEdge[ElementCalG](u, v)
+			if _, ok := E.edgeSet[uv]; !ok {
+				continue
+			}
+		}
+		for _, g := range E.gens {
+			w := NewElementCalGIdentity()
+			w.Mul(v, g)
+			if E.quotient {
+				w = w.Modf(*E.modulus)
+			}
+			if w.Equal(u) {
+				continue
+			}
+			if edgeChecks {
+				vw := NewZEdge[ElementCalG](v, w)
+				if _, ok := E.edgeSet[vw]; !ok {
+					continue
+				}
+			}
+			for _, h := range E.gens {
+				x := NewElementCalGIdentity()
+				x.Mul(w, h)
+				if E.quotient {
+					x = x.Modf(*E.modulus)
+				}
+				if x.Equal(v) {
+					continue
+				} else if x.Equal(u) {
+					if edgeChecks {
+						wu := NewZEdge[ElementCalG](w, u)
+						if _, ok := E.edgeSet[wu]; !ok {
+							continue
+						}
+					}
+					triangle := NewZTriangle[ElementCalG](u, v, w)
+					triangles = append(triangles, triangle)
+				}
+			}
+		}
+	}
+	return triangles
 }
 
 type calGTodoQueue interface {
