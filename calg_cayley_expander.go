@@ -451,9 +451,9 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 				}
 				now := time.Now()
 				rate := float64(totalProgress) / now.Sub(startTime).Seconds()
-				estimatedSecondsRemaining := float64(numVertices-totalProgress) / rate
-				msg := fmt.Sprintf("triangleBasis; progress=%d/%d rate=%1.3f esr=%1.1f",
-					totalProgress, numVertices, rate, estimatedSecondsRemaining)
+				estimatedHoursRemaining := float64(numVertices-totalProgress) / rate / 3600
+				msg := fmt.Sprintf("triangleBasis; progress=%d/%d rate=%1.3f ehr=%1.1f",
+					totalProgress, numVertices, rate, estimatedHoursRemaining)
 				log.Println(msg)
 			}
 		}
