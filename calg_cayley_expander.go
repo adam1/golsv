@@ -3,6 +3,7 @@ package golsv
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"runtime"
 	"sort"
 	"strings"
@@ -368,13 +369,36 @@ type triangleWorkerData struct {
 	currentIdx int
 }
 
-func (E *CalGCayleyExpander) triangleWorker(worker *triangleWorkerData, trianglesAtOrigin []ZTriangle[ElementCalG], edgeChecks bool) {
+func (E *CalGCayleyExpander) triangleWorker(worker *triangleWorkerData, trianglesAtOrigin []ZTriangle[ElementCalG], edgeChecks bool, triangleSet map[ZTriangle[ElementCalG]]any, basis *[]ZTriangle[ElementCalG], mutex *sync.Mutex) {
+	drainThreshold := 5000 + rand.Intn(5001) // 5000-10000
+	
+	drain := func() {
+		if len(worker.triangles) == 0 {
+			return
+		}
+		mutex.Lock()
+		for _, triangle := range worker.triangles {
+			if _, ok := triangleSet[triangle]; !ok {
+				triangleSet[triangle] = nil
+				*basis = append(*basis, triangle)
+			}
+		}
+		mutex.Unlock()
+		worker.triangles = worker.triangles[:0] // clear slice but keep capacity
+	}
+	
 	for i := worker.startIdx; i < worker.endIdx; i++ {
 		worker.currentIdx = i
 		u := E.vertexBasis[i]
 		localTriangles := E.trianglesAtVertex2(u, trianglesAtOrigin, edgeChecks)
 		worker.triangles = append(worker.triangles, localTriangles...)
+		
+		if len(worker.triangles) >= drainThreshold {
+			drain()
+			drainThreshold = 5000 + rand.Intn(5001) // new random threshold
+		}
 	}
+	drain()
 }
 
 func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
@@ -415,17 +439,17 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	//
 	basis := make([]ZTriangle[ElementCalG], 0)
 	triangleSet := make(map[ZTriangle[ElementCalG]]any)
+	var mutex sync.Mutex
 	
 	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func(workerIdx int) {
 			defer wg.Done()
-			E.triangleWorker(&workers[workerIdx], trianglesAtOrigin, edgeChecks)
+			E.triangleWorker(&workers[workerIdx], trianglesAtOrigin, edgeChecks, triangleSet, &basis, &mutex)
 		}(i)
 	}
 	
-	// Progress reporting with select/timer pattern
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -440,10 +464,8 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	for {
 		select {
 		case <-done:
-			// Workers finished
 			goto workersComplete
 		case <-ticker.C:
-			// Time for progress update
 			if E.verbose {
 				totalProgress := 0
 				for _, worker := range workers {
@@ -460,19 +482,6 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	}
 	
 workersComplete:
-	
-	// Aggregate results from all workers
-	for workerIdx, worker := range workers {
-		if E.verbose && workerIdx == 0 {
-			log.Printf("triangles at origin: %d", len(worker.triangles))
-		}
-		for _, triangle := range worker.triangles {
-			if _, ok := triangleSet[triangle]; !ok {
-				triangleSet[triangle] = nil
-				basis = append(basis, triangle)
-			}
-		}
-	}
 	if E.verbose {
 		log.Printf("done computing triangle basis; found %d triangles", len(basis))
 		log.Printf("sorting triangles")
