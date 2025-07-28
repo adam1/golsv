@@ -215,6 +215,9 @@ func (C *ZComplex[T]) BFWalk3Cliques(f func(c [3]ZVertex[T])) {
 }
 
 func (C *ZComplex[T]) computeEdgeIndex() {
+	if C.verbose {
+		log.Printf("creating edge index; edges=%d", len(C.edgeBasis))
+	}
 	C.edgeIndex = make(map[ZEdge[T]]int)
 	for i, edge := range C.edgeBasis {
 		C.edgeIndex[edge] = i
@@ -222,6 +225,9 @@ func (C *ZComplex[T]) computeEdgeIndex() {
 }
 
 func (C *ZComplex[T]) computeVertexIndex() {
+	if C.verbose {
+		log.Printf("creating vertex index; vertices=%d", len(C.vertexBasis))
+	}
 	C.vertexIndex = make(map[ZVertex[T]]int)
 	for i, vertex := range C.vertexBasis {
 		C.vertexIndex[vertex] = i
