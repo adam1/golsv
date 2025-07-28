@@ -368,11 +368,11 @@ type triangleWorkerData struct {
 	currentIdx int
 }
 
-func (E *CalGCayleyExpander) triangleWorker(worker *triangleWorkerData, edgeChecks bool) {
+func (E *CalGCayleyExpander) triangleWorker(worker *triangleWorkerData, trianglesAtOrigin []ZTriangle[ElementCalG], edgeChecks bool) {
 	for i := worker.startIdx; i < worker.endIdx; i++ {
 		worker.currentIdx = i
 		u := E.vertexBasis[i]
-		localTriangles := E.trianglesAtVertex(u, edgeChecks)
+		localTriangles := E.trianglesAtVertex2(u, trianglesAtOrigin, edgeChecks)
 		worker.triangles = append(worker.triangles, localTriangles...)
 	}
 }
@@ -385,6 +385,7 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	if E.maxDepth > 0 {
 		edgeChecks = true
 	}
+	trianglesAtOrigin := E.trianglesAtVertex(E.vertexBasis[0], edgeChecks)
 	
 	numWorkers := runtime.NumCPU()
 	numVertices := len(E.vertexBasis)
@@ -420,7 +421,7 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 		wg.Add(1)
 		go func(workerIdx int) {
 			defer wg.Done()
-			E.triangleWorker(&workers[workerIdx], edgeChecks)
+			E.triangleWorker(&workers[workerIdx], trianglesAtOrigin, edgeChecks)
 		}(i)
 	}
 	
@@ -534,6 +535,41 @@ func (E *CalGCayleyExpander) trianglesAtVertex(uVertex ZVertex[ElementCalG], edg
 				}
 			}
 		}
+	}
+	return triangles
+}
+
+func (E *CalGCayleyExpander) trianglesAtVertex2(uVertex ZVertex[ElementCalG], trianglesAtOrigin []ZTriangle[ElementCalG], edgeChecks bool) (triangles []ZTriangle[ElementCalG]) {
+	u := uVertex.(ElementCalG)
+	for _, t := range trianglesAtOrigin {
+		a := t[0].(ElementCalG)
+		b := t[1].(ElementCalG)
+		c := t[2].(ElementCalG)
+		var ua, ub, uc ElementCalG
+		ua.Mul(u, a)
+		ub.Mul(u, b)
+		uc.Mul(u, c)
+		if E.quotient {
+			ua = ua.Modf(*E.modulus)
+			ub = ub.Modf(*E.modulus)
+			uc = uc.Modf(*E.modulus)
+		}
+		if edgeChecks {
+			uaub := NewZEdge(ua, ub)
+			if _, ok := E.edgeSet[uaub]; !ok {
+				continue
+			}
+			uauc := NewZEdge(ua, uc)
+			if _, ok := E.edgeSet[uauc]; !ok {
+				continue
+			}
+			ubuc := NewZEdge(ub, uc)
+			if _, ok := E.edgeSet[ubuc]; !ok {
+				continue
+			}
+		}
+		s := NewZTriangle[ElementCalG](ua, ub, uc)
+		triangles = append(triangles, s)
 	}
 	return triangles
 }
