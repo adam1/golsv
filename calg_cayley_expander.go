@@ -411,7 +411,10 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	}
 	trianglesAtOrigin := E.trianglesAtVertex(E.vertexBasis[0], edgeChecks)
 	
-	numWorkers := runtime.NumCPU()
+	numWorkers := runtime.NumCPU() - 1
+	if numWorkers < 1 {
+		numWorkers = 1
+	}
 	numVertices := len(E.vertexBasis)
 	verticesPerWorker := numVertices / numWorkers
 	
