@@ -24,25 +24,38 @@ func main() {
 	if args.SystolicCandidatesFile != "" {
 		computeSystolicCandidates(args, f, gens)
 		return
+
+	} else if args.Graph {
+		var observer golsv.CalGObserver
+		if args.MeshFile != "" {
+			observer = golsv.NewCalGVisualizer(args.MeshFile)
+		}
+		E := golsv.NewCalGCayleyExpander(gens,
+			args.MaxDepth, args.Verbose, &f, args.Quotient,
+			observer)
+		graph := E.Graph()
+		writeGraphFiles(graph, args)
+		log.Printf("done")
+
+	} else if args.FillTriangles {
+		// xxx read vertex and edge bases;
+
+		// xxx create CalGTriangleFiller
+
+		// xxx get complex
+
+		// xxx write triangle basis
+
+		// xxx write d2.txt
+		
+		panic("xxx tbd")
+		// 	log.Printf("computing complex")
+		// 	complex := E.Complex()
+		// 	writeTriangleFiles(complex, args)
 	}
-
-	var observer golsv.CalGObserver
-	if args.MeshFile != "" {
-		observer = golsv.NewCalGVisualizer(args.MeshFile)
-	}
-	E := golsv.NewCalGCayleyExpander(gens,
-		args.MaxDepth, args.Verbose, &f, args.Quotient,
-		observer)
-	E.Expand()
-
-	log.Printf("computing complex")
-	complex := E.Complex()
-
-	writeComplexFiles(complex, args)
-	log.Printf("done")
 }
 
-// xxx test?
+// xxx this was ported to the separation of graph-generation and triangle-filling paradigm, but not tested.
 func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []golsv.ElementCalG) {
 	log.Printf("computing systolic candidates")
 	// first, expand the complex without quotient to limited depth to
@@ -53,7 +66,7 @@ func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomia
 	quotient := false
 	maxDepth := args.MaxDepth
 	E := golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil)
-	E.Expand()
+	E.Graph()
 	lifts := E.SystolicCandidateLifts()
 	lens := make(map[int]int)
 	for _, path := range lifts {
@@ -66,7 +79,8 @@ func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomia
 	quotient = true
 	maxDepth = 0
 	E = golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil)
-	E.Expand()
+	graph := E.Graph()
+	writeGraphFiles(graph, args)
 
 	// now, project the candidates to the quotient complex, i.e. take
 	// each vertex mod f. by construction, this ought to be a no-op
@@ -80,18 +94,15 @@ func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomia
 	// log.Printf("xxx candidatePaths=%v", candidatePaths)
 
 	// convert candidates to column vectors in the edge basis.
-	log.Printf("computing complex")
-	complex := E.Complex()
-	writeComplexFiles(complex, args)
 
 	// xxx despite the comment, this doesn't appear to be de-duping
 	log.Printf("converting candidates to edge vectors and deduping")
 	vecs := make(map[string]golsv.BinaryVector)
 	for _, path := range candidatePaths {
-		vec := complex.PathToEdgeVector(path)
+		vec := graph.PathToEdgeVector(path)
 		vecs[vec.String()] = vec
 	}
-	candidatesMatrix := golsv.NewSparseBinaryMatrix(len(complex.EdgeBasis()), 0)
+	candidatesMatrix := golsv.NewSparseBinaryMatrix(len(graph.EdgeBasis()), 0)
 	for _, vec := range vecs {
 		candidatesMatrix.AppendColumn(vec.Matrix())
 	}
@@ -125,6 +136,25 @@ func writeComplexFiles(complex *golsv.ZComplex[golsv.ElementCalG], args *CalGCay
 	if args.TriangleBasisFile != "" {
 		log.Printf("writing triangle basis to %s", args.TriangleBasisFile)
 		golsv.WriteStringFile(triangleBasis, args.TriangleBasisFile)
+	}
+}
+
+func writeGraphFiles(complex *golsv.ZComplex[golsv.ElementCalG], args *CalGCayleyExpanderArgs) {
+	vertexBasis := complex.VertexBasis()
+	edgeBasis := complex.EdgeBasis()
+
+	if args.D1File != "" {
+		D1sparse := complex.D1().(*golsv.Sparse)
+		log.Printf("writing d1 to %s", args.D1File)
+		D1sparse.WriteFile(args.D1File)
+	}
+	if args.VertexBasisFile != "" {
+		log.Printf("writing vertex basis to %s", args.VertexBasisFile)
+		golsv.WriteStringFile(vertexBasis, args.VertexBasisFile)
+	}
+	if args.EdgeBasisFile != "" {
+		log.Printf("writing edge basis to %s", args.EdgeBasisFile)
+		golsv.WriteStringFile(edgeBasis, args.EdgeBasisFile)
 	}
 }
 
@@ -237,7 +267,9 @@ type CalGCayleyExpanderArgs struct {
 	D1File                  string
 	D2File                  string
 	EdgeBasisFile           string
+	FillTriangles           bool
 	GeneratorsLatexFile     string
+	Graph                   bool
 	MaxDepth                int
 	MeshFile                string
 	Modulus                 string
@@ -258,10 +290,12 @@ func parseFlags() *CalGCayleyExpanderArgs {
 		Modulus:            "111",
 	}
 	args.ProfileArgs.ConfigureFlags()
-	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 output file (sparse column support txt format)")
+	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 input/output file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", args.EdgeBasisFile, "edge basis output file (text)")
+	flag.BoolVar(&args.FillTriangles, "fill-triangles", args.FillTriangles, "read vertex and edge bases, compute triangle basis and d2.txt")
 	flag.StringVar(&args.GeneratorsLatexFile, "generators-latex-file", args.GeneratorsLatexFile, "write table of generators to this file (latex)")
+	flag.BoolVar(&args.Graph, "graph", args.Graph, "do Cayley expansion to produce d1.txt")
 	flag.IntVar(&args.MaxDepth, "max-depth", args.MaxDepth, "maximum depth")
 	flag.StringVar(&args.MeshFile, "mesh", args.MeshFile, "mesh output file (OFF Object File Format text)")
 	flag.StringVar(&args.Modulus, "modulus", args.Modulus, "modulus corresponding to a principle congruence subgroup")
@@ -272,5 +306,11 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "verbose logging")
 	flag.StringVar(&args.VertexBasisFile, "vertex-basis", args.VertexBasisFile, "vertex basis output file (text)")
 	flag.Parse()
+
+	if !args.Graph && !args.FillTriangles && args.SystolicCandidatesFile == "" {
+		flag.Usage()
+		log.Fatal("Use one of: -graph -fill-triangles -systolic-candidates-file")
+	}
+
 	return &args
 }
