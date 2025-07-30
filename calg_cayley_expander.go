@@ -366,6 +366,7 @@ func (E *CalGCayleyExpander) triangleToSortedVertexIndices(t ZTriangle[ElementCa
 }
 
 type triangleWorkerData struct {
+	id         int
 	startIdx   int
 	endIdx     int
 	triangles  []ZTriangle[ElementCalG]
@@ -373,13 +374,17 @@ type triangleWorkerData struct {
 }
 
 func (E *CalGCayleyExpander) triangleWorker(worker *triangleWorkerData, trianglesAtOrigin []ZTriangle[ElementCalG], edgeChecks bool, triangleSet map[ZTriangle[ElementCalG]]any, basis *[]ZTriangle[ElementCalG], mutex *sync.Mutex) {
-	drainThreshold := 5000 + rand.Intn(5001) // 5000-10000
+	drainThresholdBase := 10000
+	drainThreshold := drainThresholdBase + rand.Intn(5001)
 	
 	drain := func() {
 		if len(worker.triangles) == 0 {
 			return
 		}
 		mutex.Lock()
+		if E.verbose {
+			log.Printf("worker %d synchronizing %d triangles", worker.id, len(worker.triangles))
+		}
 		for _, triangle := range worker.triangles {
 			if _, ok := triangleSet[triangle]; !ok {
 				triangleSet[triangle] = nil
@@ -398,7 +403,7 @@ func (E *CalGCayleyExpander) triangleWorker(worker *triangleWorkerData, triangle
 		
 		if len(worker.triangles) >= drainThreshold {
 			drain()
-			drainThreshold = 5000 + rand.Intn(5001) // new random threshold
+			drainThreshold = drainThresholdBase + rand.Intn(5001) // new random threshold
 		}
 	}
 	drain()
@@ -423,6 +428,7 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	
 	workers := make([]triangleWorkerData, numWorkers)
 	for i := 0; i < numWorkers; i++ {
+		workers[i].id = i
 		workers[i].startIdx = i * verticesPerWorker
 		if i == numWorkers-1 {
 			workers[i].endIdx = numVertices
@@ -463,7 +469,7 @@ func (E *CalGCayleyExpander) triangleBasis() []ZTriangle[ElementCalG] {
 	}()
 	
 	startTime := time.Now()
-	statInterval := 5 * time.Second
+	statInterval := 10 * time.Second
 	ticker := time.NewTicker(statInterval)
 	defer ticker.Stop()
 	
