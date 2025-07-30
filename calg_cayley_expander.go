@@ -301,6 +301,9 @@ func (E *CalGCayleyExpander) SystolicCandidateLifts() []ZPath[ElementCalG] {
 }
 
 func (E *CalGCayleyExpander) sortEdgeBasis() {
+	if E.verbose {
+		log.Printf("sorting edge basis")
+	}
 	sort.Slice(E.edgeBasis, func(i, j int) bool {
 		return E.edgeLessByVertexAttendance(E.edgeBasis[i], E.edgeBasis[j])
 	})
