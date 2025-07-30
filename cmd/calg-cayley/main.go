@@ -10,9 +10,6 @@ import (
 	"text/template"
 )
 
-// Usage:
-//
-//	calg-cayley -truncate-generators=0 -max-depth=0 -modulus=111 -quotient
 func main() {
 	args := parseFlags()
 	args.ProfileArgs.Start()
@@ -22,41 +19,56 @@ func main() {
 	gens := prepareGenerators(args, f)
 
 	if args.SystolicCandidatesFile != "" {
-		computeSystolicCandidates(args, f, gens)
-		return
-
+		handleSystolicCandidatesMode(args, f, gens)
 	} else if args.Graph {
-		var observer golsv.CalGObserver
-		if args.MeshFile != "" {
-			observer = golsv.NewCalGVisualizer(args.MeshFile)
-		}
-		E := golsv.NewCalGCayleyExpander(gens,
-			args.MaxDepth, args.Verbose, &f, args.Quotient,
-			observer)
-		graph := E.Graph()
-		writeGraphFiles(graph, args)
-		log.Printf("done")
-
+		handleGraphMode(args, f, gens)
 	} else if args.FillTriangles {
-		// xxx read vertex and edge bases;
-
-		// xxx create CalGTriangleFiller
-
-		// xxx get complex
-
-		// xxx write triangle basis
-
-		// xxx write d2.txt
-		
-		panic("xxx tbd")
-		// 	log.Printf("computing complex")
-		// 	complex := E.Complex()
-		// 	writeTriangleFiles(complex, args)
+		handleFillTrianglesMode(args, f, gens)
 	}
 }
 
+func handleGraphMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []golsv.ElementCalG) {
+	var observer golsv.CalGObserver
+	if args.MeshFile != "" {
+		observer = golsv.NewCalGVisualizer(args.MeshFile)
+	}
+	E := golsv.NewCalGCayleyExpander(gens,
+		args.MaxDepth, args.Verbose, &f, args.Quotient,
+		observer)
+	graph := E.Graph()
+	writeGraphFiles(graph, args)
+	log.Printf("done")
+}
+
+func handleFillTrianglesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []golsv.ElementCalG) {
+	if args.Verbose {
+		log.Printf("reading vertex basis file %s", args.VertexBasisFile)
+	}
+	vertexBasis := golsv.ReadElementCalGVertexFile(args.VertexBasisFile)
+	if args.Verbose {
+		log.Printf("reading edge basis file %s", args.EdgeBasisFile)
+	}
+	edgeBasis := golsv.ReadElementCalGEdgeFile(args.EdgeBasisFile)
+
+	edgeChecks := false
+	F := golsv.NewCalGTriangleFiller(vertexBasis, edgeBasis, gens, args.Verbose, &f, args.Quotient, edgeChecks)
+	complex := F.Complex()
+	log.Printf("complex: %s", complex)
+
+	if args.TriangleBasisFile != "" {
+		log.Printf("writing triangle basis to %s", args.TriangleBasisFile)
+		golsv.WriteStringFile(complex.TriangleBasis(), args.TriangleBasisFile)
+	}
+	if args.D2File != "" {
+		D2sparse := complex.D2().(*golsv.Sparse)
+		log.Printf("writing d2 to %s", args.D2File)
+		D2sparse.WriteFile(args.D2File)
+	}
+	log.Printf("done")
+}
+
 // xxx this was ported to the separation of graph-generation and triangle-filling paradigm, but not tested.
-func computeSystolicCandidates(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []golsv.ElementCalG) {
+func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []golsv.ElementCalG) {
 	log.Printf("computing systolic candidates")
 	// first, expand the complex without quotient to limited depth to
 	// find shortest candidates.  this finds the congruence subgroup
