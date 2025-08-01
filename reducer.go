@@ -298,6 +298,7 @@ type worker struct {
 	workRow      int
 	workColStart int
 	workColEnd   int
+	workColData  []orderedIntSet
 	resultOps    []Operation
 }
 
@@ -321,22 +322,40 @@ func (w *worker) run() {
 }
 
 func (w *worker) doWork() {
-	// log.Printf("xxx worker-%d: doWork", w.index)
 	w.resultOps = w.resultOps[:0]
 	for j := w.workColStart; j < w.workColEnd; j++ {
-		if w.matrix.Get(w.workRow, j) == 1 {
+		colHasOne := false
+		if sparse, ok := w.matrix.(*Sparse); ok {
+			// optimization for sparse matrices: when the total number
+			// of columns is very large (e.g. L3), obtaining the
+			// orderedIntSet for a given column becomes a bottleneck.
+			// xxx are we even avoiding this? since we are just
+			// reslicing over the same underlying array?
+			if sparse.GetFromColumnData(w.workRow, w.workColData[j - w.workColStart]) == 1 {
+				colHasOne = true
+			}
+		} else {
+			if w.matrix.Get(w.workRow, j) == 1 {
+				colHasOne = true
+			}
+		}
+		if colHasOne {
 			w.matrix.AddColumn(w.workRow, j)
 			w.resultOps = append(w.resultOps, AddOp{w.workRow, j})
 		}
+		
 	}
 	w.group.Done()
 }
 
 func (w *worker) setWork(row, colStart, colEnd int) {
-	// log.Printf("xxx worker-%d: row=%d colStart=%d colEnd=%d", w.index, row, colStart, colEnd)
 	w.workRow = row
 	w.workColStart = colStart
 	w.workColEnd = colEnd
+	if sparse, ok := w.matrix.(*Sparse); ok {
+		// this is an optimization for sparse matrices
+		w.workColData = sparse.ColumnData()[colStart:colEnd]
+	}
 	w.group.Add(1)
 	w.todo <- nil
 }
