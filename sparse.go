@@ -177,10 +177,6 @@ func (S *Sparse) AsRowVector() BinaryVector {
 	return genericAsRowVector(S)
 }
 
-func (S *Sparse) ColumnData() []orderedIntSet {
-	return S.ColData
-}
-
 func (S *Sparse) ColumnDifferences() BinaryMatrix {
 	colVecs := make([]BinaryVector, S.NumColumns())
 	for j := 0; j < S.NumColumns(); j++ {
@@ -294,11 +290,7 @@ func (S *Sparse) Equal(other BinaryMatrix) bool {
 }
 
 func (S *Sparse) Get(i, j int) uint8 {
-	return S.GetFromColumnData(i, S.ColData[j])
-}
-
-func (S *Sparse) GetFromColumnData(i int, intSet orderedIntSet) uint8 {
-	for _, k := range intSet {
+	for _, k := range S.ColData[j] {
 		if k > i {
 			break
 		} else if k == i {
