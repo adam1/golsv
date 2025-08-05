@@ -320,7 +320,7 @@ func (g ElementCalG) Latex() string {
 
 func (g ElementCalG) LatexMatrix() string {
 	var buf bytes.Buffer
-	buf.WriteString("\\begin{pmatrix}\n")
+	buf.WriteString("\\left \\langle \\begin{matrix}\n")
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
 			f := g[i*3+j]
@@ -331,7 +331,7 @@ func (g ElementCalG) LatexMatrix() string {
 		}
 		buf.WriteString("\\\\\n")
 	}
-	buf.WriteString("\\end{pmatrix}\n")
+	buf.WriteString("\\end{matrix}\\right \\rangle \n")
 	return buf.String()
 }
 
@@ -726,6 +726,7 @@ func cartwrightStegerGenBInv() ElementCalG {
 		F2PolynomialOnePlusY, F2PolynomialOne, F2PolynomialOne)
 }
 
+// xxx deprecated
 func CartwrightStegerGenerators() []ElementCalG {
 	gens := make([]ElementCalG, 0)
 	b := cartwrightStegerGenB()
@@ -779,6 +780,7 @@ type CartwrightStegerGenMatrixInfo struct {
 	B_u, B_uInv ProjMatF2Poly
 }
 
+// xxx deprecated
 func CartwrightStegerGeneratorsMatrixReps() (gens []ProjMatF2Poly, table []CartwrightStegerGenMatrixInfo) {
 	// per the example in LSV section 10, we don't need to use the
 	// normal basis of F_8; we can use the standard basis instead.
@@ -805,9 +807,70 @@ func CartwrightStegerGeneratorsMatrixReps() (gens []ProjMatF2Poly, table []Cartw
 	return gens, table
 }
 
+type CartwrightStegerGenInfo struct {
+	U                 F2Polynomial
+	B_u, B_uInv       ElementCalG
+	B_uRep, B_uInvRep ProjMatF2Poly
+}
+
+// set modulus to zero to not take a quotient
+func CartwrightStegerGeneratorsWithMatrixReps(modulus F2Polynomial) []CartwrightStegerGenInfo {
+	table := make([]CartwrightStegerGenInfo, 0)
+	b := cartwrightStegerGenB()
+	bInv := cartwrightStegerGenBInv()
+	repB := cartwrightStegerMatrixRepB()
+	repBInv := cartwrightStegerMatrixRepBInverse()
+	fieldElements := FqdAllElements()
+	for _, uZeta := range fieldElements {
+		if uZeta.IsZero() {
+			continue
+		}
+		// first, the ElementCalG form
+		// b_u = u b u^{-1}
+		g_u := NewElementCalGFromFieldElement(uZeta)
+		tmp := NewElementCalGIdentity()
+		tmp.Mul(g_u, b)
+		uInv := uZeta.Inverse()
+		g_uInv := NewElementCalGFromFieldElement(uInv)
+		b_u := NewElementCalGIdentity()
+		b_u.Mul(tmp, g_uInv)
+		if modulus != F2PolynomialZero {
+			b_u = b_u.Modf(modulus)
+		}
+		// b_u^{-1} = u b^{-1} u^{-1}
+		tmp.Mul(g_u, bInv)
+		b_uInv := NewElementCalGIdentity()
+		b_uInv.Mul(tmp, g_uInv)
+		if modulus != F2PolynomialZero {
+			b_uInv = b_uInv.Modf(modulus)
+		}
+		// next, the matrix reps
+		uStd := uZeta.ToStandardBasis()
+		uRep := ProjMatF2Poly(cartwrightStegerMatrixRepFieldElement(uStd))
+		uInvRep := ProjMatF2Poly(cartwrightStegerMatrixRepFieldElement(uStd.InverseModf(cartwrightStegerModulus)))
+		// b_u = u b u^{-1}
+		b_uRep := uRep.Mul(repB).Mul(uInvRep)
+		var yxModulus F2Polynomial = CartwrightStegerEmbedPolynomial(modulus)
+		if yxModulus != F2PolynomialZero {
+			b_uRep = b_uRep.ReduceModf(yxModulus)
+		}
+		// b_u^{-1} = u b^{-1} u^{-1}
+		b_uInvRep := uRep.Mul(repBInv).Mul(uInvRep)
+		if yxModulus != F2PolynomialZero {
+			b_uInvRep = b_uInvRep.ReduceModf(yxModulus)
+		}
+		table = append(table, CartwrightStegerGenInfo{
+			uStd,
+			b_u, b_uInv,
+			b_uRep, b_uInvRep,
+		})
+	}
+	return table
+}
+
 func cartwrightStegerMatrixRepOnePlusBetaX() MatF2Poly {
 	// We assume beta = 1 + v.  Note that for computing matrix
-	// representations for other values of q or d, we will need to
+	// representations for other values of q or d, we would need to
 	// find another appropriate value for beta.
 	beta := cartwrightStegerEmbeddingBeta
 	betaMat := cartwrightStegerMatrixRepFieldElement(beta)
@@ -848,7 +911,7 @@ func cartwrightStegerMatrixRepB() ProjMatF2Poly {
 	// and projectivizing, we drop the scalar factor
 	//
 	// projRepB = (1 + y(x))I - repZ^2
-	//          = (1 + y(x))I + repZ^2
+	//          = I + y(x)I + repZ^2
 	repZ := cartwrightStegerMatrixRepZ()
 	repZSq := repZ.Mul(repZ)
 	id := MatF2PolyIdentity
@@ -891,4 +954,14 @@ func coeffToPoly(c int) F2Polynomial {
 	default:
 		panic("invalid coefficient")
 	}
+}
+
+func CartwrightStegerEmbedPolynomial(f_of_y F2Polynomial) (f_of_y_of_x F2Polynomial) {
+	var sum F2Polynomial = F2PolynomialZero
+	for i := 0; i <= f_of_y.Degree(); i++ {
+		if f_of_y.Coefficient(i) == 1 {
+			sum = sum.Add(cartwrightStegerEmbeddingY.Pow(i))
+		}
+	}
+	return sum
 }

@@ -2,7 +2,6 @@ package golsv
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"math/big"
@@ -98,47 +97,127 @@ func (R *RandomComplexGenerator) RandomSimplicialComplex() (d_1, d_2 BinaryMatri
 	return C.D1(), C.D2(), nil
 }
 
-func (R *RandomComplexGenerator) RandomCliqueComplex(probEdge float64) (d_1, d_2 BinaryMatrix, err error) {
-	numVertices := R.dimC_0
+func (R *RandomComplexGenerator) RandomCliqueComplex(probEdge float64) (*ZComplex[ZVertexInt], error) {
 	if R.verbose {
-		log.Printf("Generating clique complex over %d vertices with edge probability %v", numVertices, probEdge)
+		log.Printf("Generating clique complex over %d vertices with edge probability %v", R.dimC_0, probEdge)
 	}
-	if probEdge < 0 || probEdge > 1 {
-		panic("pEdge must be between 0 and 1")
+	C, err := RandomGraph(R.dimC_0, probEdge, R.verbose)
+	if err != nil {
+		return nil, err
 	}
-	entropyBytesPerBit := 2 // nb. increase if more precision is needed in probEdge
-	entropy := make([]byte, numVertices * entropyBytesPerBit)
-	bytes := make([]byte, 8)
-	maxInt := uint64(1)<<(entropyBytesPerBit * 8) - 1
-	cutoff := uint64(probEdge * float64(maxInt))
-	d_1Sparse := NewSparseBinaryMatrix(numVertices, 0).Sparse()
-	numEdges := 0
-	for i := 0; i < numVertices; i++ {
-		numCols := numVertices - i - 1
-		entropy = entropy[:numCols * entropyBytesPerBit]
-		_, err := rand.Read(entropy)
-		if err != nil {
-			panic(err)
-		}
-		for k := 0; k < len(entropy); k += entropyBytesPerBit {
-			copy(bytes, entropy[k:k+entropyBytesPerBit])
-			num := binary.LittleEndian.Uint64(bytes)
-			if num <= cutoff {
-				M := NewSparseBinaryMatrix(numVertices, 1)
-				M.Set(i, 0, 1)
-				M.Set(i+k/entropyBytesPerBit+1, 0, 1)
-				d_1Sparse.AppendColumn(M)
-				numEdges++
-			}
-		}
-	}
-	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
 	if R.verbose {
-		log.Printf("Generated d_1: %v\n", d_1Sparse)
 		log.Printf("Filling cliques")
 	}
 	C.Fill3Cliques()
-	return C.D1(), C.D2(), nil
+	return C, nil
+}
+
+
+// randomCirculantStepsWithTriangles generates a random step set for a k-regular circulant graph.
+// Returns k/2 steps which will be normalized to include inverses, resulting in k degree.
+// It starts with step 1, then adds additional steps preferring triangle-forming sets.
+// When adding generator d, also adds n - d - 1 to ensure triangle formation.
+func randomCirculantStepsWithTriangles(n, k int) ([]int, error) {
+	if k < 0 || k >= n {
+		return nil, fmt.Errorf("regularity degree %d must be between 0 and %d", k, n-1)
+	}
+	if k%2 != 0 {
+		return nil, fmt.Errorf("regularity degree %d must be even", k)
+	}
+	if n < 2 {
+		return nil, fmt.Errorf("number of vertices %d must be at least 2", n)
+	}
+	targetSteps := k / 2
+	generators := make(map[int]bool)
+	generatorList := make([]int, 0, targetSteps)
+	
+	// Start with step 1 (this will generate 1 and n-1 after normalization)
+	generators[1] = true
+	generatorList = append(generatorList, 1)
+	
+	// Add remaining (targetSteps-1) generators, preferring triangle-forming sets
+	remaining := targetSteps - 1
+	for remaining > 0 {
+		// Pick random integer between 2 and n/2 inclusive to avoid duplicates with inverses
+		var d int
+		maxAttempts := 100
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			if n <= 4 {
+				// For small n, just try step 2 if available
+				d = 2
+				if d >= n {
+					break
+				}
+			} else {
+				// Sample from range [2, n-2] and let constraint logic handle duplicates
+				dBig, err := rand.Int(rand.Reader, big.NewInt(int64(n-3)))
+				if err != nil {
+					return nil, err
+				}
+				d = int(dBig.Int64()) + 2 // shift to range [2, n-2]
+			}
+			
+			// Don't add if this step is already used (including its inverse)
+			negD := (n - d) % n
+			
+			// Exclude d = n-1 because it would create triangleStep = 0, which is invalid
+			if !generators[d] && !generators[negD] && d != negD && d != (n-1) {
+				// Add the main generator d
+				generators[d] = true
+				generatorList = append(generatorList, d)
+				remaining--
+				
+				// Also add triangle-forming step n - d - 1 if not already present and we have space
+				triangleStep := (n - d - 1) % n
+				triangleStepInverse := (n - triangleStep) % n
+				if remaining > 0 && triangleStep > 0 && triangleStep != (n-1) && triangleStep != triangleStepInverse && !generators[triangleStep] && !generators[triangleStepInverse] && triangleStep != d && triangleStep != negD {
+					generators[triangleStep] = true
+					generatorList = append(generatorList, triangleStep)
+					remaining--
+				}
+				break
+			}
+			
+			if attempt == maxAttempts-1 {
+				return nil, fmt.Errorf("failed to generate unique generators after %d attempts", maxAttempts)
+			}
+		}
+		
+		if remaining == 0 {
+			break
+		}
+	}
+	
+	return generatorList, nil
+}
+
+func (R *RandomComplexGenerator) RandomCirculantComplex(n, k int) (*ZComplex[ZVertexInt], error) {
+	if R.verbose {
+		log.Printf("Generating circulant clique complex over %d vertices with regularity degree %d", n, k)
+	}
+	steps, err := randomCirculantStepsWithTriangles(n, k)
+	if err != nil {
+		return nil, err
+	}
+	if R.verbose {
+		log.Printf("Generated circulant generators: %v", steps)
+	}
+	return CirculantComplex(n, steps, R.verbose)
+}
+
+func (R *RandomComplexGenerator) RandomRegularCliqueComplexByBalancing(degree int, maxIterations int) (*ZComplex[ZVertexInt], error) {
+	C, err := RandomRegularGraphByBalancing(R.dimC_0, degree, maxIterations, R.verbose)
+	if err != nil {
+		return nil, err
+	}
+	if R.verbose {
+		log.Printf("Filling cliques")
+	}
+	C.Fill3Cliques()
+	if R.verbose {
+		log.Printf("Generated: %v", C)
+	}
+	return C, nil
 }
 
 func (R *RandomComplexGenerator) randomizeGeneral_d_1() (d_1 BinaryMatrix, kernelMatrix BinaryMatrix) {
@@ -261,3 +340,4 @@ func randFloat() float64 {
 	}
 	return float64(d.Int64()) / 1000000.0
 }
+

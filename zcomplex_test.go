@@ -289,6 +289,650 @@ func TestZComplexNeighbors(t *testing.T) {
 	}
 }
 
+func TestZComplexAddEdge(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		u, v     int     // vertices to connect
+		expected [][]int // expected neighbors after adding edge
+	}{
+		{
+			name:    "add edge to empty graph",
+			initial: [][]int{},
+			u:       0,
+			v:       1,
+			expected: [][]int{
+				{1},    // neighbors of vertex 0
+				{0},    // neighbors of vertex 1
+			},
+		},
+		{
+			name:    "add edge to existing triangle",
+			initial: [][]int{{0, 1, 2}, {3}}, // include vertex 3 in complex
+			u:       0,
+			v:       3,
+			expected: [][]int{
+				{1, 2, 3}, // neighbors of vertex 0
+				{0, 2},    // neighbors of vertex 1
+				{0, 1},    // neighbors of vertex 2
+				{0},       // neighbors of vertex 3
+			},
+		},
+		{
+			name:    "add edge between existing vertices",
+			initial: [][]int{{0, 1}, {2, 3}},
+			u:       1,
+			v:       2,
+			expected: [][]int{
+				{1},    // neighbors of vertex 0
+				{0, 2}, // neighbors of vertex 1
+				{1, 3}, // neighbors of vertex 2
+				{2},    // neighbors of vertex 3
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var C *ZComplex[ZVertexInt]
+			if len(test.initial) == 0 {
+				// Create empty complex with just vertices
+				vertices := []ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2), ZVertexInt(3)}
+				C = NewZComplex(vertices, nil, nil, false, false)
+			} else {
+				C = NewZComplexFromMaximalSimplices(test.initial)
+			}
+
+			initialEdgeCount := C.NumEdges()
+			C.AddEdge(test.u, test.v)
+
+			// Check edge was added
+			if C.NumEdges() != initialEdgeCount+1 {
+				t.Errorf("Expected %d edges, got %d", initialEdgeCount+1, C.NumEdges())
+			}
+
+			// Check neighbors are correct
+			for vertex, expectedNeighbors := range test.expected {
+				if vertex >= len(C.vertexBasis) {
+					continue
+				}
+				neighbors := C.Neighbors(vertex)
+				if !equalIntSlices(neighbors, expectedNeighbors) {
+					t.Errorf("Vertex %d: expected neighbors %v, got %v", vertex, expectedNeighbors, neighbors)
+				}
+			}
+
+			// Check that vertices are mutual neighbors
+			if !C.IsNeighbor(test.u, test.v) {
+				t.Errorf("Vertices %d and %d should be neighbors", test.u, test.v)
+			}
+			if !C.IsNeighbor(test.v, test.u) {
+				t.Errorf("Vertices %d and %d should be neighbors", test.v, test.u)
+			}
+		})
+	}
+}
+
+func TestZComplexAddEdgeDuplicateHandling(t *testing.T) {
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1}})
+	initialEdgeCount := C.NumEdges()
+
+	// Adding the same edge should not increase edge count
+	C.AddEdge(0, 1)
+	if C.NumEdges() != initialEdgeCount {
+		t.Errorf("Expected %d edges after adding duplicate, got %d", initialEdgeCount, C.NumEdges())
+	}
+
+	// Adding reverse direction should not increase edge count
+	C.AddEdge(1, 0)
+	if C.NumEdges() != initialEdgeCount {
+		t.Errorf("Expected %d edges after adding reverse duplicate, got %d", initialEdgeCount, C.NumEdges())
+	}
+}
+
+func TestZComplexAddEdgePanics(t *testing.T) {
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}})
+
+	// Test self-loop panic
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic for self-loop")
+		}
+	}()
+	C.AddEdge(0, 0)
+}
+
+// Helper function to compare int slices ignoring order
+func equalIntSlices(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[int]int)
+	for _, x := range a {
+		counts[x]++
+	}
+	for _, x := range b {
+		counts[x]--
+		if counts[x] < 0 {
+			return false
+		}
+	}
+	for _, count := range counts {
+		if count != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func TestZComplexDegree(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		vertex   int     // vertex to check degree
+		expected int     // expected degree
+	}{
+		{
+			name:     "isolated vertex",
+			initial:  [][]int{{0}, {1, 2}}, // vertex 0 is isolated
+			vertex:   0,
+			expected: 0,
+		},
+		{
+			name:     "vertex in edge",
+			initial:  [][]int{{0, 1}},
+			vertex:   0,
+			expected: 1,
+		},
+		{
+			name:     "vertex in triangle",
+			initial:  [][]int{{0, 1, 2}},
+			vertex:   0,
+			expected: 2,
+		},
+		{
+			name:     "vertex with multiple connections",
+			initial:  [][]int{{0, 1}, {0, 2}, {0, 3}},
+			vertex:   0,
+			expected: 3,
+		},
+		{
+			name:     "vertex in complex graph",
+			initial:  [][]int{{0, 1}, {1, 2}, {2, 3}, {0, 3}}, // square
+			vertex:   1,
+			expected: 2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			C := NewZComplexFromMaximalSimplices(test.initial)
+			degree := C.Degree(test.vertex)
+			if degree != test.expected {
+				t.Errorf("Expected degree %d for vertex %d, got %d", test.expected, test.vertex, degree)
+			}
+		})
+	}
+}
+
+func TestZComplexIsNeighbor(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		u, v     int     // vertices to check
+		expected bool    // expected result
+	}{
+		{
+			name:     "isolated vertices",
+			initial:  [][]int{{0}, {1}}, // both isolated
+			u:        0,
+			v:        1,
+			expected: false,
+		},
+		{
+			name:     "connected by edge",
+			initial:  [][]int{{0, 1}},
+			u:        0,
+			v:        1,
+			expected: true,
+		},
+		{
+			name:     "connected by edge (reverse)",
+			initial:  [][]int{{0, 1}},
+			u:        1,
+			v:        0,
+			expected: true,
+		},
+		{
+			name:     "connected in triangle",
+			initial:  [][]int{{0, 1, 2}},
+			u:        0,
+			v:        1,
+			expected: true,
+		},
+		{
+			name:     "not connected in triangle",
+			initial:  [][]int{{0, 1, 2}, {3}},
+			u:        0,
+			v:        3,
+			expected: false,
+		},
+		{
+			name:     "connected through multiple paths",
+			initial:  [][]int{{0, 1}, {0, 2}, {1, 2}}, // triangle
+			u:        1,
+			v:        2,
+			expected: true,
+		},
+		{
+			name:     "self-check",
+			initial:  [][]int{{0, 1}},
+			u:        0,
+			v:        0,
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			C := NewZComplexFromMaximalSimplices(test.initial)
+			result := C.IsNeighbor(test.u, test.v)
+			if result != test.expected {
+				t.Errorf("Expected IsNeighbor(%d, %d) = %v, got %v", test.u, test.v, test.expected, result)
+			}
+		})
+	}
+}
+
+func TestZComplexIsRegular(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		expected bool    // expected regularity
+	}{
+		{
+			name:     "empty graph",
+			initial:  [][]int{},
+			expected: true,
+		},
+		{
+			name:     "single vertex",
+			initial:  [][]int{{0}},
+			expected: true,
+		},
+		{
+			name:     "two isolated vertices",
+			initial:  [][]int{{0}, {1}},
+			expected: true, // both have degree 0
+		},
+		{
+			name:     "single edge (2-regular)",
+			initial:  [][]int{{0, 1}},
+			expected: true, // both vertices have degree 1
+		},
+		{
+			name:     "triangle (2-regular)",
+			initial:  [][]int{{0, 1, 2}},
+			expected: true, // all vertices have degree 2
+		},
+		{
+			name:     "irregular graph",
+			initial:  [][]int{{0, 1}, {1, 2}}, // vertex 1 has degree 2, others have degree 1
+			expected: false,
+		},
+		{
+			name:     "square (2-regular)",
+			initial:  [][]int{{0, 1}, {1, 2}, {2, 3}, {3, 0}},
+			expected: true, // all vertices have degree 2
+		},
+		{
+			name:     "star graph (irregular)",
+			initial:  [][]int{{0, 1}, {0, 2}, {0, 3}}, // vertex 0 has degree 3, others have degree 1
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var C *ZComplex[ZVertexInt]
+			if len(test.initial) == 0 {
+				// Create empty complex
+				vertices := []ZVertex[ZVertexInt]{}
+				C = NewZComplex(vertices, nil, nil, false, false)
+			} else {
+				C = NewZComplexFromMaximalSimplices(test.initial)
+			}
+			
+			result, _ := C.IsRegular()
+			if result != test.expected {
+				t.Errorf("Expected IsRegular() = %v, got %v", test.expected, result)
+			}
+		})
+	}
+}
+
+func TestZComplexMoveEdge(t *testing.T) {
+	tests := []struct {
+		name        string
+		initial     [][]int // maximal simplices for initial complex
+		edgeToMove  [2]int  // vertices of edge to move
+		newVertices [2]int  // new vertices for the edge
+		expected    [][]int // expected neighbors after moving edge
+	}{
+		{
+			name:        "move edge in simple graph",
+			initial:     [][]int{{0, 1}, {2, 3}}, // two separate edges
+			edgeToMove:  [2]int{0, 1},
+			newVertices: [2]int{1, 2}, // move edge (0,1) to (1,2)
+			expected: [][]int{
+				{},      // neighbors of vertex 0
+				{2},     // neighbors of vertex 1
+				{1, 3},  // neighbors of vertex 2
+				{2},     // neighbors of vertex 3
+			},
+		},
+		{
+			name:        "move edge in connected graph",
+			initial:     [][]int{{0, 1}, {1, 2}, {2, 3}}, // path graph
+			edgeToMove:  [2]int{1, 2},
+			newVertices: [2]int{0, 3}, // move middle edge to connect endpoints
+			expected: [][]int{
+				{1, 3},  // neighbors of vertex 0
+				{0},     // neighbors of vertex 1
+				{3},     // neighbors of vertex 2
+				{0, 2},  // neighbors of vertex 3
+			},
+		},
+		{
+			name:        "move edge to create different topology",
+			initial:     [][]int{{0, 1}, {0, 2}, {1, 2}}, // triangle edges
+			edgeToMove:  [2]int{0, 1},
+			newVertices: [2]int{0, 3}, // move edge to new vertex
+			expected: [][]int{
+				{2, 3},  // neighbors of vertex 0
+				{2},     // neighbors of vertex 1
+				{0, 1},  // neighbors of vertex 2
+				{0},     // neighbors of vertex 3
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Find the maximum vertex needed for this test
+			maxVertex := 0
+			for _, edge := range test.initial {
+				for _, v := range edge {
+					if v > maxVertex {
+						maxVertex = v
+					}
+				}
+			}
+			for _, v := range test.edgeToMove {
+				if v > maxVertex {
+					maxVertex = v
+				}
+			}
+			for _, v := range test.newVertices {
+				if v > maxVertex {
+					maxVertex = v
+				}
+			}
+			
+			// Create all vertices we need
+			vertices := []ZVertex[ZVertexInt]{}
+			for i := 0; i <= maxVertex; i++ {
+				vertices = append(vertices, ZVertexInt(i))
+			}
+			
+			// Create edges from test.initial
+			edges := []ZEdge[ZVertexInt]{}
+			for _, edge := range test.initial {
+				if len(edge) == 2 {
+					edges = append(edges, NewZEdge(ZVertexInt(edge[0]), ZVertexInt(edge[1])))
+				}
+			}
+			
+			// Create the complex with vertices and edges
+			C := NewZComplex(vertices, edges, nil, false, false)
+
+			initialEdgeCount := C.NumEdges()
+
+			// Find the edge to move
+			edgeIdx, ok := C.IndexOfEdge(test.edgeToMove[0], test.edgeToMove[1])
+			if !ok {
+				t.Fatalf("Edge (%d,%d) not found for moving", test.edgeToMove[0], test.edgeToMove[1])
+			}
+
+			// Verify original edge exists
+			if !C.IsNeighbor(test.edgeToMove[0], test.edgeToMove[1]) {
+				t.Fatalf("Original edge (%d,%d) should exist", test.edgeToMove[0], test.edgeToMove[1])
+			}
+
+			// Move the edge
+			C.MoveEdge(edgeIdx, test.newVertices[0], test.newVertices[1])
+
+			// Verify edge count remains the same
+			if C.NumEdges() != initialEdgeCount {
+				t.Errorf("Expected %d edges after moving, got %d", initialEdgeCount, C.NumEdges())
+			}
+
+			// Verify original edge no longer exists
+			if C.IsNeighbor(test.edgeToMove[0], test.edgeToMove[1]) {
+				t.Errorf("Original edge (%d,%d) should no longer exist", test.edgeToMove[0], test.edgeToMove[1])
+			}
+
+			// Verify new edge exists
+			if !C.IsNeighbor(test.newVertices[0], test.newVertices[1]) {
+				t.Errorf("New edge (%d,%d) should exist", test.newVertices[0], test.newVertices[1])
+			}
+
+			// Check all neighbors are as expected
+			for vertex, expectedNeighbors := range test.expected {
+				if vertex >= len(C.vertexBasis) {
+					continue
+				}
+				neighbors := C.Neighbors(vertex)
+				if !equalIntSlices(neighbors, expectedNeighbors) {
+					t.Errorf("Vertex %d: expected neighbors %v, got %v", vertex, expectedNeighbors, neighbors)
+				}
+			}
+
+			// Verify edge index is correctly updated
+			newEdgeIdx, ok := C.IndexOfEdge(test.newVertices[0], test.newVertices[1])
+			if !ok {
+				t.Errorf("New edge (%d,%d) not found in edge index", test.newVertices[0], test.newVertices[1])
+			}
+			if newEdgeIdx != edgeIdx {
+				t.Errorf("Expected moved edge to have same index %d, got %d", edgeIdx, newEdgeIdx)
+			}
+
+			// Verify old edge is not in index
+			_, ok = C.IndexOfEdge(test.edgeToMove[0], test.edgeToMove[1])
+			if ok {
+				t.Errorf("Old edge (%d,%d) should not be in edge index after moving", test.edgeToMove[0], test.edgeToMove[1])
+			}
+		})
+	}
+}
+
+func TestZComplexDeleteEdge(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		u, v     int     // vertices to disconnect
+		expected [][]int // expected neighbors after deleting edge
+	}{
+		{
+			name:    "delete edge from graph",
+			initial: [][]int{{0, 1}, {0, 2}}, // edges only, no triangles
+			u:       0,
+			v:       1,
+			expected: [][]int{
+				{2}, // neighbors of vertex 0
+				{},  // neighbors of vertex 1
+				{0}, // neighbors of vertex 2
+			},
+		},
+		{
+			name:    "delete edge from disconnected components",
+			initial: [][]int{{0, 1}, {2, 3}},
+			u:       0,
+			v:       1,
+			expected: [][]int{
+				{},  // neighbors of vertex 0
+				{},  // neighbors of vertex 1
+				{3}, // neighbors of vertex 2
+				{2}, // neighbors of vertex 3
+			},
+		},
+		{
+			name:    "delete edge from complex graph",
+			initial: [][]int{{0, 1}, {1, 2}, {2, 3}, {0, 3}},
+			u:       1,
+			v:       2,
+			expected: [][]int{
+				{1, 3}, // neighbors of vertex 0
+				{0},    // neighbors of vertex 1
+				{3},    // neighbors of vertex 2
+				{0, 2}, // neighbors of vertex 3
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			C := NewZComplexFromMaximalSimplices(test.initial)
+			initialEdgeCount := C.NumEdges()
+
+			// Verify edge exists before deletion
+			if !C.IsNeighbor(test.u, test.v) {
+				t.Fatalf("Edge (%d,%d) should exist before deletion", test.u, test.v)
+			}
+
+			// Find edge index
+			edgeIdx, ok := C.IndexOfEdge(test.u, test.v)
+			if !ok {
+				t.Fatalf("Edge (%d,%d) not found in edge index", test.u, test.v)
+			}
+
+			C.DeleteEdge(edgeIdx)
+
+			// Check edge was removed
+			if C.NumEdges() != initialEdgeCount-1 {
+				t.Errorf("Expected %d edges, got %d", initialEdgeCount-1, C.NumEdges())
+			}
+
+			// Check neighbors are correct
+			for vertex, expectedNeighbors := range test.expected {
+				if vertex >= len(C.vertexBasis) {
+					continue
+				}
+				neighbors := C.Neighbors(vertex)
+				if !equalIntSlices(neighbors, expectedNeighbors) {
+					t.Errorf("Vertex %d: expected neighbors %v, got %v", vertex, expectedNeighbors, neighbors)
+				}
+			}
+
+			// Check that vertices are no longer neighbors
+			if C.IsNeighbor(test.u, test.v) {
+				t.Errorf("Vertices %d and %d should not be neighbors after deletion", test.u, test.v)
+			}
+			if C.IsNeighbor(test.v, test.u) {
+				t.Errorf("Vertices %d and %d should not be neighbors after deletion", test.v, test.u)
+			}
+		})
+	}
+}
+
+func TestZComplexDeleteEdgeNonExistent(t *testing.T) {
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1}, {2, 3}})
+	initialEdgeCount := C.NumEdges()
+
+	// Deleting non-existent edge should not change edge count
+	edgeIdx, ok := C.IndexOfEdge(0, 2) // no edge between 0 and 2
+	if ok {
+		C.DeleteEdge(edgeIdx)
+	}
+	// Note: If edge doesn't exist, we don't call DeleteEdge at all
+	if C.NumEdges() != initialEdgeCount {
+		t.Errorf("Expected %d edges after deleting non-existent edge, got %d", initialEdgeCount, C.NumEdges())
+	}
+
+	// Neighbors should remain unchanged
+	expectedNeighbors := map[int][]int{
+		0: {1},
+		1: {0},
+		2: {3},
+		3: {2},
+	}
+	for vertex, expected := range expectedNeighbors {
+		neighbors := C.Neighbors(vertex)
+		if !equalIntSlices(neighbors, expected) {
+			t.Errorf("Vertex %d: expected neighbors %v, got %v", vertex, expected, neighbors)
+		}
+	}
+}
+
+func TestZComplexDeleteEdgeRoundTrip(t *testing.T) {
+	// Test that adding and then deleting an edge returns to original state
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2}}) // edges only, no triangles
+	
+	// Record original state
+	originalEdgeCount := C.NumEdges()
+	originalNeighbors := make(map[int][]int)
+	for i := 0; i < 4; i++ {
+		if i < len(C.vertexBasis) {
+			neighbors := C.Neighbors(i)
+			originalNeighbors[i] = make([]int, len(neighbors))
+			copy(originalNeighbors[i], neighbors)
+		}
+	}
+
+	// Add vertex 3 to have somewhere to connect
+	vertices := []ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2), ZVertexInt(3)}
+	edges := C.EdgeBasis()
+	C = NewZComplex(vertices, edges, nil, false, false)
+
+	// Add an edge then delete it
+	C.AddEdge(0, 3)
+	edgeIdx, ok := C.IndexOfEdge(0, 3)
+	if !ok {
+		t.Fatalf("Edge (0,3) not found after adding")
+	}
+	C.DeleteEdge(edgeIdx)
+
+	// Check we're back to original state (for vertices that existed originally)
+	if C.NumEdges() != originalEdgeCount {
+		t.Errorf("Expected %d edges after round trip, got %d", originalEdgeCount, C.NumEdges())
+	}
+
+	for vertex, expectedNeighbors := range originalNeighbors {
+		neighbors := C.Neighbors(vertex)
+		if !equalIntSlices(neighbors, expectedNeighbors) {
+			t.Errorf("Vertex %d: expected neighbors %v after round trip, got %v", vertex, expectedNeighbors, neighbors)
+		}
+	}
+}
+
+func TestZComplexDeleteEdgeTrianglePanic(t *testing.T) {
+	// Test that DeleteEdge panics when used on complex with triangles
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}) // This creates a triangle
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic when deleting edge from complex with triangles")
+		}
+	}()
+	
+	edgeIdx, ok := C.IndexOfEdge(0, 1)
+	if ok {
+		C.DeleteEdge(edgeIdx) // Should panic
+	} else {
+		t.Errorf("Expected edge (0,1) to exist in triangle complex")
+	}
+}
+
 func TestZComplexTrianglesContainingVertex(t *testing.T) {
 	T := ZTriangle[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)}
 	U := ZTriangle[ZVertexInt]{ZVertexInt(3), ZVertexInt(1), ZVertexInt(0)}
@@ -437,18 +1081,17 @@ func TestZComplexMaximalSimplicesStringRandom(t *testing.T) {
 		numVertices := 3 + rand.Intn(maxVertices)
 		probEdge := 0.3
 		generator := NewRandomComplexGenerator(numVertices, verbose)
-		d1, d2, err := generator.RandomCliqueComplex(probEdge)
+		X, err := generator.RandomCliqueComplex(probEdge)
 		if err != nil {
 			t.Fatalf("Failed to generate random clique complex: %v", err)
 		}
-		X := NewZComplexFromBoundaryMatrices(d1, d2)
 		s := X.MaximalSimplicesString()
 		simplices, err := parseSimplicesString(s)
 		if err != nil {
 			t.Fatalf("Failed to parse simplices string: %v", err)
 		}
 		Y := NewZComplexFromMaximalSimplices(simplices)
-		if !reflect.DeepEqual(X, Y) {
+		if X.String() != Y.String() {
 			t.Errorf("Test %d: got=%v, expected=%v", i, X, Y)
 		}
 	}
@@ -668,12 +1311,11 @@ func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
 	for i := 0; i < trials; i++ {
 		numVertices := rand.Intn(maxVertices-minVertices) + minVertices
 		R := NewRandomComplexGenerator(numVertices, verbose)
-		d_1, d_2, err := R.RandomCliqueComplex(0.4)
+		Xoriginal, err := R.RandomCliqueComplex(0.4)
 		if err != nil {
 			t.Errorf("Failed to generate random clique complex: %v", err)
 			continue
 		}
-		Xoriginal := NewZComplexFromBoundaryMatrices(d_1, d_2)
 		//log.Printf("Xoriginal:\n%s", Xoriginal.DumpBases())
 		initialVertex := rand.Intn(len(Xoriginal.VertexBasis()))
 

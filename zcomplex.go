@@ -254,16 +254,48 @@ func (C *ZComplex[T]) computeD2() {
 	if C.verbose {
 		log.Printf("computing d2 boundary matrix")
 	}
+	edgeIndex := C.EdgeIndex()
 	C.d2 = NewSparseBinaryMatrix(len(C.edgeBasis), len(C.triangleBasis))
 	for j, t := range C.triangleBasis {
 		for _, e := range t.Edges() {
-			row, ok := C.edgeIndex[e]
+			row, ok := edgeIndex[e]
 			if !ok {
 				panic(fmt.Sprintf("edge %v not in edge index", e))
 			}
 			C.d2.Set(row, j, 1)
 		}
 	}
+}
+
+func (C *ZComplex[T]) AddEdge(u, v int) {
+	if u < 0 || u >= len(C.vertexBasis) || v < 0 || v >= len(C.vertexBasis) {
+		panic("vertex index out of range")
+	}
+	if u == v {
+		panic("cannot add self-loop")
+	}
+	
+	// Create edge from vertex indices
+	edge := NewZEdge(C.vertexBasis[u], C.vertexBasis[v])
+	
+	// Check if edge already exists
+	for _, existingEdge := range C.edgeBasis {
+		if existingEdge.Equal(edge) {
+			return // Edge already exists
+		}
+	}
+	// Add edge to basis
+	C.edgeBasis = append(C.edgeBasis, edge)
+	
+	// Update adjacency index in place if it exists
+	if C.adjacencyIndex != nil {
+		C.adjacencyIndex[u] = append(C.adjacencyIndex[u], v)
+		C.adjacencyIndex[v] = append(C.adjacencyIndex[v], u)
+	}
+	C.edgeIndex[edge] = len(C.edgeBasis) - 1
+	// Invalidate
+	C.d1 = nil
+	C.d2 = nil
 }
 
 func (C *ZComplex[T]) D1() BinaryMatrix {
@@ -381,6 +413,62 @@ func (C *ZComplex[T]) DualComplex() *ZComplex[ZVertexInt] {
 	return NewZComplex(vertices, edges, triangles, sortBases, verbose)
 }
 
+func (C *ZComplex[T]) Degree(v int) int {
+	return len(C.Neighbors(v))
+}
+
+func (C *ZComplex[T]) DeleteEdge(idx int) {
+	if idx < 0 || idx >= len(C.edgeBasis) {
+		panic("edge index out of range")
+	}
+	if len(C.triangleBasis) > 0 {
+		panic("DeleteEdge can only be used on graphs without triangles")
+	}
+	edge := C.edgeBasis[idx]
+	C.edgeBasis = append(C.edgeBasis[:idx], C.edgeBasis[idx+1:]...)
+	
+	// Update adjacency index in place if it exists
+	if C.adjacencyIndex != nil {
+		u, ok := C.vertexIndex[edge[0]]
+		if !ok {
+			panic("Vertex not found")
+		}
+		v, ok := C.vertexIndex[edge[1]]
+		if !ok {
+			panic("Vertex not found")
+		}
+		// Remove v from u's neighbors
+		for j, neighbor := range C.adjacencyIndex[u] {
+			if neighbor == v {
+				C.adjacencyIndex[u] = append(C.adjacencyIndex[u][:j], C.adjacencyIndex[u][j+1:]...)
+				break
+			}
+		}
+		// Remove u from v's neighbors
+		for j, neighbor := range C.adjacencyIndex[v] {
+			if neighbor == u {
+				C.adjacencyIndex[v] = append(C.adjacencyIndex[v][:j], C.adjacencyIndex[v][j+1:]...)
+				break
+			}
+		}
+	}
+	//C.deleteEdgeFromEdgeIndex(edge, idx)
+	// Invalidate
+	C.edgeIndex = nil // this is optimized for deleting many edges without reading from the edgeIndex
+	C.d1 = nil
+	C.d2 = nil
+	return
+}
+
+func (C *ZComplex[T]) deleteEdgeFromEdgeIndex(edge ZEdge[T], idx int) {
+	delete(C.edgeIndex, edge)
+	for e, i := range C.edgeIndex {
+		if i > idx {
+			C.edgeIndex[e]--
+		}
+	}
+}
+
 func (C *ZComplex[T]) EdgeBasis() []ZEdge[T] {
 	return C.edgeBasis
 }
@@ -397,6 +485,9 @@ func (C *ZComplex[T]) EdgesContainingVertex(v ZVertex[T]) []ZEdge[T] {
 }
 
 func (C *ZComplex[T]) EdgeIndex() map[ZEdge[T]]int {
+	if C.edgeIndex == nil {
+		C.computeEdgeIndex()
+	}
 	return C.edgeIndex
 }
 
@@ -532,6 +623,81 @@ func parseSimplicesString(s string) (simplices [][]int, err error) {
 	return
 }
 
+func (C *ZComplex[T]) IsRegular() (bool, int) {
+	if C.NumVertices() == 0 {
+		return true, 0 // vacuously true, degree 0
+	}
+	
+	firstDegree := C.Degree(0)
+	for i := 1; i < C.NumVertices(); i++ {
+		if C.Degree(i) != firstDegree {
+			return false, -1 // not regular, degree is undefined
+		}
+	}
+	return true, firstDegree
+}
+
+func (C *ZComplex[T]) IndexOfEdge(u, v int) (int, bool) {
+	if u < 0 || u >= len(C.vertexBasis) || v < 0 || v >= len(C.vertexBasis) {
+		return -1, false
+	}
+	
+	targetEdge := NewZEdge(C.vertexBasis[u], C.vertexBasis[v])
+	edgeIndex := C.EdgeIndex()
+	idx, ok := edgeIndex[targetEdge]
+	return idx, ok
+}
+
+func (C *ZComplex[T]) IsNeighbor(u, v int) bool {
+	neighbors := C.Neighbors(u)
+	for _, neighbor := range neighbors {
+		if neighbor == v {
+			return true
+		}
+	}
+	return false
+}
+
+func (C *ZComplex[T]) MoveEdge(idx, u, v int) {
+	edgeIndex := C.EdgeIndex()
+	oldEdge := C.edgeBasis[idx]
+	
+	// Update adjacency index: remove old edge connections
+	if C.adjacencyIndex != nil {
+		oldU, okU := C.vertexIndex[oldEdge[0]]
+		oldV, okV := C.vertexIndex[oldEdge[1]]
+		if okU && okV {
+			// Remove oldV from oldU's neighbors
+			for i, neighbor := range C.adjacencyIndex[oldU] {
+				if neighbor == oldV {
+					C.adjacencyIndex[oldU] = append(C.adjacencyIndex[oldU][:i], C.adjacencyIndex[oldU][i+1:]...)
+					break
+				}
+			}
+			// Remove oldU from oldV's neighbors
+			for i, neighbor := range C.adjacencyIndex[oldV] {
+				if neighbor == oldU {
+					C.adjacencyIndex[oldV] = append(C.adjacencyIndex[oldV][:i], C.adjacencyIndex[oldV][i+1:]...)
+					break
+				}
+			}
+		}
+	}
+	
+	delete(edgeIndex, oldEdge)
+	a := C.vertexBasis[u]
+	b := C.vertexBasis[v]
+	newEdge := NewZEdge(a, b)
+	C.edgeBasis[idx] = newEdge
+	edgeIndex[newEdge] = idx
+	
+	// Update adjacency index: add new edge connections
+	if C.adjacencyIndex != nil {
+		C.adjacencyIndex[u] = append(C.adjacencyIndex[u], v)
+		C.adjacencyIndex[v] = append(C.adjacencyIndex[v], u)
+	}
+}
+
 func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
 	C.ensureAdjacencyIndex()
 	return C.adjacencyIndex[v]
@@ -561,9 +727,10 @@ func (C *ZComplex[T]) TrianglesContainingVertex(v ZVertex[T]) []ZTriangle[T] {
 
 // xxx test
 func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
+	edgeIndex := C.EdgeIndex()
 	v := NewBinaryVector(len(C.edgeBasis))
 	for _, e := range path {
-		if i, ok := C.edgeIndex[e]; ok {
+		if i, ok := edgeIndex[e]; ok {
 			v.Set(i, 1)
 		} else {
 			panic(fmt.Sprintf("edge %v not in edge index", e))

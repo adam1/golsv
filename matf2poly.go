@@ -37,6 +37,15 @@ func (M MatF2Poly) Add(N MatF2Poly) MatF2Poly {
 	return R
 }
 
+func (M MatF2Poly) Determinant() F2Polynomial {
+	return M[0].Mul(M[4]).Mul(M[8]).
+		Add(M[0].Mul(M[5]).Mul(M[7])).
+		Add(M[1].Mul(M[3]).Mul(M[8])).
+		Add(M[1].Mul(M[5]).Mul(M[6])).
+		Add(M[2].Mul(M[3]).Mul(M[7])).
+		Add(M[2].Mul(M[4]).Mul(M[6]))
+}
+
 func (M MatF2Poly) Equal(N MatF2Poly) bool {
 	for i := 0; i < 9; i++ {
 		if !M[i].Equal(N[i]) {
@@ -47,7 +56,7 @@ func (M MatF2Poly) Equal(N MatF2Poly) bool {
 }
 
 func (M MatF2Poly) Latex(varName string) string {
-	s := "\\begin{bmatrix}"
+	s := "\\begin{pmatrix}"
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
 			s += M[i*3+j].Latex(varName)
@@ -59,7 +68,7 @@ func (M MatF2Poly) Latex(varName string) string {
 			s += " \\\\ "
 		}
 	}
-	s += "\\end{bmatrix}"
+	s += "\\end{pmatrix}"
 	return s
 }
 
@@ -111,6 +120,11 @@ func NewProjMatF2PolyFromString(s string) ProjMatF2Poly {
 
 var ProjMatF2PolyIdentity = ProjMatF2Poly(MatF2PolyIdentity)
 
+
+func (M ProjMatF2Poly) Determinant() F2Polynomial {
+	return MatF2Poly(M).Determinant()
+}
+
 func (M ProjMatF2Poly) Equal(N ProjMatF2Poly) bool {
 	k := -1
 	for i := 0; i < 9; i++ {
@@ -157,4 +171,3 @@ func (M ProjMatF2Poly) ReduceModf(f F2Polynomial) ProjMatF2Poly {
 func (M ProjMatF2Poly) String() string {
 	return MatF2Poly(M).String()
 }
-

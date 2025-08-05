@@ -53,41 +53,42 @@ pgl-cayley-F2:
 pgl-cayley-F16:
 	pgl-cayley -base-field F16 -genV2 -d1 d1.txt -d2 d2.txt -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt 2>&1 | tee cayley.$(log)
 
-# Tool 2.  This tool is more specialized (perhaps convoluted).  It
-# produces the basis and boundary files for a Cayley complex, but it
-# does so in a completely different manner.  It realizes the
-# Cartwright-Steger group, looks for systolic candidate lifts in the
-# affine building (infinite complex), then computes the finite
-# quotient complex, and projects the systolic candidates down to
-# cycles in the finite complex.  So in addition to the basis and
-# boundary files, it also produces a systolic candidates file S.txt.
+# Tool 2.  This tool also produces the basis and boundary files for a
+# Cayley complex, but it does so by performing calculations in the
+# Cartwright-Steger group.  It has separate modes for:
 #
-# We are focusing on the second tool at present, hence this target
-# rule is designated as producing the basis and boundary files.
+# 1. computing the Cayley graph (1-skeleton) and producing the vertex
+#    and edge bases and d_1 boundary matrix
 #
-# This (older) target, using the -systolic-candidates flag is a bit
-# klunky in that it first partially computes the infinite complex up
-# the configured max-depth, then computes the full finite quotient
-# complex.
-calg-cayley d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt:
-	calg-cayley -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
-		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
-		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee calg-cayley.$(log)
+# 2. finding triangles (3-cliques) and producing the triangle basis
+#    and d_2 boundary matrix
+#
+# 3. computing systolic candidates, producing the file S.txt,
+#    whose columns are edge vectors.
 
-calg-cayley-graph:
+calg-cayley-graph d1.txt vertex-basis.txt edge-basis.txt:
 	calg-cayley -graph -quotient -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt 2>&1 | tee calg-cayley-graph.$(log)
 
-calg-cayley-fill-triangles:
+calg-cayley-fill-triangles d2.txt triangle-basis.txt: d1.txt
 	calg-cayley -fill-triangles -quotient -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
 		-triangle-basis triangle-basis.txt 2>&1 | tee calg-cayley-fill-triangles.$(log)
 
-gens-global.tex:
-	calg-cayley -modulus `cat modulus.txt` -max-depth 1 -generators-latex-file gens-global.tex 2>&1 | tee gens-global.$(log)
+calg-cayley-systolic-candidates S.txt: vertex-basis.txt edge-basis.txt
+	calg-cayley -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
+		--systolic-candidates S.txt  2>&1 | tee calg-cayley-systolic-candidates.$(log)
 
-gens-quotient.tex:
-	calg-cayley -modulus `cat modulus.txt` -quotient -max-depth 1 -generators-latex-file gens-quotient.tex 2>&1 | tee gens-quotient.$(log)
+table-gens-global:
+	calg-cayley -graph -modulus `cat modulus.txt` -max-depth 1 -generators-latex-file table-gens-global.tex 2>&1 | tee table-gens-global.$(log)
+
+table-gens-quotient:
+	calg-cayley -graph -modulus `cat modulus.txt` -quotient -max-depth 1 -generators-latex-file table-gens-quotient.tex 2>&1 | tee table-gens-quotient.$(log)
+
+# Many of the following targets can be used to compute homology from
+# the d1.txt and d2.txt matrix files regardless of where they came
+# from (i.e. they need not be produced by calg-cayley).
 
 # This target computes a Smith normal form for the matrix d_1.
 d1smith.txt d1colops.txt: d1.txt
@@ -395,30 +396,53 @@ G.txt: U1.txt C.txt
 FG.txt: F.txt G.txt
 	multiply -A F.txt -B G.txt -C FG.txt 2>&1 | tee FG.$(log)
 
-check-FG: FG.txt
-	rank=$$(dim -in FG.txt -image) && if [[ $$rank -eq `dim -in M.txt -domain` ]]; then echo "FG=I"; else echo "FG does not equal I!"; false; fi
-
 # F should be "reduced" cohomology generators, in that each row of F
 # is a cohomology generator that is supported on a single homology
 # generator from the G matrix.
+check-FG: FG.txt
+	rank=$$(dim -in FG.txt -image) && if [[ $$rank -eq `dim -in M.txt -domain` ]]; then echo "FG=I"; else echo "FG does not equal I!"; false; fi
 
-# wip targets
-simp-cosys: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
-	simplicial-cosystole -verbose -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys.$(log)
+simplicial-systole: d1.txt d2.txt
+	systole -simplicial -simplicial-at-vertex 0 -simplicial-stop-nonzero -d1 d1.txt -d2 d2.txt
 
-simp-cosys-prune: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
-	simplicial-cosystole -verbose -prune-by-cohomology-projection -initial-support -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys-prune.$(log)
+simplicial-cosystole: d1.txt d2.txt Z1.txt Z^1.txt B^1.txt
+	simplicial-cosystole -verbose -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys.$(log)
 
-simp-cosys-dim-ucd-seq: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
-	simplicial-cosystole -verbose -dim-ucd-seq -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys-dim-ucd-seq.$(log)
+# deprecated / experimental
+# simp-cosys-prune: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
+# 	simplicial-cosystole -verbose -prune-by-cohomology-projection -initial-support -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys-prune.$(log)
 
-simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edge-basis.txt triangle-basis.txt modulus.txt
-	simplicial-cosystole -cohomology-orbits -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B1 B1.txt -U^1 U^1.txt \
-		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
-		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)
+# simp-cosys-dim-ucd-seq: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
+# 	simplicial-cosystole -verbose -dim-ucd-seq -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys-dim-ucd-seq.$(log)
 
-sample-coboundary-decoder: d1.txt d2.txt Z1.txt
-	coboundary-decoder -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -min-error-weight 67098 -max-error-weight 67098 -verbose -results results-$(log).json 2>&1 | tee sample-coboundary-decoder.$(log)
+# simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edge-basis.txt triangle-basis.txt modulus.txt
+# 	simplicial-cosystole -cohomology-orbits -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B1 B1.txt -U^1 U^1.txt \
+# 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
+# 		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)
+
+coboundary-threshold: d1.txt d2.txt Z1.txt
+	coboundary-decoder -find-threshold -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -verbose -results results-$(log).json 2>&1 | tee coboundary-decoder-threshold.$(log)
+
+random-clique-complex:
+	random-complex -dimC0 60480 -p 0.0002315 -clique -d1 d1.txt -d2 d2.txt 2>&1 | tee random.$(log)
+
+random-regular-clique-complex:
+	random-complex -dimC0 60480 -regular 14 -clique -d1 d1.txt -d2 d2.txt 2>&1 | tee random-regular.$(log)
+
+circulant:
+	random-complex -dimC0 60480 -circulant -regular 14 -d1 d1.txt -d2 d2.txt 2>&1 | tee circulant.$(log)
+
+psl.txt:
+	calg-cayley -graph -psl psl.txt -quotient -modulus `cat modulus.txt` -max-depth 2 2>&1 | tee check-psl.$(log)
+
+psl-cayley:
+	calg-cayley -graph -generators psl.txt -quotient -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt\
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt 2>&1 | tee psl-cayley.$(log)
+
+psl-fill-triangles: d1.txt
+	calg-cayley -fill-triangles -generators psl.txt -quotient -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt \
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
+		-triangle-basis triangle-basis.txt 2>&1 | tee psl-cayley-fill-triangles.$(log)
 
 really-clean:
 		rm -f B1.txt B1colops.txt B1rowops.txt B1smith.txt C.txt F.txt FG.txt G.txt K.txt KB1.txt KS.txt \

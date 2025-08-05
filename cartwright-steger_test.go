@@ -837,3 +837,110 @@ func TestCSGeneratorsMatrixReps(t *testing.T) {
 		}
 	}
 }
+
+func TestCSCartwrightStegerEmbedPolynomial(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  F2Polynomial
+		want   F2Polynomial
+	}{
+		{
+			name:  "zero polynomial",
+			input: F2PolynomialZero,
+			want:  F2PolynomialZero,
+		},
+		{
+			name:  "constant 1",
+			input: F2PolynomialOne,
+			want:  F2PolynomialOne,
+		},
+		{
+			name:  "y (degree 1)",
+			input: F2PolynomialY,
+			want:  cartwrightStegerEmbeddingY, // x + x^3
+		},
+		{
+			name:  "1 + y",
+			input: F2PolynomialOnePlusY,
+			want:  F2PolynomialOne.Add(cartwrightStegerEmbeddingY), // 1 + x + x^3
+		},
+		{
+			name:  "y^2",
+			input: NewF2Polynomial("001"),
+			want:  cartwrightStegerEmbeddingY.Pow(2), // (x + x^3)^2
+		},
+		{
+			name:  "y^3",
+			input: NewF2Polynomial("0001"),
+			want:  cartwrightStegerEmbeddingY.Pow(3), // (x + x^3)^3
+		},
+		{
+			name:  "1 + y + y^2",
+			input: NewF2Polynomial("111"),
+			want:  F2PolynomialOne.Add(cartwrightStegerEmbeddingY).Add(cartwrightStegerEmbeddingY.Pow(2)),
+		},
+		{
+			name:  "y + y^3",
+			input: NewF2Polynomial("0101"),
+			want:  cartwrightStegerEmbeddingY.Add(cartwrightStegerEmbeddingY.Pow(3)),
+		},
+		{
+			name:  "polynomial with higher degree",
+			input: NewF2Polynomial("10101"),
+			want:  F2PolynomialOne.Add(cartwrightStegerEmbeddingY.Pow(2)).Add(cartwrightStegerEmbeddingY.Pow(4)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CartwrightStegerEmbedPolynomial(tt.input)
+			if !got.Equal(tt.want) {
+				t.Errorf("cartwrightStegerEmbedPolynomial(%v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCSCartwrightStegerEmbedPolynomialLinearity(t *testing.T) {
+	testPolys := []F2Polynomial{
+		F2PolynomialOne,
+		F2PolynomialY,
+		NewF2Polynomial("001"), // y^2
+		NewF2Polynomial("111"), // 1 + y + y^2
+	}
+
+	for i, a := range testPolys {
+		for j, b := range testPolys {
+			if i >= j {
+				continue // avoid duplicate tests
+			}
+			sum := a.Add(b)
+			embeddedSum := CartwrightStegerEmbedPolynomial(sum)
+			embeddedA := CartwrightStegerEmbedPolynomial(a)
+			embeddedB := CartwrightStegerEmbedPolynomial(b)
+			expectedSum := embeddedA.Add(embeddedB)
+
+			if !embeddedSum.Equal(expectedSum) {
+				t.Errorf("linearity test failed: embed(%v + %v) = %v, but embed(%v) + embed(%v) = %v", 
+					a, b, embeddedSum, a, b, expectedSum)
+			}
+		}
+	}
+}
+
+func TestCSGeneratorL2DeterminantsModf(t *testing.T) {
+	f := NewF2Polynomial("111") // 1 + y + y^2
+	table := CartwrightStegerGeneratorsWithMatrixReps(f)
+	
+	for i, info := range table {
+		det := info.B_uRep.Determinant()
+		detInv := info.B_uInvRep.Determinant()
+		product := det.Mul(detInv)
+		
+		if !product.IsOneModf(f) {
+			t.Errorf("generator %d: det(B_uRep) * det(B_uInvRep) = %v * %v = %v, not 1 mod %v", 
+				i, det, detInv, product, f)
+		}
+	}
+}
+

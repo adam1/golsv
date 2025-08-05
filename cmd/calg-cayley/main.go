@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"golsv"
 	"log"
 	"os"
@@ -34,9 +33,14 @@ func handleGraphMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []
 	}
 	E := golsv.NewCalGCayleyExpander(gens,
 		args.MaxDepth, args.Verbose, &f, args.Quotient,
-		observer)
+		observer, args.PslFile != "")
 	graph := E.Graph()
 	writeGraphFiles(graph, args)
+	if args.PslFile != "" {
+		pslElements := E.PslGenerators()
+		log.Printf("writing %d PSL elements to %s", len(pslElements), args.PslFile)
+		golsv.WriteStringFile(pslElements, args.PslFile)
+	}
 	log.Printf("done")
 }
 
@@ -67,7 +71,6 @@ func handleFillTrianglesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial,
 	log.Printf("done")
 }
 
-// xxx this was ported to the separation of graph-generation and triangle-filling paradigm, but not tested.
 func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []golsv.ElementCalG) {
 	log.Printf("computing systolic candidates")
 	// first, expand the complex without quotient to limited depth to
@@ -77,38 +80,36 @@ func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polyno
 	// generators.  their length is \ell_i in our terminology.
 	quotient := false
 	maxDepth := args.MaxDepth
-	E := golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil)
+	E := golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil, args.PslFile != "")
 	E.Graph()
 	lifts := E.SystolicCandidateLifts()
 	lens := make(map[int]int)
 	for _, path := range lifts {
 		lens[len(path)]++
 	}
-	log.Printf("found %d systolic candidate lifts: lengths=%v", len(lifts), lens)
-	// log.Printf("xxx lifts=%v", lifts)
-
-	// next, expand the quotient complex to full depth.
-	quotient = true
-	maxDepth = 0
-	E = golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil)
-	graph := E.Graph()
-	writeGraphFiles(graph, args)
+	if args.Verbose {
+		log.Printf("found %d systolic candidate lifts: lengths=%v", len(lifts), lens)
+		log.Printf("reading vertex basis file %s", args.VertexBasisFile)
+	}
+	vertexBasis := golsv.ReadElementCalGVertexFile(args.VertexBasisFile)
+	if args.Verbose {
+		log.Printf("reading edge basis file %s", args.EdgeBasisFile)
+	}
+	edgeBasis := golsv.ReadElementCalGEdgeFile(args.EdgeBasisFile)
+	resortBases := false
+	graph := golsv.NewZComplex(vertexBasis, edgeBasis, nil, resortBases, args.Verbose)
 
 	// now, project the candidates to the quotient complex, i.e. take
 	// each vertex mod f. by construction, this ought to be a no-op
-	// except for the last vertex, but let's verify that to be
-	// safe. (xxx verify)
+	// except for the last vertex. (xxx verify)
 	candidatePaths := make([]golsv.ZPath[golsv.ElementCalG], len(lifts))
 	for i, path := range lifts {
 		candidatePaths[i] = E.Project(path)
 	}
-	log.Printf("projected %d systolic candidates", len(candidatePaths))
-	// log.Printf("xxx candidatePaths=%v", candidatePaths)
-
-	// convert candidates to column vectors in the edge basis.
-
-	// xxx despite the comment, this doesn't appear to be de-duping
-	log.Printf("converting candidates to edge vectors and deduping")
+	if args.Verbose {
+		log.Printf("projected %d systolic candidates", len(candidatePaths))
+		log.Printf("converting candidates to edge vectors and deduping")
+	}
 	vecs := make(map[string]golsv.BinaryVector)
 	for _, path := range candidatePaths {
 		vec := graph.PathToEdgeVector(path)
@@ -118,7 +119,9 @@ func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polyno
 	for _, vec := range vecs {
 		candidatesMatrix.AppendColumn(vec.Matrix())
 	}
-	log.Printf("writing (%v) candidates matrix to %s", candidatesMatrix, args.SystolicCandidatesFile)
+	if args.Verbose {
+		log.Printf("writing (%v) candidates matrix to %s", candidatesMatrix, args.SystolicCandidatesFile)
+	}
 	candidatesMatrix.WriteFile(args.SystolicCandidatesFile)
 }
 
@@ -171,25 +174,47 @@ func writeGraphFiles(complex *golsv.ZComplex[golsv.ElementCalG], args *CalGCayle
 }
 
 func prepareGenerators(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial) []golsv.ElementCalG {
-	gens := golsv.CartwrightStegerGenerators()
-	a := dumpElements(gens)
-	log.Printf("original generators:\n%s", a)
-	if args.TruncateGenerators > 0 {
-		log.Printf("truncating generators to %d", args.TruncateGenerators)
-		gens = gens[:args.TruncateGenerators]
-	}
-	if args.Quotient {
-		log.Printf("reducing generators modulo %v", f)
-		for i := range gens {
-			gens[i] = gens[i].Modf(f)
+	var gens []golsv.ElementCalG
+	
+	if args.GeneratorsFile != "" {
+		if args.Verbose {
+			log.Printf("reading generators from file %s", args.GeneratorsFile)
+		}
+		vertexGens := golsv.ReadElementCalGVertexFile(args.GeneratorsFile)
+		gens = make([]golsv.ElementCalG, len(vertexGens))
+		for i, v := range vertexGens {
+			gens[i] = v.(golsv.ElementCalG)
+		}
+		if args.Quotient {
+			log.Printf("will reduce generators modulo %v", f)
+			for i := range gens {
+				gens[i] = gens[i].Modf(f)
+			}
+		}
+		if args.Verbose {
+			log.Printf("loaded %d generators from file", len(gens))
+		}
+	} else {
+		if args.Quotient {
+			log.Printf("will reduce generators modulo %v", f)
+		} else {
+			f = golsv.F2PolynomialZero
+		}
+		genTable := golsv.CartwrightStegerGeneratorsWithMatrixReps(f)
+		gens = make([]golsv.ElementCalG, 0)
+		for _, inf := range genTable {
+			gens = append(gens, inf.B_u, inf.B_uInv)
+		}
+		
+		if args.Determinant {
+			printGeneratorsDeterminants(args, f, genTable)
+		}
+		if args.GeneratorsLatexFile != "" {
+			produceGeneratorsLatexFile(args, genTable)
 		}
 	}
-	b := dumpElements(gens)
-	log.Printf("prepared generators (modified=%v):\n%s", a != b, b)
-
-	if args.GeneratorsLatexFile != "" {
-		produceGeneratorsLatexFile(args, gens)
-	}
+		
+	//log.Printf("prepared generators:\n%s", gens)
 	return gens
 }
 
@@ -204,46 +229,47 @@ func dumpElements(els []golsv.ElementCalG) string {
 	return s
 }
 
-// note that we implicitly assume that the generators are in the same order as
-// the matrix reps, which is true.
-func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.ElementCalG) {
-	// combine the (algebraic) generators with their matrix representations
-	// so as to produce a nice table.
-	_, genMatrixReps := golsv.CartwrightStegerGeneratorsMatrixReps()
-	log.Printf("Generator matrix reps:")
-	combined := make([]genInfo, 0)
-	for i, info := range genMatrixReps {
-		b_uCalg := gens[2*i]
-		b_uCalgInv := gens[2*i+1]
-		fmt.Printf("u=%v b_u=%v rho(b_u)=%v\n", info.U, b_uCalg, info.B_u)
-		combined = append(combined, genInfo{info, b_uCalg, b_uCalgInv})
+func printGeneratorsDeterminants(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, genTable []golsv.CartwrightStegerGenInfo) {
+	for _, inf := range genTable {
+		var b_uRepDet golsv.F2Polynomial
+		var b_uInvRepDet golsv.F2Polynomial
+		var yxModulus golsv.F2Polynomial
+		if args.Quotient {
+			yxModulus = golsv.CartwrightStegerEmbedPolynomial(f)
+		}
+		if args.Quotient {
+			b_uRepDet = inf.B_uRep.Determinant().Modf(yxModulus)
+		} else {
+			b_uRepDet = inf.B_uRep.Determinant()
+		}
+		if args.Quotient {
+			b_uInvRepDet = inf.B_uInvRep.Determinant().Modf(yxModulus)
+		} else {
+			b_uInvRepDet = inf.B_uInvRep.Determinant()
+		}
+		log.Printf("u = %s:", inf.U.String())
+		log.Printf("  b_u = %s", inf.B_u.String())
+		log.Printf("  matrix rep: %s", inf.B_uRep.String())
+		log.Printf("  determinant: %s", b_uRepDet.String())
+		log.Printf("  b_u^{-1} = %s", inf.B_uInv.String())
+		log.Printf("  matrix rep: %s", inf.B_uInvRep.String())
+		log.Printf("  determinant: %s", b_uInvRepDet.String())
+		log.Printf("")
 	}
-	// xxx we currently haven't fully implemented the calculation of the matrix representation
-	// for the quotient case, as we don't use them elsewhere.  in this case, omit the corresponding column
-	// from the latex output.
+}
+
+func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, genTable []golsv.CartwrightStegerGenInfo) {
 	var latexTemplate string
-	if args.Quotient {
-		latexTemplate = `\begin{array}{|c|c|}
+	latexTemplate = `\begin{array}{|c|c|c|}
 	\hline
-	u & b_u, \quad b_u^{-1} \\
+	u \in \F_4^\times/\F_2^\times & b_u , b_u^{-1} \in {{GenSet}} & \rho(b_u), \rho(b_u^{-1}) \in {{RepSet}}\\
 	\hline
 	{{range .}}
-	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.LatexMatrix}} \quad {{.B_uInvCalG.LatexMatrix}} \\
+	{{F2PolyLatexWithVar .U "v"}} & {{.B_u.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .B_uRep "x"}} \\
+	                              & {{.B_uInv.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .B_uInvRep "x"}} \\
 	{{end}}
 	\hline
 \end{array}`
-	} else {
-		latexTemplate = `\begin{array}{|c|c|c|}
-	\hline
-	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1})\\
-	\hline
-	{{range .}}
-	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_u "y"}} \\
-	                                        & {{.B_uInvCalG.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_uInv "y"}} \\
-	{{end}}
-	\hline
-\end{array}`
-	}
 	funcMap := template.FuncMap{
 		"F2PolyLatexWithVar": func(p golsv.F2Polynomial, varName string) string {
 			return p.Latex(varName)
@@ -251,14 +277,27 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 		"ProjMatF2PolyLatexWithVar": func(m golsv.ProjMatF2Poly, varName string) string {
 			return m.Latex(varName)
 		},
-
+		"GenSet": func() string {
+			if args.Quotient {
+				return `\mathcal{G}(R/I)`
+			} else {
+				return `\mathcal{G}(R)`
+			}
+		},
+		"RepSet": func() string {
+			if args.Quotient {
+				return `\PGL_3(\bar{R}/\bar{I})`
+			} else {
+				return `\PGL_3(\bar{R})`
+			}
+		},
 	}
 	tpl, err := template.New("gens").Funcs(funcMap).Parse(latexTemplate)
 	if err != nil {
 		log.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := tpl.Execute(&out, combined); err != nil {
+	if err := tpl.Execute(&out, genTable); err != nil {
 		log.Fatal(err)
 	}
 	err = os.WriteFile(args.GeneratorsLatexFile, []byte(out.String()), 0644)
@@ -270,21 +309,19 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 	}
 }
 
-type genInfo struct {
-	MInfo golsv.CartwrightStegerGenMatrixInfo
-	B_uCalG, B_uInvCalG golsv.ElementCalG
-}
-
 type CalGCayleyExpanderArgs struct {
 	D1File                  string
 	D2File                  string
+	Determinant             bool
 	EdgeBasisFile           string
 	FillTriangles           bool
+	GeneratorsFile          string
 	GeneratorsLatexFile     string
 	Graph                   bool
 	MaxDepth                int
 	MeshFile                string
 	Modulus                 string
+	PslFile                 string
 	Quotient                bool
 	SystolicCandidatesFile  string
 	TriangleBasisFile       string
@@ -304,13 +341,16 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 input/output file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")
+	flag.BoolVar(&args.Determinant, "determinant", args.Determinant, "print matrix representation and determinant of each generator")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", args.EdgeBasisFile, "edge basis output file (text)")
 	flag.BoolVar(&args.FillTriangles, "fill-triangles", args.FillTriangles, "read vertex and edge bases, compute triangle basis and d2.txt")
+	flag.StringVar(&args.GeneratorsFile, "generators", args.GeneratorsFile, "read generators from file (one ElementCalG per line)")
 	flag.StringVar(&args.GeneratorsLatexFile, "generators-latex-file", args.GeneratorsLatexFile, "write table of generators to this file (latex)")
 	flag.BoolVar(&args.Graph, "graph", args.Graph, "do Cayley expansion to produce d1.txt")
 	flag.IntVar(&args.MaxDepth, "max-depth", args.MaxDepth, "maximum depth")
 	flag.StringVar(&args.MeshFile, "mesh", args.MeshFile, "mesh output file (OFF Object File Format text)")
 	flag.StringVar(&args.Modulus, "modulus", args.Modulus, "modulus corresponding to a principle congruence subgroup")
+	flag.StringVar(&args.PslFile, "psl", args.PslFile, "output file for PSL elements found during Cayley expansion")
 	flag.BoolVar(&args.Quotient, "quotient", args.Quotient, "construct finite quotient complex by first reducing generators modulo the given modulus")
 	flag.StringVar(&args.SystolicCandidatesFile, "systolic-candidates", args.SystolicCandidatesFile, "systolic candidates output file (text)")
 	flag.StringVar(&args.TriangleBasisFile, "triangle-basis", args.TriangleBasisFile, "triangle basis output file (text)")

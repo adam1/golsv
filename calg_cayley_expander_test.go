@@ -10,7 +10,8 @@ func TestCalGCayleyExpanderInverse(t *testing.T) {
 	verbose := false
 	var modulus *F2Polynomial = nil
 	quotient := false
-	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil)
+	checkPSL := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil, checkPSL)
 	E.Graph()
 
 	pathLenCounts := make([]int, maxDepth+1)
@@ -49,7 +50,8 @@ func TestCalGCayleyExpanderInverseModf(t *testing.T) {
 	verbose := false
 	var modulus F2Polynomial = NewF2Polynomial("111")
 	quotient := true
-	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, nil)
+	checkPSL := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, nil, checkPSL)
 	E.Graph()
 
 	pathLenCounts := make([]int, maxDepth+1)
@@ -88,7 +90,8 @@ func TestCalGCayleyExpanderComplex(t *testing.T) {
 	verbose := false
 	var modulus *F2Polynomial = nil
 	quotient := false
-	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil)
+	checkPSL := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil, checkPSL)
 	graph := E.Graph()
 	vertices := graph.VertexBasis()
 	expectedVertices := 15
@@ -115,7 +118,8 @@ func TestCalGCayleyExpanderEdgeOrder(t *testing.T) {
 	var modulus F2Polynomial = NewF2Polynomial("111")
 	quotient := true
 	var observer CalGObserver
-	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer)
+	checkPSL := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer, checkPSL)
 	graph := E.Graph()
 	edges := graph.EdgeBasis()
 
@@ -147,5 +151,88 @@ func TestNewEdgeElementCalGFromString(t *testing.T) {
 		if !e.Equal(test.want) {
 			t.Errorf("Test %d: got=%v expected=%v", i, e, test.want)
 		}
+	}
+}
+
+func TestCalGCayleyExpanderElementGeneratorPath(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	maxDepth := 2
+	verbose := false
+	var modulus *F2Polynomial = nil
+	quotient := false
+	checkPSL := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, modulus, quotient, nil, checkPSL)
+	E.Graph()
+
+	// test identity has empty path
+	identity := NewElementCalGIdentity()
+	identityPath := E.elementGeneratorPath(identity)
+	if len(identityPath) != 0 {
+		t.Errorf("Identity path should be empty, got: %v", identityPath)
+	}
+
+	// test that reconstructing elements from generator paths works
+	for element, _ := range E.attendance {
+		if element.IsIdentity() {
+			continue
+		}
+		
+		genPath := E.elementGeneratorPath(element)
+		
+		// reconstruct element by multiplying generators
+		reconstructed := NewElementCalGIdentity()
+		tmp := NewElementCalGIdentity()
+		for _, genIndex := range genPath {
+			if genIndex < 0 || genIndex >= len(gens) {
+				t.Errorf("Invalid generator index %d for element %v", genIndex, element)
+				continue
+			}
+			tmp.Mul(reconstructed, gens[genIndex])
+			reconstructed.Copy(tmp)
+		}
+		
+		if !reconstructed.Equal(element) {
+			t.Errorf("Reconstruction failed:\nelement: %v\ngenPath: %v\nreconstructed: %v", 
+				element, genPath, reconstructed)
+		}
+	}
+}
+
+func TestCalGCayleyExpanderElementIsInPSL(t *testing.T) {
+	gens := CartwrightStegerGenerators()
+	maxDepth := 1
+	verbose := false
+	f := NewF2Polynomial("111") // 1 + y + y^2
+	quotient := true
+	checkPSL := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &f, quotient, nil, checkPSL)
+	E.Graph()
+
+	// test identity is in PSL (determinant = 1)
+	identity := NewElementCalGIdentity()
+	if !E.elementIsInPSL(identity) {
+		t.Errorf("Identity should be in PSL")
+	}
+
+	// test some elements and check consistency
+	pslCount := 0
+	nonPslCount := 0
+	
+	for element, _ := range E.attendance {
+		isPSL := E.elementIsInPSL(element)
+		if isPSL {
+			pslCount++
+		} else {
+			nonPslCount++
+		}
+	}
+	
+	// log the counts for verification
+	t.Logf("PSL elements: %d, non-PSL elements: %d, total: %d", 
+		pslCount, nonPslCount, len(E.attendance))
+	
+	// basic sanity check: we should have at least one PSL element (identity)
+	if pslCount < 1 {
+		t.Errorf("Expected at least 1 PSL element, got %d", pslCount)
 	}
 }
