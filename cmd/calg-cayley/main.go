@@ -67,7 +67,6 @@ func handleFillTrianglesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial,
 	log.Printf("done")
 }
 
-// xxx this was ported to the separation of graph-generation and triangle-filling paradigm, but not tested.
 func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []golsv.ElementCalG) {
 	log.Printf("computing systolic candidates")
 	// first, expand the complex without quotient to limited depth to
@@ -84,31 +83,29 @@ func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polyno
 	for _, path := range lifts {
 		lens[len(path)]++
 	}
-	log.Printf("found %d systolic candidate lifts: lengths=%v", len(lifts), lens)
-	// log.Printf("xxx lifts=%v", lifts)
-
-	// next, expand the quotient complex to full depth.
-	quotient = true
-	maxDepth = 0
-	E = golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil)
-	graph := E.Graph()
-	writeGraphFiles(graph, args)
+	if args.Verbose {
+		log.Printf("found %d systolic candidate lifts: lengths=%v", len(lifts), lens)
+		log.Printf("reading vertex basis file %s", args.VertexBasisFile)
+	}
+	vertexBasis := golsv.ReadElementCalGVertexFile(args.VertexBasisFile)
+	if args.Verbose {
+		log.Printf("reading edge basis file %s", args.EdgeBasisFile)
+	}
+	edgeBasis := golsv.ReadElementCalGEdgeFile(args.EdgeBasisFile)
+	resortBases := false
+	graph := golsv.NewZComplex(vertexBasis, edgeBasis, nil, resortBases, args.Verbose)
 
 	// now, project the candidates to the quotient complex, i.e. take
 	// each vertex mod f. by construction, this ought to be a no-op
-	// except for the last vertex, but let's verify that to be
-	// safe. (xxx verify)
+	// except for the last vertex. (xxx verify)
 	candidatePaths := make([]golsv.ZPath[golsv.ElementCalG], len(lifts))
 	for i, path := range lifts {
 		candidatePaths[i] = E.Project(path)
 	}
-	log.Printf("projected %d systolic candidates", len(candidatePaths))
-	// log.Printf("xxx candidatePaths=%v", candidatePaths)
-
-	// convert candidates to column vectors in the edge basis.
-
-	// xxx despite the comment, this doesn't appear to be de-duping
-	log.Printf("converting candidates to edge vectors and deduping")
+	if args.Verbose {
+		log.Printf("projected %d systolic candidates", len(candidatePaths))
+		log.Printf("converting candidates to edge vectors and deduping")
+	}
 	vecs := make(map[string]golsv.BinaryVector)
 	for _, path := range candidatePaths {
 		vec := graph.PathToEdgeVector(path)
@@ -118,7 +115,9 @@ func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polyno
 	for _, vec := range vecs {
 		candidatesMatrix.AppendColumn(vec.Matrix())
 	}
-	log.Printf("writing (%v) candidates matrix to %s", candidatesMatrix, args.SystolicCandidatesFile)
+	if args.Verbose {
+		log.Printf("writing (%v) candidates matrix to %s", candidatesMatrix, args.SystolicCandidatesFile)
+	}
 	candidatesMatrix.WriteFile(args.SystolicCandidatesFile)
 }
 

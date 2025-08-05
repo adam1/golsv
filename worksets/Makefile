@@ -53,35 +53,32 @@ pgl-cayley-F2:
 pgl-cayley-F16:
 	pgl-cayley -base-field F16 -genV2 -d1 d1.txt -d2 d2.txt -vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt 2>&1 | tee cayley.$(log)
 
-# Tool 2.  This tool is more specialized (perhaps convoluted).  It
-# produces the basis and boundary files for a Cayley complex, but it
-# does so in a completely different manner.  It realizes the
-# Cartwright-Steger group, looks for systolic candidate lifts in the
-# affine building (infinite complex), then computes the finite
-# quotient complex, and projects the systolic candidates down to
-# cycles in the finite complex.  So in addition to the basis and
-# boundary files, it also produces a systolic candidates file S.txt.
+# Tool 2.  This tool also produces the basis and boundary files for a
+# Cayley complex, but it does so by performing calculations in the
+# Cartwright-Steger group.  It has separate modes for:
 #
-# We are focusing on the second tool at present, hence this target
-# rule is designated as producing the basis and boundary files.
+# 1. computing the Cayley graph (1-skeleton) and producing the vertex
+#    and edge bases and d_1 boundary matrix
 #
-# This (older) target, using the -systolic-candidates flag is a bit
-# klunky in that it first partially computes the infinite complex up
-# the configured max-depth, then computes the full finite quotient
-# complex.
-calg-cayley d1.txt d2.txt vertex-basis.txt edge-basis.txt triangle-basis.txt S.txt:
-	calg-cayley -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
-		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
-		-triangle-basis triangle-basis.txt --systolic-candidates S.txt  2>&1 | tee calg-cayley.$(log)
+# 2. finding triangles (3-cliques) and producing the triangle basis
+#    and d_2 boundary matrix
+#
+# 3. computing systolic candidates, producing the file S.txt,
+#    whose columns are edge vectors.
 
-calg-cayley-graph:
+calg-cayley-graph d1.txt vertex-basis.txt edge-basis.txt:
 	calg-cayley -graph -quotient -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt 2>&1 | tee calg-cayley-graph.$(log)
 
-calg-cayley-fill-triangles:
+calg-cayley-fill-triangles d2.txt triangle-basis.txt: d1.txt vertex-basis.txt edge-basis.txt
 	calg-cayley -fill-triangles -quotient -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
 		-triangle-basis triangle-basis.txt 2>&1 | tee calg-cayley-fill-triangles.$(log)
+
+calg-cayley-systolic-candidates S.txt: vertex-basis.txt edge-basis.txt
+	calg-cayley -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
+		--systolic-candidates S.txt  2>&1 | tee calg-cayley-systolic-candidates.$(log)
 
 gens-global.tex:
 	calg-cayley -modulus `cat modulus.txt` -max-depth 1 -generators-latex-file gens-global.tex 2>&1 | tee gens-global.$(log)
