@@ -19,7 +19,9 @@ func main() {
 	gen := golsv.NewRandomComplexGenerator(args.DimC0, args.Verbose)
 	var err error
 	var d_1, d_2 golsv.BinaryMatrix
-	if args.Regular {
+	if args.Circulant {
+		d_1, d_2, err = gen.RandomCirculantCliqueComplex(args.DimC0, args.RegularityDegree)
+	} else if args.Regular {
 		d_1, d_2, err = gen.RandomRegularCliqueComplexWithRetries(args.RegularityDegree, args.MaxRetries)
 	} else if args.Clique {
 		d_1, d_2, err = gen.RandomCliqueComplex(args.ProbEdge)
@@ -55,6 +57,7 @@ type Args struct {
 	Simplicial         bool
 	Clique             bool
 	Regular            bool
+	Circulant          bool
 	ProbEdge           float64
 	RegularityDegree   int
 	MaxRetries         int
@@ -70,6 +73,7 @@ func parseFlags() *Args {
 		MaxRetries: 100,
 	}
 	args.ProfileArgs.ConfigureFlags()
+	flag.BoolVar(&args.Circulant, "circulant", args.Circulant, "Generate a circulant clique complex")
 	flag.BoolVar(&args.Clique, "clique", args.Clique, "Generate a clique complex over a random graph")
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 output file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")

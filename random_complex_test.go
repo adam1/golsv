@@ -217,3 +217,83 @@ func TestRandomRegularCliqueComplex(t *testing.T) {
 		})
 	}
 }
+
+func TestRandomCirculantCliqueComplex(t *testing.T) {
+	tests := []struct {
+		n           int
+		k           int
+		expectError bool
+	}{
+		{6, 2, false},   // 6 vertices, 2-regular circulant
+		{8, 4, false},   // 8 vertices, 4-regular circulant
+		{10, 6, false},  // 10 vertices, 6-regular circulant
+		{6, 3, true},    // k must be even
+		{4, 4, true},    // k >= n
+		{1, 0, true},    // n must be at least 2
+		{5, 1, true},    // k must be even
+	}
+
+	verbose := false
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("n=%d_k=%d", test.n, test.k), func(t *testing.T) {
+			R := NewRandomComplexGenerator(test.n, verbose)
+			d_1, d_2, err := R.RandomCirculantCliqueComplex(test.n, test.k)
+
+			if test.expectError {
+				if err == nil {
+					t.Errorf("expected error for n=%d, k=%d", test.n, test.k)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if d_1.NumRows() != test.n {
+				t.Errorf("expected d_1.NumRows()=%d, got %d", test.n, d_1.NumRows())
+			}
+
+			expectedEdges := test.n * test.k / 2
+			if d_1.NumColumns() != expectedEdges {
+				t.Errorf("expected %d edges, got %d", expectedEdges, d_1.NumColumns())
+			}
+
+			// Verify regularity: each vertex should have degree k
+			degrees := make([]int, test.n)
+			for j := 0; j < d_1.NumColumns(); j++ {
+				vertices := make([]int, 0, 2)
+				for i := 0; i < test.n; i++ {
+					if d_1.Get(i, j) == 1 {
+						vertices = append(vertices, i)
+					}
+				}
+				if len(vertices) != 2 {
+					t.Errorf("edge %d should connect exactly 2 vertices, got %d", j, len(vertices))
+				}
+				degrees[vertices[0]]++
+				degrees[vertices[1]]++
+			}
+
+			for i, degree := range degrees {
+				if degree != test.k {
+					t.Errorf("vertex %d has degree %d, expected %d", i, degree, test.k)
+				}
+			}
+
+			// Basic checks on d_2 (triangles from clique filling)
+			if d_2.NumRows() != d_1.NumColumns() {
+				t.Errorf("expected d_2.NumRows()=%d, got %d", d_1.NumColumns(), d_2.NumRows())
+			}
+
+			// Each triangle should have weight 3
+			for j := 0; j < d_2.NumColumns(); j++ {
+				weight := d_2.ColumnWeight(j)
+				if weight != 3 {
+					t.Errorf("triangle %d has weight %d, expected 3", j, weight)
+				}
+			}
+		})
+	}
+}

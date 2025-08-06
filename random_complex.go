@@ -236,6 +236,105 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRet
 	return C.D1(), C.D2(), nil
 }
 
+func (R *RandomComplexGenerator) RandomCirculantCliqueComplex(n, k int) (d_1, d_2 BinaryMatrix, err error) {
+	if R.verbose {
+		log.Printf("Generating circulant clique complex over %d vertices with regularity degree %d", n, k)
+	}
+	if k < 0 || k >= n {
+		return nil, nil, fmt.Errorf("regularity degree %d must be between 0 and %d", k, n-1)
+	}
+	if k%2 != 0 {
+		return nil, nil, fmt.Errorf("regularity degree %d must be even", k)
+	}
+	if n < 2 {
+		return nil, nil, fmt.Errorf("number of vertices %d must be at least 2", n)
+	}
+	
+	// Build generating set for circulant graph
+	generators := make(map[int]bool)
+	generatorList := make([]int, 0, k)
+	
+	// Start with 1 and -1 (== n-1 mod n)
+	generators[1] = true
+	generators[(n-1)%n] = true
+	generatorList = append(generatorList, 1, (n-1)%n)
+	
+	// Add remaining (k-2) generators in pairs
+	remaining := k - 2
+	for remaining > 0 {
+		// Pick random integer between 2 and n-2 inclusive
+		var g int
+		maxAttempts := 100
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			gBig, err := rand.Int(rand.Reader, big.NewInt(int64(n-3)))
+			if err != nil {
+				return nil, nil, err
+			}
+			g = int(gBig.Int64()) + 2 // shift to range [2, n-2]
+			
+			negG := (n - g) % n
+			
+			// Check if g or -g already used
+			if !generators[g] && !generators[negG] {
+				generators[g] = true
+				generators[negG] = true
+				generatorList = append(generatorList, g)
+				if g != negG { // avoid duplicating self-inverse generators
+					generatorList = append(generatorList, negG)
+					remaining -= 2
+				} else {
+					remaining -= 1
+				}
+				break
+			}
+			
+			if attempt == maxAttempts-1 {
+				return nil, nil, fmt.Errorf("failed to generate unique generators after %d attempts", maxAttempts)
+			}
+		}
+		if remaining == 1 {
+			break // handle case where k-2 is odd and we added a self-inverse generator
+		}
+	}
+	
+	if R.verbose {
+		log.Printf("Generated circulant generators: %v", generatorList)
+	}
+	
+	// Create circulant graph edges
+	d_1Sparse := NewSparseBinaryMatrix(n, 0).Sparse()
+	edgeSet := make(map[[2]int]bool)
+	
+	for v := 0; v < n; v++ {
+		for _, g := range generatorList {
+			u := (v + g) % n
+			if v != u { // avoid self-loops
+				// Ensure edge ordering (smaller vertex first) to avoid duplicates
+				if v < u {
+					edge := [2]int{v, u}
+					if !edgeSet[edge] {
+						edgeSet[edge] = true
+						M := NewSparseBinaryMatrix(n, 1)
+						M.Set(v, 0, 1)
+						M.Set(u, 0, 1)
+						d_1Sparse.AppendColumn(M)
+					}
+				}
+			}
+		}
+	}
+	
+	numEdges := d_1Sparse.NumColumns()
+	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
+	if R.verbose {
+		log.Printf("Generated circulant graph with %d edges", numEdges)
+		log.Printf("Generated d_1: %v\n", d_1Sparse)
+		log.Printf("Filling cliques")
+	}
+	C.Fill3Cliques()
+	return C.D1(), C.D2(), nil
+}
+
 func (R *RandomComplexGenerator) randomizeGeneral_d_1() (d_1 BinaryMatrix, kernelMatrix BinaryMatrix) {
 	density := 0.1
 	for true {
