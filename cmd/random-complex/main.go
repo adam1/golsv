@@ -19,7 +19,9 @@ func main() {
 	gen := golsv.NewRandomComplexGenerator(args.DimC0, args.Verbose)
 	var err error
 	var d_1, d_2 golsv.BinaryMatrix
-	if args.Clique {
+	if args.Regular {
+		d_1, d_2, err = gen.RandomRegularCliqueComplexWithRetries(args.RegularityDegree, args.MaxRetries)
+	} else if args.Clique {
 		d_1, d_2, err = gen.RandomCliqueComplex(args.ProbEdge)
 	} else if args.Simplicial {
 		d_1, d_2, err = gen.RandomSimplicialComplex()
@@ -52,7 +54,10 @@ type Args struct {
 	DimC0              int
 	Simplicial         bool
 	Clique             bool
+	Regular            bool
 	ProbEdge           float64
+	RegularityDegree   int
+	MaxRetries         int
 	Verbose            bool
 	golsv.ProfileArgs
 }
@@ -61,6 +66,8 @@ func parseFlags() *Args {
 	args := Args{
 		DimC0: 10,
 		Verbose: true,
+		RegularityDegree: 3,
+		MaxRetries: 100,
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.BoolVar(&args.Clique, "clique", args.Clique, "Generate a clique complex over a random graph")
@@ -68,6 +75,9 @@ func parseFlags() *Args {
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")
 	flag.IntVar(&args.DimC0, "dimC0", args.DimC0, fmt.Sprintf("dim C_0 (default %d)", args.DimC0))
 	flag.Float64Var(&args.ProbEdge, "p", args.ProbEdge, "probability of edge in random graph")
+	flag.BoolVar(&args.Regular, "regular", args.Regular, "Generate a regular clique complex")
+	flag.IntVar(&args.RegularityDegree, "k", args.RegularityDegree, fmt.Sprintf("regularity degree for regular complex (default %d)", args.RegularityDegree))
+	flag.IntVar(&args.MaxRetries, "retries", args.MaxRetries, fmt.Sprintf("max retries for regular graph generation (default %d)", args.MaxRetries))
 	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "complex should be simplicial")
 	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "verbose logging")
 	flag.Parse()

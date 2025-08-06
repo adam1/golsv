@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	mathrand "math/rand"
 )	
 
 type RandomComplexGenerator struct {
@@ -134,6 +135,100 @@ func (R *RandomComplexGenerator) RandomCliqueComplex(probEdge float64) (d_1, d_2
 	}
 	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
 	if R.verbose {
+		log.Printf("Generated d_1: %v\n", d_1Sparse)
+		log.Printf("Filling cliques")
+	}
+	C.Fill3Cliques()
+	return C.D1(), C.D2(), nil
+}
+
+func (R *RandomComplexGenerator) RandomRegularCliqueComplex(k int) (d_1, d_2 BinaryMatrix, err error) {
+	return R.RandomRegularCliqueComplexWithRetries(k, 100)
+}
+
+func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRetries int) (d_1, d_2 BinaryMatrix, err error) {
+	numVertices := R.dimC_0
+	if R.verbose {
+		log.Printf("Generating regular clique complex over %d vertices with regularity degree %d", numVertices, k)
+	}
+	if k < 0 || k >= numVertices {
+		return nil, nil, fmt.Errorf("regularity degree %d must be between 0 and %d", k, numVertices-1)
+	}
+	if numVertices*k%2 != 0 {
+		return nil, nil, fmt.Errorf("cannot create %d-regular graph on %d vertices (n*k must be even)", k, numVertices)
+	}
+	
+	// Use configuration model: create k stubs per vertex, then randomly pair them
+	stubs := make([]int, 0, numVertices*k)
+	for v := 0; v < numVertices; v++ {
+		for i := 0; i < k; i++ {
+			stubs = append(stubs, v)
+		}
+	}
+	
+	mathrand.Shuffle(len(stubs), func(i, j int) {
+		stubs[i], stubs[j] = stubs[j], stubs[i]
+	})
+	
+	// Track adjacency to avoid multiple edges between same vertices
+	adjacency := make([]map[int]bool, numVertices)
+	for i := 0; i < numVertices; i++ {
+		adjacency[i] = make(map[int]bool)
+	}
+	
+	d_1Sparse := NewSparseBinaryMatrix(numVertices, 0).Sparse()
+	
+	// Pair up stubs to create edges
+	for retry := 0; retry < maxRetries; retry++ {
+		edges := make([][2]int, 0)
+		adjacencyCopy := make([]map[int]bool, numVertices)
+		for i := 0; i < numVertices; i++ {
+			adjacencyCopy[i] = make(map[int]bool)
+		}
+		
+		success := true
+		for i := 0; i < len(stubs); i += 2 {
+			v, u := stubs[i], stubs[i+1]
+			
+			// Skip self-loops and multiple edges
+			if v == u || adjacencyCopy[v][u] {
+				success = false
+				break
+			}
+			
+			adjacencyCopy[v][u] = true
+			adjacencyCopy[u][v] = true
+			if v > u {
+				v, u = u, v
+			}
+			edges = append(edges, [2]int{v, u})
+		}
+		
+		if success {
+			// Create boundary matrix from successful edge list
+			for _, edge := range edges {
+				v, u := edge[0], edge[1]
+				M := NewSparseBinaryMatrix(numVertices, 1)
+				M.Set(v, 0, 1)
+				M.Set(u, 0, 1)
+				d_1Sparse.AppendColumn(M)
+			}
+			break
+		}
+		
+		mathrand.Shuffle(len(stubs), func(i, j int) {
+			stubs[i], stubs[j] = stubs[j], stubs[i]
+		})
+		
+		if retry == maxRetries-1 {
+			return nil, nil, fmt.Errorf("failed to generate %d-regular graph after %d attempts", k, maxRetries)
+		}
+	}
+	
+	numEdges := d_1Sparse.NumColumns()
+	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
+	if R.verbose {
+		log.Printf("Generated regular graph with %d edges", numEdges)
 		log.Printf("Generated d_1: %v\n", d_1Sparse)
 		log.Printf("Filling cliques")
 	}
