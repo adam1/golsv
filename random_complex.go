@@ -259,31 +259,49 @@ func (R *RandomComplexGenerator) RandomCirculantCliqueComplex(n, k int) (d_1, d_
 	generators[(n-1)%n] = true
 	generatorList = append(generatorList, 1, (n-1)%n)
 	
-	// Add remaining (k-2) generators in pairs
+	// Add remaining (k-2) generators, preferring triangle-forming sets
 	remaining := k - 2
 	for remaining > 0 {
 		// Pick random integer between 2 and n-2 inclusive
-		var g int
+		var d int
 		maxAttempts := 100
 		for attempt := 0; attempt < maxAttempts; attempt++ {
-			gBig, err := rand.Int(rand.Reader, big.NewInt(int64(n-3)))
+			dBig, err := rand.Int(rand.Reader, big.NewInt(int64(n-3)))
 			if err != nil {
 				return nil, nil, err
 			}
-			g = int(gBig.Int64()) + 2 // shift to range [2, n-2]
+			d = int(dBig.Int64()) + 2 // shift to range [2, n-2]
 			
-			negG := (n - g) % n
+			negD := (n - d) % n
+			e := (n - 1 - d) % n     // triangle-forming generator
+			negE := (n - e) % n
 			
-			// Check if g or -g already used
-			if !generators[g] && !generators[negG] {
-				generators[g] = true
-				generators[negG] = true
-				generatorList = append(generatorList, g)
-				if g != negG { // avoid duplicating self-inverse generators
-					generatorList = append(generatorList, negG)
-					remaining -= 2
-				} else {
-					remaining -= 1
+			// Check how many of {d, -d, e, -e} are available
+			needed := make([]int, 0, 4)
+			if !generators[d] {
+				needed = append(needed, d)
+			}
+			if !generators[negD] && negD != d {
+				needed = append(needed, negD)
+			}
+			if !generators[e] && e != d && e != negD {
+				needed = append(needed, e)
+			}
+			if !generators[negE] && negE != d && negE != negD && negE != e {
+				needed = append(needed, negE)
+			}
+			
+			if len(needed) > 0 {
+				// Add as many as possible up to remaining slots
+				toAdd := needed
+				if len(toAdd) > remaining {
+					toAdd = toAdd[:remaining]
+				}
+				
+				for _, gen := range toAdd {
+					generators[gen] = true
+					generatorList = append(generatorList, gen)
+					remaining--
 				}
 				break
 			}
@@ -292,8 +310,9 @@ func (R *RandomComplexGenerator) RandomCirculantCliqueComplex(n, k int) (d_1, d_
 				return nil, nil, fmt.Errorf("failed to generate unique generators after %d attempts", maxAttempts)
 			}
 		}
-		if remaining == 1 {
-			break // handle case where k-2 is odd and we added a self-inverse generator
+		
+		if remaining == 0 {
+			break
 		}
 	}
 	
