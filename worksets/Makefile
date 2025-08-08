@@ -70,7 +70,7 @@ calg-cayley-graph d1.txt vertex-basis.txt edge-basis.txt:
 	calg-cayley -graph -quotient -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt 2>&1 | tee calg-cayley-graph.$(log)
 
-calg-cayley-fill-triangles d2.txt triangle-basis.txt: d1.txt vertex-basis.txt edge-basis.txt
+calg-cayley-fill-triangles d2.txt triangle-basis.txt: d1.txt
 	calg-cayley -fill-triangles -quotient -modulus `cat modulus.txt` -max-depth `cat max-depth.txt` -d1 d1.txt -d2 d2.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
 		-triangle-basis triangle-basis.txt 2>&1 | tee calg-cayley-fill-triangles.$(log)
@@ -85,6 +85,10 @@ gens-global.tex:
 
 gens-quotient.tex:
 	calg-cayley -modulus `cat modulus.txt` -quotient -max-depth 1 -generators-latex-file gens-quotient.tex 2>&1 | tee gens-quotient.$(log)
+
+# Many of the following targets can be used to compute homology from
+# the d1.txt and d2.txt matrix files regardless of where they came
+# from (i.e. they need not be produced by calg-cayley).
 
 # This target computes a Smith normal form for the matrix d_1.
 d1smith.txt d1colops.txt: d1.txt
