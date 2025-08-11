@@ -403,6 +403,10 @@ check-FG: FG.txt
 # is a cohomology generator that is supported on a single homology
 # generator from the G matrix.
 
+simplicial-systole: d1.txt d2.txt
+	systole -simplicial -simplicial-at-vertex 0 -simplicial-stop-nonzero -d1 d1.txt -d2 d2.txt
+
+
 # wip targets
 simp-cosys: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
 	simplicial-cosystole -verbose -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys.$(log)
