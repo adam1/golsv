@@ -425,6 +425,9 @@ simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edg
 sample-coboundary-decoder: d1.txt d2.txt Z1.txt
 	coboundary-decoder -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -min-error-weight 67098 -max-error-weight 67098 -verbose -results results-$(log).json 2>&1 | tee sample-coboundary-decoder.$(log)
 
+circulant:
+	random-complex -dimC0 60480 -circulant -regular -k 14 -d1 d1.txt -d2 d2.txt 2>&1 | tee circulant.$(log)
+
 really-clean:
 		rm -f B1.txt B1colops.txt B1rowops.txt B1smith.txt C.txt F.txt FG.txt G.txt K.txt KB1.txt KS.txt \
 		KSdiffs.txt KSsmith.txt KT.txt KTsmith.txt M.txt Mcolops.txt Mrowops.txt Msmith.txt P1.txt \
