@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import subprocess
+
+def cmd_type(instance_id):
+    """Report the instance type"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--instance-id', instance_id,
+            '--query', 'Reservations[].Instances[].InstanceType',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        print(result.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_set_type(instance_id, args):
+    """Set the instance type"""
+    if len(args) < 1:
+        print("Usage: ec2 set-type <instance-type>")
+        sys.exit(1)
+    
+    instance_type = args[0]
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'modify-instance-attribute',
+            '--instance-id', instance_id,
+            '--instance-type', instance_type
+        ], capture_output=True, text=True, check=True)
+        print(f"Instance type set to {instance_type}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_state(instance_id):
+    """Report the instance state"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--instance-id', instance_id,
+            '--query', 'Reservations[].Instances[].State.Name',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        print(result.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_start(instance_id):
+    """Start the instance"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'start-instances',
+            '--instance-ids', instance_id
+        ], capture_output=True, text=True, check=True)
+        print(f"Starting instance {instance_id}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_stop(instance_id):
+    """Stop the instance"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'stop-instances',
+            '--instance-ids', instance_id
+        ], capture_output=True, text=True, check=True)
+        print(f"Stopping instance {instance_id}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_ip(instance_id):
+    """Report the public IP address"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--instance-id', instance_id,
+            '--query', 'Reservations[].Instances[].PublicIpAddress',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        ip = result.stdout.strip()
+        if ip and ip != "None":
+            print(ip)
+        else:
+            print("No public IP address assigned")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: ec2 <command> [args]")
+        print("Commands:")
+        print("  type           - Report the instance type")
+        print("  set-type <type> - Set the instance type")
+        print("  state          - Report the instance state")
+        print("  start          - Start the instance")
+        print("  stop           - Stop the instance")
+        print("  ip             - Report the public IP address")
+        sys.exit(1)
+    
+    command = sys.argv[1]
+    args = sys.argv[2:]
+    
+    # Check for required environment variable
+    instance_id = os.environ.get('INSTANCE_ID')
+    if not instance_id:
+        print("Error: INSTANCE_ID environment variable is not set")
+        sys.exit(1)
+    
+    # Command dispatch
+    if command == "type":
+        cmd_type(instance_id)
+    elif command == "set-type":
+        cmd_set_type(instance_id, args)
+    elif command == "state":
+        cmd_state(instance_id)
+    elif command == "start":
+        cmd_start(instance_id)
+    elif command == "stop":
+        cmd_stop(instance_id)
+    elif command == "ip":
+        cmd_ip(instance_id)
+    else:
+        print(f"Unknown command: {command}")
+        print("Available commands: type, set-type, state, start, stop, ip")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
