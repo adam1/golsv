@@ -220,17 +220,18 @@ func TestRandomRegularCliqueComplex(t *testing.T) {
 
 func TestRandomCirculantComplex(t *testing.T) {
 	tests := []struct {
-		n           int
-		k           int
-		expectError bool
+		n               int
+		k               int
+		expectError     bool
+		expectedTriangles int
 	}{
-		{6, 2, false},   // 6 vertices, 2-regular circulant
-		{8, 4, false},   // 8 vertices, 4-regular circulant
-		{10, 6, false},  // 10 vertices, 6-regular circulant
-		{6, 3, true},    // k must be even
-		{4, 4, true},    // k >= n
-		{1, 0, true},    // n must be at least 2
-		{5, 1, true},    // k must be even
+		{6, 2, false, 0},   // 6 vertices, 2-regular circulant
+		{8, 4, false, -1},   // 8 vertices, 4-regular circulant
+		{10, 6, false, -1}, // 10 vertices, 6-regular circulant, -1 means check for at least 1
+		{6, 3, true, -1},   // k must be even
+		{4, 4, true, -1},   // k >= n
+		{1, 0, true, -1},   // n must be at least 2
+		{5, 1, true, -1},   // k must be even
 	}
 
 	verbose := false
@@ -288,6 +289,19 @@ func TestRandomCirculantComplex(t *testing.T) {
 			// Basic checks on d_2 (triangles from clique filling)
 			if d_2.NumRows() != d_1.NumColumns() {
 				t.Errorf("expected d_2.NumRows()=%d, got %d", d_1.NumColumns(), d_2.NumRows())
+			}
+
+			// Check expected number of triangles
+			if test.expectedTriangles == -1 {
+				// Check for at least one triangle
+				if d_2.NumColumns() < 1 {
+					t.Errorf("expected at least 1 triangle, got %d", d_2.NumColumns())
+				}
+			} else {
+				// Check for exact number of triangles
+				if d_2.NumColumns() != test.expectedTriangles {
+					t.Errorf("expected %d triangles, got %d", test.expectedTriangles, d_2.NumColumns())
+				}
 			}
 
 			// Each triangle should have weight 3

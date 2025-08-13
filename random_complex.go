@@ -336,10 +336,11 @@ func (R *RandomComplexGenerator) randomRegularConfigurationComplexWithRetries(k,
 	return C.D1(), C.D2(), nil
 }
 
-// generateRandomCirculantSteps generates a random step set for a k-regular circulant graph.
+// randomCirculantStepsWithTriangles generates a random step set for a k-regular circulant graph.
 // Returns k/2 steps which will be normalized to include inverses, resulting in k degree.
 // It starts with step 1, then adds additional steps preferring triangle-forming sets.
-func generateRandomCirculantSteps(n, k int) ([]int, error) {
+// When adding generator d, also adds n - d - 1 to ensure triangle formation.
+func randomCirculantStepsWithTriangles(n, k int) ([]int, error) {
 	if k < 0 || k >= n {
 		return nil, fmt.Errorf("regularity degree %d must be between 0 and %d", k, n-1)
 	}
@@ -349,11 +350,7 @@ func generateRandomCirculantSteps(n, k int) ([]int, error) {
 	if n < 2 {
 		return nil, fmt.Errorf("number of vertices %d must be at least 2", n)
 	}
-	
-	// We need k/2 distinct steps (since CirculantComplex will add inverses)
 	targetSteps := k / 2
-	
-	// Build generating set for circulant graph
 	generators := make(map[int]bool)
 	generatorList := make([]int, 0, targetSteps)
 	
@@ -384,10 +381,20 @@ func generateRandomCirculantSteps(n, k int) ([]int, error) {
 			
 			// Don't add if this step is already used (including its inverse)
 			negD := (n - d) % n
+			triangleStep := (n - d - 1) % n
+			
 			if !generators[d] && !generators[negD] && d != negD {
+				// Add the main generator d
 				generators[d] = true
 				generatorList = append(generatorList, d)
 				remaining--
+				
+				// Also add triangle-forming step n - d - 1 if not already present and we have space
+				if remaining > 0 && !generators[triangleStep] && !generators[(n - triangleStep) % n] && triangleStep != d && triangleStep != negD {
+					generators[triangleStep] = true
+					generatorList = append(generatorList, triangleStep)
+					remaining--
+				}
 				break
 			}
 			
@@ -408,7 +415,7 @@ func (R *RandomComplexGenerator) RandomCirculantComplex(n, k int) (*ZComplex[ZVe
 	if R.verbose {
 		log.Printf("Generating circulant clique complex over %d vertices with regularity degree %d", n, k)
 	}
-	steps, err := generateRandomCirculantSteps(n, k)
+	steps, err := randomCirculantStepsWithTriangles(n, k)
 	if err != nil {
 		return nil, err
 	}
