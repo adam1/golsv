@@ -39,8 +39,8 @@ func parseFlags() CoboundaryDecoderArgs {
 	args := CoboundaryDecoderArgs{
 		ErrorWeight: 10,
 		SamplesPerWeight: 100,
-		MinErrorWeight: 1,
-		MaxErrorWeight: 50,
+		MinErrorWeight: 0,
+		MaxErrorWeight: -1, // -1 means use code length
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", "", "D1 matrix file")
@@ -52,7 +52,7 @@ func parseFlags() CoboundaryDecoderArgs {
 	flag.StringVar(&args.ResultsFile, "results", "", "Results file")
 	flag.BoolVar(&args.FindThreshold, "find-threshold", false, "Find error weight threshold using binary search")
 	flag.IntVar(&args.MinErrorWeight, "min-error-weight", args.MinErrorWeight, "Minimum error weight for threshold search")
-	flag.IntVar(&args.MaxErrorWeight, "max-error-weight", args.MaxErrorWeight, "Maximum error weight for threshold search")
+	flag.IntVar(&args.MaxErrorWeight, "max-error-weight", args.MaxErrorWeight, "Maximum error weight for threshold search (-1 = code length)")
 	flag.BoolVar(&args.Verbose, "verbose", false, "Verbose output")
 	flag.Parse()
 
@@ -111,7 +111,11 @@ func main() {
 	if args.ErrorsFile != "" {
 		decodeErrorsFromFile(decoder, args)
 	} else if args.FindThreshold {
-		finder := golsv.NewDecoderThresholdFinder(decoder, args.MinErrorWeight, args.MaxErrorWeight, args.SamplesPerWeight, args.Verbose)
+		maxErrorWeight := args.MaxErrorWeight
+		if maxErrorWeight == -1 {
+			maxErrorWeight = complex.NumEdges()
+		}
+		finder := golsv.NewDecoderThresholdFinder(decoder, args.MinErrorWeight, maxErrorWeight, args.SamplesPerWeight, args.Verbose)
 		results := finder.FindThreshold()
 		log.Printf("Threshold search results: threshold=%d, maxSuccess=%d, minFailure=%d, steps=%d, samples=%d", 
 			results.ThresholdWeight, results.MaxSuccessWeight, results.MinFailureWeight, results.BinarySearchSteps, results.TotalSamples)
