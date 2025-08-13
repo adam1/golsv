@@ -363,6 +363,7 @@ type DecoderSampler struct {
 	results DecoderSamplerResults
 	resultsFilename string
 	verbose bool
+	failFast bool
 }
 
 type DecoderSamplerResults struct {
@@ -373,13 +374,14 @@ type DecoderSamplerResults struct {
 	SameCosetCount int
 }
 
-func NewDecoderSampler(decoder Decoder, errorWeight int, samplesPerWeight int, resultsFilename string, verbose bool) *DecoderSampler {
+func NewDecoderSampler(decoder Decoder, errorWeight int, samplesPerWeight int, resultsFilename string, verbose bool, failFast bool) *DecoderSampler {
 	return &DecoderSampler{
 		decoder: decoder,
 		errorWeight: errorWeight,
 		samplesPerWeight: samplesPerWeight,
 		resultsFilename: resultsFilename,
 		verbose: verbose,
+		failFast: failFast,
 	}
 }
 
@@ -419,6 +421,12 @@ func (S *DecoderSampler) Run() {
 				float64(S.results.SuccessCount*100)/float64(i+1), int(elapsed.Seconds()))
 		}
 		S.writeResultsFile()
+		if S.failFast && S.results.FailCount > 0 {
+			if S.verbose {
+				log.Printf("FailFast mode: stopping after first failure at sample %d/%d", i+1, S.samplesPerWeight)
+			}
+			break
+		}
 	}
 }
 
@@ -487,14 +495,15 @@ func (F *DecoderThresholdFinder) FindThreshold() DecoderThresholdResults {
 			log.Printf("Binary search step %d: testing weight %d (range [%d, %d])", results.BinarySearchSteps, mid, left, right)
 		}
 		
-		sampler := NewDecoderSampler(F.decoder, mid, F.samplesPerWeight, "", F.verbose)
+		sampler := NewDecoderSampler(F.decoder, mid, F.samplesPerWeight, "", F.verbose, true)
 		sampler.Run()
-		results.TotalSamples += F.samplesPerWeight
+		actualSamples := sampler.results.SuccessCount + sampler.results.FailCount
+		results.TotalSamples += actualSamples
 		
-		successRate := float64(sampler.results.SuccessCount) / float64(F.samplesPerWeight)
+		successRate := float64(sampler.results.SuccessCount) / float64(actualSamples)
 		
 		if F.verbose {
-			log.Printf("Weight %d: success rate = %1.2f%% (%d/%d)", mid, successRate*100, sampler.results.SuccessCount, F.samplesPerWeight)
+			log.Printf("Weight %d: success rate = %1.2f%% (%d/%d)", mid, successRate*100, sampler.results.SuccessCount, actualSamples)
 		}
 		
 		if sampler.results.FailCount == 0 {

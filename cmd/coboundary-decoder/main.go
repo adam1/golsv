@@ -120,7 +120,7 @@ func main() {
 		log.Printf("Threshold search results: threshold=%d, maxSuccess=%d, minFailure=%d, steps=%d, samples=%d", 
 			results.ThresholdWeight, results.MaxSuccessWeight, results.MinFailureWeight, results.BinarySearchSteps, results.TotalSamples)
 	} else {
-		sampler := golsv.NewDecoderSampler(decoder, args.ErrorWeight, args.SamplesPerWeight, args.ResultsFile, args.Verbose)
+		sampler := golsv.NewDecoderSampler(decoder, args.ErrorWeight, args.SamplesPerWeight, args.ResultsFile, args.Verbose, false)
 		sampler.Run()
 	}
 }
