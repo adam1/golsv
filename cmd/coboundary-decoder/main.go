@@ -25,8 +25,7 @@ type CoboundaryDecoderArgs struct {
 	D2File           string
 	Z_1File          string
 	Verbose          bool
-	MinErrorWeight   int
-	MaxErrorWeight   int
+	ErrorWeight      int
 	SamplesPerWeight int
 	ErrorsFile       string
 	ResultsFile	     string
@@ -35,16 +34,14 @@ type CoboundaryDecoderArgs struct {
 
 func parseFlags() CoboundaryDecoderArgs {
 	args := CoboundaryDecoderArgs{
-		MinErrorWeight: 0,
-		MaxErrorWeight: 100,
+		ErrorWeight: 10,
 		SamplesPerWeight: 100,
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", "", "D1 matrix file")
 	flag.StringVar(&args.D2File, "d2", "", "D2 matrix file")
 	flag.StringVar(&args.Z_1File, "Z_1", "", "Z_1 matrix file")
-	flag.IntVar(&args.MinErrorWeight, "min-error-weight", args.MinErrorWeight, "Minimum error weight")
-	flag.IntVar(&args.MaxErrorWeight, "max-error-weight", args.MaxErrorWeight, "Maximum error weight")
+	flag.IntVar(&args.ErrorWeight, "error-weight", args.ErrorWeight, "Error weight")
 	flag.IntVar(&args.SamplesPerWeight, "samples-per-weight", args.SamplesPerWeight, "Number of samples per weight")
 	flag.StringVar(&args.ErrorsFile, "errors", args.ResultsFile, "Errors file. Decode these errors instead of sampling.")
 	flag.StringVar(&args.ResultsFile, "results", "", "Results file")
@@ -106,7 +103,7 @@ func main() {
 	if args.ErrorsFile != "" {
 		decodeErrorsFromFile(decoder, args)
 	} else {
-		sampler := golsv.NewDecoderSampler(decoder, args.MinErrorWeight, args.MaxErrorWeight, args.SamplesPerWeight, args.ResultsFile, args.Verbose)
+		sampler := golsv.NewDecoderSampler(decoder, args.ErrorWeight, args.SamplesPerWeight, args.ResultsFile, args.Verbose)
 		sampler.Run()
 	}
 }

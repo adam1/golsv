@@ -358,8 +358,7 @@ type Decoder interface {
 
 type DecoderSampler struct {
 	decoder Decoder
-	minErrorWeight int
-	maxErrorWeight int
+	errorWeight int
 	samplesPerWeight int
 	results DecoderSamplerResults
 	resultsFilename string
@@ -374,11 +373,10 @@ type DecoderSamplerResults struct {
 	SameCosetCount int
 }
 
-func NewDecoderSampler(decoder Decoder, minErrorWeight int, maxErrorWeight int, samplesPerWeight int, resultsFilename string, verbose bool) *DecoderSampler {
+func NewDecoderSampler(decoder Decoder, errorWeight int, samplesPerWeight int, resultsFilename string, verbose bool) *DecoderSampler {
 	return &DecoderSampler{
 		decoder: decoder,
-		minErrorWeight: minErrorWeight,
-		maxErrorWeight: maxErrorWeight,
+		errorWeight: errorWeight,
 		samplesPerWeight: samplesPerWeight,
 		resultsFilename: resultsFilename,
 		verbose: verbose,
@@ -387,42 +385,40 @@ func NewDecoderSampler(decoder Decoder, minErrorWeight int, maxErrorWeight int, 
 
 func (S *DecoderSampler) Run() {
 	n := S.decoder.Length()
-	for weight := S.minErrorWeight; weight <= S.maxErrorWeight; weight++ {
-		log.Printf("Sampling error weight=%d samples=%d", weight, S.samplesPerWeight)
-		S.results.ErrorWeight = weight
-		S.results.SuccessCount = 0
-		S.results.EqualCount = 0
-		S.results.SameCosetCount = 0
-		S.results.FailCount = 0
-		for i := 0; i < S.samplesPerWeight; i++ {
-			errorVec := NewBinaryVector(n)
-			errorVec.RandomizeWithWeight(weight)
-			syndrome := S.decoder.Syndrome(errorVec)
-			before := time.Now()
-			err, decodedErrorVec := S.decoder.Decode(syndrome)
-			status := "failure"
-			now := time.Now()
-			elapsed := now.Sub(before)
-			if err != nil {
-				S.results.FailCount++
-			} else if decodedErrorVec.Equal(errorVec) {
-				status = "success"
-				S.results.SuccessCount++
-				S.results.EqualCount++
-			} else if S.decoder.SameCoset(errorVec, decodedErrorVec) {
-				status = "success"
-				S.results.SuccessCount++
-				S.results.SameCosetCount++
-			} else {
-				S.results.FailCount++
-			}
-			if S.verbose {
-				log.Printf("Decode %s: errweight=%d equal=%d sameCoset=%d fail=%d success=%d/%d/%d successrate=%1.1f%% dur=%d",
-					status, weight, S.results.EqualCount, S.results.SameCosetCount, S.results.FailCount, S.results.SuccessCount, i+1, S.samplesPerWeight,
-					float64(S.results.SuccessCount*100)/float64(i+1), int(elapsed.Seconds()))
-			}
-			S.writeResultsFile()
+	log.Printf("Sampling error weight=%d samples=%d", S.errorWeight, S.samplesPerWeight)
+	S.results.ErrorWeight = S.errorWeight
+	S.results.SuccessCount = 0
+	S.results.EqualCount = 0
+	S.results.SameCosetCount = 0
+	S.results.FailCount = 0
+	for i := 0; i < S.samplesPerWeight; i++ {
+		errorVec := NewBinaryVector(n)
+		errorVec.RandomizeWithWeight(S.errorWeight)
+		syndrome := S.decoder.Syndrome(errorVec)
+		before := time.Now()
+		err, decodedErrorVec := S.decoder.Decode(syndrome)
+		status := "failure"
+		now := time.Now()
+		elapsed := now.Sub(before)
+		if err != nil {
+			S.results.FailCount++
+		} else if decodedErrorVec.Equal(errorVec) {
+			status = "success"
+			S.results.SuccessCount++
+			S.results.EqualCount++
+		} else if S.decoder.SameCoset(errorVec, decodedErrorVec) {
+			status = "success"
+			S.results.SuccessCount++
+			S.results.SameCosetCount++
+		} else {
+			S.results.FailCount++
 		}
+		if S.verbose {
+			log.Printf("Decode %s: errweight=%d equal=%d sameCoset=%d fail=%d success=%d/%d/%d successrate=%1.1f%% dur=%d",
+				status, S.errorWeight, S.results.EqualCount, S.results.SameCosetCount, S.results.FailCount, S.results.SuccessCount, i+1, S.samplesPerWeight,
+				float64(S.results.SuccessCount*100)/float64(i+1), int(elapsed.Seconds()))
+		}
+		S.writeResultsFile()
 	}
 }
 
