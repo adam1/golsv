@@ -437,3 +437,87 @@ func (S *DecoderSampler) writeResultsFile() {
 	log.Printf("Wrote file %s", S.resultsFilename)
 }
 
+type DecoderThresholdFinder struct {
+	decoder Decoder
+	minErrorWeight int
+	maxErrorWeight int
+	samplesPerWeight int
+	verbose bool
+}
+
+type DecoderThresholdResults struct {
+	ThresholdWeight int
+	MaxSuccessWeight int
+	MinFailureWeight int
+	TotalSamples int
+	BinarySearchSteps int
+}
+
+func NewDecoderThresholdFinder(decoder Decoder, minErrorWeight int, maxErrorWeight int, samplesPerWeight int, verbose bool) *DecoderThresholdFinder {
+	return &DecoderThresholdFinder{
+		decoder: decoder,
+		minErrorWeight: minErrorWeight,
+		maxErrorWeight: maxErrorWeight,
+		samplesPerWeight: samplesPerWeight,
+		verbose: verbose,
+	}
+}
+
+func (F *DecoderThresholdFinder) FindThreshold() DecoderThresholdResults {
+	results := DecoderThresholdResults{
+		ThresholdWeight: -1,
+		MaxSuccessWeight: -1,
+		MinFailureWeight: -1,
+		TotalSamples: 0,
+		BinarySearchSteps: 0,
+	}
+	
+	left := F.minErrorWeight
+	right := F.maxErrorWeight
+	maxSuccessWeight := -1
+	minFailureWeight := -1
+	
+	log.Printf("Starting binary search for decoder threshold between weights %d and %d", left, right)
+	
+	for left <= right {
+		results.BinarySearchSteps++
+		mid := (left + right) / 2
+		
+		if F.verbose {
+			log.Printf("Binary search step %d: testing weight %d (range [%d, %d])", results.BinarySearchSteps, mid, left, right)
+		}
+		
+		sampler := NewDecoderSampler(F.decoder, mid, F.samplesPerWeight, "", F.verbose)
+		sampler.Run()
+		results.TotalSamples += F.samplesPerWeight
+		
+		successRate := float64(sampler.results.SuccessCount) / float64(F.samplesPerWeight)
+		
+		if F.verbose {
+			log.Printf("Weight %d: success rate = %1.2f%% (%d/%d)", mid, successRate*100, sampler.results.SuccessCount, F.samplesPerWeight)
+		}
+		
+		if sampler.results.FailCount == 0 {
+			maxSuccessWeight = mid
+			left = mid + 1
+		} else {
+			minFailureWeight = mid
+			right = mid - 1
+		}
+	}
+	
+	results.MaxSuccessWeight = maxSuccessWeight
+	results.MinFailureWeight = minFailureWeight
+	
+	if maxSuccessWeight != -1 && minFailureWeight != -1 {
+		results.ThresholdWeight = maxSuccessWeight
+	} else if minFailureWeight != -1 {
+		results.ThresholdWeight = minFailureWeight
+	}
+	
+	log.Printf("Threshold search completed: maxSuccessWeight=%d, minFailureWeight=%d, threshold=%d, steps=%d, totalSamples=%d", 
+		results.MaxSuccessWeight, results.MinFailureWeight, results.ThresholdWeight, results.BinarySearchSteps, results.TotalSamples)
+	
+	return results
+}
+
