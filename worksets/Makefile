@@ -423,7 +423,7 @@ simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edg
 		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)
 
 coboundary-decoder-threshold: d1.txt d2.txt Z1.txt
-	coboundary-decoder -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -verbose -results results-$(log).json 2>&1 | tee coboundary-decoder-threshold.$(log)
+	coboundary-decoder -find-threshold -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -verbose -results results-$(log).json 2>&1 | tee coboundary-decoder-threshold.$(log)
 
 circulant:
 	random-complex -dimC0 60480 -circulant -regular -k 14 -d1 d1.txt -d2 d2.txt 2>&1 | tee circulant.$(log)
