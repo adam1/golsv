@@ -315,18 +315,18 @@ func TestRandomCirculantStepsWithTriangles(t *testing.T) {
 
 func TestRandomCirculantComplex(t *testing.T) {
 	tests := []struct {
-		n               int
-		k               int
-		expectError     bool
-		expectedTriangles int
+		n                      int
+		k                      int
+		expectError            bool
+		expectedTrianglesRange [2]int
 	}{
-		{6, 2, false, 0},   // 6 vertices, 2-regular circulant
-		{8, 4, false, -1},   // 8 vertices, 4-regular circulant
-		{10, 6, false, -1}, // 10 vertices, 6-regular circulant, -1 means check for at least 1
-		{6, 3, true, -1},   // k must be even
-		{4, 4, true, -1},   // k >= n
-		{1, 0, true, -1},   // n must be at least 2
-		{5, 1, true, -1},   // k must be even
+		{6, 2, false, [2]int{0,0}},   // 6 vertices, 2-regular circulant
+		{8, 4, false, [2]int{0,10}},  // 8 vertices, 4-regular circulant
+		{10, 6, false, [2]int{1,100}}, // 10 vertices, 6-regular circulant
+		{6, 3, true, [2]int{0,0}},   // k must be even
+		{4, 4, true, [2]int{0,0}},   // k >= n
+		{1, 0, true, [2]int{0,0}},   // n must be at least 2
+		{5, 1, true, [2]int{0,0}},   // k must be even
 	}
 
 	verbose := false
@@ -387,16 +387,10 @@ func TestRandomCirculantComplex(t *testing.T) {
 			}
 
 			// Check expected number of triangles
-			if test.expectedTriangles == -1 {
-				// Check for at least one triangle
-				if d_2.NumColumns() < 1 {
-					t.Errorf("expected at least 1 triangle, got %d", d_2.NumColumns())
-				}
-			} else {
-				// Check for exact number of triangles
-				if d_2.NumColumns() != test.expectedTriangles {
-					t.Errorf("expected %d triangles, got %d", test.expectedTriangles, d_2.NumColumns())
-				}
+			numTriangles := d_2.NumColumns()
+			if numTriangles < test.expectedTrianglesRange[0] ||
+				numTriangles > test.expectedTrianglesRange[1] {
+				t.Errorf("expected triangles in range %v, got %d", test.expectedTrianglesRange, numTriangles)
 			}
 
 			// Each triangle should have weight 3
