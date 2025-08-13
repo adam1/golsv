@@ -20,7 +20,11 @@ func main() {
 	var err error
 	var d_1, d_2 golsv.BinaryMatrix
 	if args.Circulant {
-		d_1, d_2, err = gen.RandomCirculantCliqueComplex(args.DimC0, args.RegularityDegree)
+		var complex *golsv.ZComplex[golsv.ZVertexInt]
+		complex, err = gen.RandomCirculantComplex(args.DimC0, args.RegularityDegree)
+		if err == nil {
+			d_1, d_2 = complex.D1(), complex.D2()
+		}
 	} else if args.Regular {
 		d_1, d_2, err = gen.RandomRegularCliqueComplexWithRetries(args.RegularityDegree, args.MaxRetries)
 	} else if args.Clique {

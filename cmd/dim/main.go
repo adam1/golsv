@@ -53,7 +53,7 @@ func main() {
 			}
 		}
 		if found > 0 {
-			panic(fmt.Sprintf("found %d zero columns"))
+			panic(fmt.Sprintf("found %d zero columns", found))
 		}
 		log.Printf("all columns are nonzero")
 	}

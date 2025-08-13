@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	mathrand "math/rand"
 )	
 
 type RandomComplexGenerator struct {
@@ -158,6 +157,110 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRet
 		return nil, nil, fmt.Errorf("cannot create %d-regular graph on %d vertices (n*k must be even)", k, numVertices)
 	}
 	
+	// For even k, try circulant approach first (more structured)
+	// For odd k, fall back to configuration model
+	if k%2 == 0 {
+		if R.verbose {
+			log.Printf("Using circulant graph approach for even regularity %d", k)
+		}
+		return R.randomRegularCirculantComplexWithRetries(k, maxRetries)
+	} else {
+		if R.verbose {
+			log.Printf("Using configuration model approach for odd regularity %d", k)
+		}
+		return R.randomRegularConfigurationComplexWithRetries(k, maxRetries)
+	}
+}
+
+func (R *RandomComplexGenerator) randomRegularCirculantComplexWithRetries(k, maxRetries int) (d_1, d_2 BinaryMatrix, err error) {
+	numVertices := R.dimC_0
+	
+	// Generate steps for k-regular circulant graph
+	// For k-regular circulant, we need k/2 distinct step sizes (since each step generates 2 edges per vertex)
+	steps := make([]int, k/2)
+	
+	// Try different step combinations with retries
+	for retry := 0; retry < maxRetries; retry++ {
+		// Generate k/2 random step sizes between 1 and n/2
+		stepSet := make(map[int]bool)
+		steps = steps[:0] // reset slice
+		
+		for len(steps) < k/2 {
+			// Generate random step between 1 and numVertices/2
+			var step int
+			if numVertices == 2 {
+				step = 1
+			} else {
+				stepBig, err := rand.Int(rand.Reader, big.NewInt(int64(numVertices/2)))
+				if err != nil {
+					return nil, nil, err
+				}
+				step = int(stepBig.Int64()) + 1 // shift to range [1, n/2]
+			}
+			
+			// Avoid step that equals numVertices/2 when numVertices is even (self-inverse)
+			// unless we need exactly one more step and this is the only option
+			if step == numVertices/2 && numVertices%2 == 0 && len(steps) < k/2-1 {
+				continue
+			}
+			
+			if !stepSet[step] {
+				stepSet[step] = true
+				steps = append(steps, step)
+			}
+		}
+		
+		if R.verbose {
+			log.Printf("Attempt %d: trying circulant steps %v", retry+1, steps)
+		}
+		
+		// Generate circulant clique complex with these steps
+		complex, err := CirculantComplex(numVertices, steps, R.verbose)
+		if err != nil {
+			if R.verbose {
+				log.Printf("Attempt %d failed: %v", retry+1, err)
+			}
+			continue
+		}
+		
+		// Check if the resulting graph is k-regular
+		// (This should always be true for properly chosen steps, but let's verify)
+		d1 := complex.D1()
+		regularityOk := true
+		for v := 0; v < numVertices; v++ {
+			degree := 0
+			for e := 0; e < d1.NumColumns(); e++ {
+				if d1.Get(v, e) == 1 {
+					degree++
+				}
+			}
+			if degree != k {
+				regularityOk = false
+				if R.verbose {
+					log.Printf("Vertex %d has degree %d, expected %d", v, degree, k)
+				}
+				break
+			}
+		}
+		
+		if regularityOk {
+			if R.verbose {
+				log.Printf("Successfully generated %d-regular circulant clique complex with steps %v", k, steps)
+			}
+			return complex.D1(), complex.D2(), nil
+		}
+		
+		if R.verbose {
+			log.Printf("Attempt %d: graph not %d-regular, retrying", retry+1, k)
+		}
+	}
+	
+	return nil, nil, fmt.Errorf("failed to generate %d-regular circulant graph after %d attempts", k, maxRetries)
+}
+
+func (R *RandomComplexGenerator) randomRegularConfigurationComplexWithRetries(k, maxRetries int) (d_1, d_2 BinaryMatrix, err error) {
+	numVertices := R.dimC_0
+	
 	// Use configuration model: create k stubs per vertex, then randomly pair them
 	stubs := make([]int, 0, numVertices*k)
 	for v := 0; v < numVertices; v++ {
@@ -166,20 +269,20 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRet
 		}
 	}
 	
-	mathrand.Shuffle(len(stubs), func(i, j int) {
-		stubs[i], stubs[j] = stubs[j], stubs[i]
-	})
-	
-	// Track adjacency to avoid multiple edges between same vertices
-	adjacency := make([]map[int]bool, numVertices)
-	for i := 0; i < numVertices; i++ {
-		adjacency[i] = make(map[int]bool)
-	}
-	
 	d_1Sparse := NewSparseBinaryMatrix(numVertices, 0).Sparse()
 	
 	// Pair up stubs to create edges
 	for retry := 0; retry < maxRetries; retry++ {
+		// Shuffle stubs randomly
+		for i := len(stubs) - 1; i > 0; i-- {
+			jBig, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+			if err != nil {
+				return nil, nil, err
+			}
+			j := int(jBig.Int64())
+			stubs[i], stubs[j] = stubs[j], stubs[i]
+		}
+		
 		edges := make([][2]int, 0)
 		adjacencyCopy := make([]map[int]bool, numVertices)
 		for i := 0; i < numVertices; i++ {
@@ -206,6 +309,7 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRet
 		
 		if success {
 			// Create boundary matrix from successful edge list
+			d_1Sparse = NewSparseBinaryMatrix(numVertices, 0).Sparse() // Reset matrix
 			for _, edge := range edges {
 				v, u := edge[0], edge[1]
 				M := NewSparseBinaryMatrix(numVertices, 1)
@@ -216,10 +320,6 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRet
 			break
 		}
 		
-		mathrand.Shuffle(len(stubs), func(i, j int) {
-			stubs[i], stubs[j] = stubs[j], stubs[i]
-		})
-		
 		if retry == maxRetries-1 {
 			return nil, nil, fmt.Errorf("failed to generate %d-regular graph after %d attempts", k, maxRetries)
 		}
@@ -228,7 +328,7 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRet
 	numEdges := d_1Sparse.NumColumns()
 	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
 	if R.verbose {
-		log.Printf("Generated regular graph with %d edges", numEdges)
+		log.Printf("Generated regular graph with %d edges using configuration model", numEdges)
 		log.Printf("Generated d_1: %v\n", d_1Sparse)
 		log.Printf("Filling cliques")
 	}
@@ -236,78 +336,63 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexWithRetries(k, maxRet
 	return C.D1(), C.D2(), nil
 }
 
-func (R *RandomComplexGenerator) RandomCirculantCliqueComplex(n, k int) (d_1, d_2 BinaryMatrix, err error) {
-	if R.verbose {
-		log.Printf("Generating circulant clique complex over %d vertices with regularity degree %d", n, k)
-	}
+// generateRandomCirculantSteps generates a random step set for a k-regular circulant graph.
+// Returns k/2 steps which will be normalized to include inverses, resulting in k degree.
+// It starts with step 1, then adds additional steps preferring triangle-forming sets.
+func generateRandomCirculantSteps(n, k int) ([]int, error) {
 	if k < 0 || k >= n {
-		return nil, nil, fmt.Errorf("regularity degree %d must be between 0 and %d", k, n-1)
+		return nil, fmt.Errorf("regularity degree %d must be between 0 and %d", k, n-1)
 	}
 	if k%2 != 0 {
-		return nil, nil, fmt.Errorf("regularity degree %d must be even", k)
+		return nil, fmt.Errorf("regularity degree %d must be even", k)
 	}
 	if n < 2 {
-		return nil, nil, fmt.Errorf("number of vertices %d must be at least 2", n)
+		return nil, fmt.Errorf("number of vertices %d must be at least 2", n)
 	}
+	
+	// We need k/2 distinct steps (since CirculantComplex will add inverses)
+	targetSteps := k / 2
 	
 	// Build generating set for circulant graph
 	generators := make(map[int]bool)
-	generatorList := make([]int, 0, k)
+	generatorList := make([]int, 0, targetSteps)
 	
-	// Start with 1 and -1 (== n-1 mod n)
+	// Start with step 1 (this will generate 1 and n-1 after normalization)
 	generators[1] = true
-	generators[(n-1)%n] = true
-	generatorList = append(generatorList, 1, (n-1)%n)
+	generatorList = append(generatorList, 1)
 	
-	// Add remaining (k-2) generators, preferring triangle-forming sets
-	remaining := k - 2
+	// Add remaining (targetSteps-1) generators, preferring triangle-forming sets
+	remaining := targetSteps - 1
 	for remaining > 0 {
-		// Pick random integer between 2 and n-2 inclusive
+		// Pick random integer between 2 and n/2 inclusive to avoid duplicates with inverses
 		var d int
 		maxAttempts := 100
 		for attempt := 0; attempt < maxAttempts; attempt++ {
-			dBig, err := rand.Int(rand.Reader, big.NewInt(int64(n-3)))
-			if err != nil {
-				return nil, nil, err
+			if n <= 4 {
+				// For small n, just try step 2 if available
+				d = 2
+				if d >= n {
+					break
+				}
+			} else {
+				dBig, err := rand.Int(rand.Reader, big.NewInt(int64(n/2-1)))
+				if err != nil {
+					return nil, err
+				}
+				d = int(dBig.Int64()) + 2 // shift to range [2, n/2]
 			}
-			d = int(dBig.Int64()) + 2 // shift to range [2, n-2]
 			
+			// Don't add if this step is already used (including its inverse)
 			negD := (n - d) % n
-			e := (n - 1 - d) % n     // triangle-forming generator
-			negE := (n - e) % n
-			
-			// Check how many of {d, -d, e, -e} are available
-			needed := make([]int, 0, 4)
-			if !generators[d] {
-				needed = append(needed, d)
-			}
-			if !generators[negD] && negD != d {
-				needed = append(needed, negD)
-			}
-			if !generators[e] && e != d && e != negD {
-				needed = append(needed, e)
-			}
-			if !generators[negE] && negE != d && negE != negD && negE != e {
-				needed = append(needed, negE)
-			}
-			
-			if len(needed) > 0 {
-				// Add as many as possible up to remaining slots
-				toAdd := needed
-				if len(toAdd) > remaining {
-					toAdd = toAdd[:remaining]
-				}
-				
-				for _, gen := range toAdd {
-					generators[gen] = true
-					generatorList = append(generatorList, gen)
-					remaining--
-				}
+			if !generators[d] && !generators[negD] && d != negD {
+				generators[d] = true
+				generatorList = append(generatorList, d)
+				remaining--
 				break
 			}
 			
 			if attempt == maxAttempts-1 {
-				return nil, nil, fmt.Errorf("failed to generate unique generators after %d attempts", maxAttempts)
+				return nil, fmt.Errorf("failed to generate unique generators after %d attempts", maxAttempts)
 			}
 		}
 		
@@ -316,42 +401,21 @@ func (R *RandomComplexGenerator) RandomCirculantCliqueComplex(n, k int) (d_1, d_
 		}
 	}
 	
+	return generatorList, nil
+}
+
+func (R *RandomComplexGenerator) RandomCirculantComplex(n, k int) (*ZComplex[ZVertexInt], error) {
 	if R.verbose {
-		log.Printf("Generated circulant generators: %v", generatorList)
+		log.Printf("Generating circulant clique complex over %d vertices with regularity degree %d", n, k)
 	}
-	
-	// Create circulant graph edges
-	d_1Sparse := NewSparseBinaryMatrix(n, 0).Sparse()
-	edgeSet := make(map[[2]int]bool)
-	
-	for v := 0; v < n; v++ {
-		for _, g := range generatorList {
-			u := (v + g) % n
-			if v != u { // avoid self-loops
-				// Ensure edge ordering (smaller vertex first) to avoid duplicates
-				if v < u {
-					edge := [2]int{v, u}
-					if !edgeSet[edge] {
-						edgeSet[edge] = true
-						M := NewSparseBinaryMatrix(n, 1)
-						M.Set(v, 0, 1)
-						M.Set(u, 0, 1)
-						d_1Sparse.AppendColumn(M)
-					}
-				}
-			}
-		}
+	steps, err := generateRandomCirculantSteps(n, k)
+	if err != nil {
+		return nil, err
 	}
-	
-	numEdges := d_1Sparse.NumColumns()
-	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
 	if R.verbose {
-		log.Printf("Generated circulant graph with %d edges", numEdges)
-		log.Printf("Generated d_1: %v\n", d_1Sparse)
-		log.Printf("Filling cliques")
+		log.Printf("Generated circulant generators: %v", steps)
 	}
-	C.Fill3Cliques()
-	return C.D1(), C.D2(), nil
+	return CirculantComplex(n, steps, R.verbose)
 }
 
 func (R *RandomComplexGenerator) randomizeGeneral_d_1() (d_1 BinaryMatrix, kernelMatrix BinaryMatrix) {

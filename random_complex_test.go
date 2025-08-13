@@ -218,7 +218,7 @@ func TestRandomRegularCliqueComplex(t *testing.T) {
 	}
 }
 
-func TestRandomCirculantCliqueComplex(t *testing.T) {
+func TestRandomCirculantComplex(t *testing.T) {
 	tests := []struct {
 		n           int
 		k           int
@@ -237,7 +237,7 @@ func TestRandomCirculantCliqueComplex(t *testing.T) {
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("n=%d_k=%d", test.n, test.k), func(t *testing.T) {
 			R := NewRandomComplexGenerator(test.n, verbose)
-			d_1, d_2, err := R.RandomCirculantCliqueComplex(test.n, test.k)
+			complex, err := R.RandomCirculantComplex(test.n, test.k)
 
 			if test.expectError {
 				if err == nil {
@@ -250,6 +250,9 @@ func TestRandomCirculantCliqueComplex(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
+
+			d_1 := complex.D1()
+			d_2 := complex.D2()
 
 			if d_1.NumRows() != test.n {
 				t.Errorf("expected d_1.NumRows()=%d, got %d", test.n, d_1.NumRows())
