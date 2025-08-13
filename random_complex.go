@@ -372,25 +372,28 @@ func randomCirculantStepsWithTriangles(n, k int) ([]int, error) {
 					break
 				}
 			} else {
-				dBig, err := rand.Int(rand.Reader, big.NewInt(int64(n/2-1)))
+				// Sample from range [2, n-2] and let constraint logic handle duplicates
+				dBig, err := rand.Int(rand.Reader, big.NewInt(int64(n-3)))
 				if err != nil {
 					return nil, err
 				}
-				d = int(dBig.Int64()) + 2 // shift to range [2, n/2]
+				d = int(dBig.Int64()) + 2 // shift to range [2, n-2]
 			}
 			
 			// Don't add if this step is already used (including its inverse)
 			negD := (n - d) % n
-			triangleStep := (n - d - 1) % n
 			
-			if !generators[d] && !generators[negD] && d != negD {
+			// Exclude d = n-1 because it would create triangleStep = 0, which is invalid
+			if !generators[d] && !generators[negD] && d != negD && d != (n-1) {
 				// Add the main generator d
 				generators[d] = true
 				generatorList = append(generatorList, d)
 				remaining--
 				
 				// Also add triangle-forming step n - d - 1 if not already present and we have space
-				if remaining > 0 && !generators[triangleStep] && !generators[(n - triangleStep) % n] && triangleStep != d && triangleStep != negD {
+				triangleStep := (n - d - 1) % n
+				triangleStepInverse := (n - triangleStep) % n
+				if remaining > 0 && triangleStep > 0 && triangleStep != (n-1) && triangleStep != triangleStepInverse && !generators[triangleStep] && !generators[triangleStepInverse] && triangleStep != d && triangleStep != negD {
 					generators[triangleStep] = true
 					generatorList = append(generatorList, triangleStep)
 					remaining--

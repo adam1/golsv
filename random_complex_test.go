@@ -218,6 +218,101 @@ func TestRandomRegularCliqueComplex(t *testing.T) {
 	}
 }
 
+func TestRandomCirculantStepsWithTriangles(t *testing.T) {
+	tests := []struct {
+		n           int
+		k           int
+		expectError bool
+	}{
+		{6, 2, false},   // 6 vertices, 2-regular
+		{8, 4, false},   // 8 vertices, 4-regular
+		{10, 6, false},  // 10 vertices, 6-regular
+		{12, 8, false},  // 12 vertices, 8-regular
+		{6, 3, true},    // k must be even
+		{4, 4, true},    // k >= n
+		{1, 0, true},    // n must be at least 2
+		{5, 1, true},    // k must be even
+	}
+
+	trials := 10 // Reduced to 10 for regular testing after debugging
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("n=%d_k=%d", test.n, test.k), func(t *testing.T) {
+			if test.expectError {
+				_, err := randomCirculantStepsWithTriangles(test.n, test.k)
+				if err == nil {
+					t.Errorf("expected error for n=%d, k=%d", test.n, test.k)
+				}
+				return
+			}
+
+			// Run multiple trials to verify consistency
+			for trial := 0; trial < trials; trial++ {
+				steps, err := randomCirculantStepsWithTriangles(test.n, test.k)
+				if err != nil {
+					t.Errorf("trial %d: unexpected error: %v", trial, err)
+					continue
+				}
+
+				// Verify step count
+				expectedSteps := test.k / 2
+				if len(steps) != expectedSteps {
+					t.Errorf("trial %d: expected %d steps, got %d", trial, expectedSteps, len(steps))
+					continue
+				}
+
+				// Normalize steps to get full step set (including inverses)
+				normalized := normalizeCirculantSteps(test.n, steps)
+
+				// Verify normalized step count equals k
+				if len(normalized) != test.k {
+					t.Errorf("trial %d: expected %d normalized steps, got %d. Original steps: %v, Normalized: %v", 
+						trial, test.k, len(normalized), steps, normalized)
+					continue
+				}
+
+				// Verify all steps are valid (> 0 and < n)
+				for _, step := range normalized {
+					if step <= 0 || step >= test.n {
+						t.Errorf("trial %d: invalid step %d (must be in range [1, %d))", trial, step, test.n)
+					}
+				}
+
+				// Verify no duplicate steps in normalized set
+				stepSet := make(map[int]bool)
+				for _, step := range normalized {
+					if stepSet[step] {
+						t.Errorf("trial %d: duplicate step %d in normalized set %v", trial, step, normalized)
+					}
+					stepSet[step] = true
+				}
+
+				// Verify all original steps are in valid range
+				for _, step := range steps {
+					if step <= 0 || step >= test.n {
+						t.Errorf("trial %d: invalid original step %d", trial, step)
+					}
+					if step == test.n-1 {
+						t.Errorf("trial %d: step %d equals n-1, should be excluded", trial, step)
+					}
+				}
+
+				// Verify step 1 is always included
+				found1 := false
+				for _, step := range steps {
+					if step == 1 {
+						found1 = true
+						break
+					}
+				}
+				if !found1 {
+					t.Errorf("trial %d: step 1 should always be included, got steps %v", trial, steps)
+				}
+			}
+		})
+	}
+}
+
+
 func TestRandomCirculantComplex(t *testing.T) {
 	tests := []struct {
 		n               int
