@@ -5,7 +5,7 @@ import sys
 import subprocess
 import time
 
-def cmd_type(instance_id):
+def cmd_type_get(instance_id):
     """Report the instance type"""
     try:
         result = subprocess.run([
@@ -19,13 +19,8 @@ def cmd_type(instance_id):
         print(f"Error running AWS command: {e}")
         sys.exit(1)
 
-def cmd_set_type(instance_id, args):
+def cmd_type_set(instance_id, instance_type):
     """Set the instance type"""
-    if len(args) < 1:
-        print("Usage: ec2 set-type <instance-type>")
-        sys.exit(1)
-    
-    instance_type = args[0]
     try:
         result = subprocess.run([
             'aws', 'ec2', 'modify-instance-attribute',
@@ -36,6 +31,13 @@ def cmd_set_type(instance_id, args):
     except subprocess.CalledProcessError as e:
         print(f"Error running AWS command: {e}")
         sys.exit(1)
+
+def cmd_type(instance_id, args):
+    """Report or set the instance type"""
+    if len(args) == 0:
+        cmd_type_get(instance_id)
+    else:
+        cmd_type_set(instance_id, args[0])
 
 def cmd_state(instance_id):
     """Report the instance state"""
@@ -267,8 +269,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: ec2 <command> [args]")
         print("Commands:")
-        print("  type           - Report the instance type")
-        print("  set-type <type> - Set the instance type")
+        print("  type [type]    - Report current instance type or set to [type]")
         print("  state          - Report the instance state")
         print("  start          - Start the instance")
         print("  stop           - Stop the instance")
@@ -287,9 +288,7 @@ def main():
     
     # Command dispatch
     if command == "type":
-        cmd_type(instance_id)
-    elif command == "set-type":
-        cmd_set_type(instance_id, args)
+        cmd_type(instance_id, args)
     elif command == "state":
         cmd_state(instance_id)
     elif command == "start":
@@ -302,7 +301,7 @@ def main():
         cmd_volume_size(instance_id, args)
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: type, set-type, state, start, stop, ip, volume-size")
+        print("Available commands: type, state, start, stop, ip, volume-size")
         sys.exit(1)
 
 if __name__ == "__main__":
