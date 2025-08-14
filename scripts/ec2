@@ -153,6 +153,116 @@ def cmd_ip(instance_id):
         print(f"Error running AWS command: {e}")
         sys.exit(1)
 
+def get_root_volume_id(instance_id):
+    """Get the root volume ID for the instance"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--instance-id', instance_id,
+            '--query', 'Reservations[].Instances[].BlockDeviceMappings[?DeviceName==`/dev/sda1` || DeviceName==`/dev/xvda`].Ebs.VolumeId',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        volume_id = result.stdout.strip()
+        if volume_id and volume_id != "None":
+            return volume_id
+        else:
+            print("No root volume found")
+            sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_volume_size_get(volume_id):
+    """Report the current volume size"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-volumes',
+            '--volume-ids', volume_id,
+            '--query', 'Volumes[].Size',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        current_size = result.stdout.strip()
+        print(f"{current_size} GB")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_volume_size_set(volume_id, new_size):
+    """Set the volume to a new size"""
+    try:
+        new_size = int(new_size)
+    except ValueError:
+        print("Error: Volume size must be a number")
+        sys.exit(1)
+    
+    # Get current size to validate
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-volumes',
+            '--volume-ids', volume_id,
+            '--query', 'Volumes[].Size',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        current_size = int(result.stdout.strip())
+        
+        if new_size <= current_size:
+            print(f"Error: New size ({new_size} GB) must be larger than current size ({current_size} GB)")
+            sys.exit(1)
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+    except ValueError:
+        print("Error: Could not parse current volume size")
+        sys.exit(1)
+    
+    # Modify volume
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'modify-volume',
+            '--volume-id', volume_id,
+            '--size', str(new_size)
+        ], capture_output=True, text=True, check=True)
+        print(f"Resizing volume from {current_size} GB to {new_size} GB...")
+        
+        # Poll modification status
+        while True:
+            result = subprocess.run([
+                'aws', 'ec2', 'describe-volumes-modifications',
+                '--volume-ids', volume_id,
+                '--query', 'VolumesModifications[].ModificationState',
+                '--output', 'text'
+            ], capture_output=True, text=True, check=True)
+            
+            state = result.stdout.strip()
+            print(f"Modification state: {state}")
+            
+            if state in ["completed", "optimizing"]:
+                print(f"Volume resize completed to {new_size} GB")
+                print("Note: You may need to extend the filesystem within the instance")
+                break
+            elif state in ["modifying"]:
+                time.sleep(5)
+            elif state == "failed":
+                print("Volume modification failed")
+                sys.exit(1)
+            else:
+                print(f"Unexpected modification state: {state}")
+                break
+                
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_volume_size(instance_id, args):
+    """Report or set the root volume size"""
+    volume_id = get_root_volume_id(instance_id)
+    
+    if len(args) == 0:
+        cmd_volume_size_get(volume_id)
+    else:
+        cmd_volume_size_set(volume_id, args[0])
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: ec2 <command> [args]")
@@ -163,6 +273,7 @@ def main():
         print("  start          - Start the instance")
         print("  stop           - Stop the instance")
         print("  ip             - Report the public IP address")
+        print("  volume-size [size] - Report current volume size or resize to [size] GB")
         sys.exit(1)
     
     command = sys.argv[1]
@@ -187,9 +298,11 @@ def main():
         cmd_stop(instance_id)
     elif command == "ip":
         cmd_ip(instance_id)
+    elif command == "volume-size":
+        cmd_volume_size(instance_id, args)
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: type, set-type, state, start, stop, ip")
+        print("Available commands: type, set-type, state, start, stop, ip, volume-size")
         sys.exit(1)
 
 if __name__ == "__main__":
