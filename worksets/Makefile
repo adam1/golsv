@@ -396,31 +396,29 @@ G.txt: U1.txt C.txt
 FG.txt: F.txt G.txt
 	multiply -A F.txt -B G.txt -C FG.txt 2>&1 | tee FG.$(log)
 
-check-FG: FG.txt
-	rank=$$(dim -in FG.txt -image) && if [[ $$rank -eq `dim -in M.txt -domain` ]]; then echo "FG=I"; else echo "FG does not equal I!"; false; fi
-
 # F should be "reduced" cohomology generators, in that each row of F
 # is a cohomology generator that is supported on a single homology
 # generator from the G matrix.
+check-FG: FG.txt
+	rank=$$(dim -in FG.txt -image) && if [[ $$rank -eq `dim -in M.txt -domain` ]]; then echo "FG=I"; else echo "FG does not equal I!"; false; fi
 
 simplicial-systole: d1.txt d2.txt
 	systole -simplicial -simplicial-at-vertex 0 -simplicial-stop-nonzero -d1 d1.txt -d2 d2.txt
 
+simplicial-cosystole: d1.txt d2.txt Z1.txt Z^1.txt B^1.txt
+	simplicial-cosystole -verbose -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys.$(log)
 
-# wip targets
-simp-cosys: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
-	simplicial-cosystole -verbose -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys.$(log)
+# deprecated / experimental
+# simp-cosys-prune: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
+# 	simplicial-cosystole -verbose -prune-by-cohomology-projection -initial-support -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys-prune.$(log)
 
-simp-cosys-prune: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
-	simplicial-cosystole -verbose -prune-by-cohomology-projection -initial-support -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys-prune.$(log)
+# simp-cosys-dim-ucd-seq: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
+# 	simplicial-cosystole -verbose -dim-ucd-seq -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys-dim-ucd-seq.$(log)
 
-simp-cosys-dim-ucd-seq: d1.txt d2.txt Z1.txt B^1.txt U^1.txt
-	simplicial-cosystole -verbose -dim-ucd-seq -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B^1 B^1.txt -U^1 U^1.txt 2>&1 | tee simp-cosys-dim-ucd-seq.$(log)
-
-simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edge-basis.txt triangle-basis.txt modulus.txt
-	simplicial-cosystole -cohomology-orbits -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B1 B1.txt -U^1 U^1.txt \
-		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
-		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)
+# simp-cosys-coho-orbits: d1.txt d2.txt Z1.txt B1.txt U^1.txt vertex-basis.txt edge-basis.txt triangle-basis.txt modulus.txt
+# 	simplicial-cosystole -cohomology-orbits -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -B1 B1.txt -U^1 U^1.txt \
+# 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
+# 		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)
 
 coboundary-decoder-threshold: d1.txt d2.txt Z1.txt
 	coboundary-decoder -find-threshold -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -verbose -results results-$(log).json 2>&1 | tee coboundary-decoder-threshold.$(log)
