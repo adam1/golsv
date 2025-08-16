@@ -312,14 +312,13 @@ func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 		numVertices := 3 + rand.Intn(maxVertices)
 		probEdge := 0.3
 		generator := NewRandomComplexGenerator(numVertices, verbose)
-		d1, d2, err := generator.RandomCliqueComplex(probEdge)
+		X, err := generator.RandomCliqueComplex(probEdge)
 		if err != nil {
 			t.Fatalf("Failed to generate random clique complex: %v", err)
 		}
-		X := NewZComplexFromBoundaryMatrices(d1, d2)
 		//log.Printf("random clique complex: %s", X)
 
-		exhaustiveSystole, _, _, _ := ComputeFirstSystole(d1, d2, verbose)
+		exhaustiveSystole, _, _, _ := ComputeFirstSystole(X.D1(), X.D2(), verbose)
 
 		S := NewSimplicialSystoleSearch(X, stopNonzero, verbose)
 		simplicialSystole := S.Search()

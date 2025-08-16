@@ -28,7 +28,11 @@ func main() {
 	} else if args.Regular {
 		d_1, d_2, err = gen.RandomRegularCliqueComplexWithRetries(args.RegularityDegree, args.MaxRetries)
 	} else if args.Clique {
-		d_1, d_2, err = gen.RandomCliqueComplex(args.ProbEdge)
+		var complex *golsv.ZComplex[golsv.ZVertexInt]
+		complex, err = gen.RandomCliqueComplex(args.ProbEdge)
+		if err == nil {
+			d_1, d_2 = complex.D1(), complex.D2()
+		}
 	} else if args.Simplicial {
 		d_1, d_2, err = gen.RandomSimplicialComplex()
 	} else {

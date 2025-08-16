@@ -91,10 +91,12 @@ func TestRandom2dCliqueComplexComplete(t *testing.T) {
 		// verify that with p=1, we get the clique complex of a complete graph
 		verbose := false
 		R := NewRandomComplexGenerator(numVertices, verbose)
-		d_1, d_2, err := R.RandomCliqueComplex(1.0)
+		X, err := R.RandomCliqueComplex(1.0)
 		if err != nil {
 			t.Error("wanted no error, got ", err)
 		}
+		d_1 := X.D1()
+		d_2 := X.D2()
 		if d_1.NumRows() != numVertices {
 			t.Error("wanted d_1.NumRows() == n, got ", d_1.NumRows())
 		}
@@ -120,10 +122,11 @@ func TestRandom2dCliqueComplex(t *testing.T) {
 	for i := 0; i < trials; i++ {
 		dimC_0 := rand.Intn(maxDimC_0 - minDimC_0) + minDimC_0
 		R := NewRandomComplexGenerator(dimC_0, verbose)
-		d_1, _, err := R.RandomCliqueComplex(0.3)
+		X, err := R.RandomCliqueComplex(0.3)
 		if err != nil {
 			t.Error("wanted no error, got ", err)
 		}
+		d_1 := X.D1()
 		if d_1.NumRows() != dimC_0 {
 			t.Error("wanted d_1.NumRows() == n, got ", d_1.NumRows())
 		}

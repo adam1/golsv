@@ -437,18 +437,17 @@ func TestZComplexMaximalSimplicesStringRandom(t *testing.T) {
 		numVertices := 3 + rand.Intn(maxVertices)
 		probEdge := 0.3
 		generator := NewRandomComplexGenerator(numVertices, verbose)
-		d1, d2, err := generator.RandomCliqueComplex(probEdge)
+		X, err := generator.RandomCliqueComplex(probEdge)
 		if err != nil {
 			t.Fatalf("Failed to generate random clique complex: %v", err)
 		}
-		X := NewZComplexFromBoundaryMatrices(d1, d2)
 		s := X.MaximalSimplicesString()
 		simplices, err := parseSimplicesString(s)
 		if err != nil {
 			t.Fatalf("Failed to parse simplices string: %v", err)
 		}
 		Y := NewZComplexFromMaximalSimplices(simplices)
-		if !reflect.DeepEqual(X, Y) {
+		if X.String() != Y.String() {
 			t.Errorf("Test %d: got=%v, expected=%v", i, X, Y)
 		}
 	}
@@ -668,12 +667,11 @@ func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
 	for i := 0; i < trials; i++ {
 		numVertices := rand.Intn(maxVertices-minVertices) + minVertices
 		R := NewRandomComplexGenerator(numVertices, verbose)
-		d_1, d_2, err := R.RandomCliqueComplex(0.4)
+		Xoriginal, err := R.RandomCliqueComplex(0.4)
 		if err != nil {
 			t.Errorf("Failed to generate random clique complex: %v", err)
 			continue
 		}
-		Xoriginal := NewZComplexFromBoundaryMatrices(d_1, d_2)
 		//log.Printf("Xoriginal:\n%s", Xoriginal.DumpBases())
 		initialVertex := rand.Intn(len(Xoriginal.VertexBasis()))
 
