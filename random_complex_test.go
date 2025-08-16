@@ -143,6 +143,40 @@ func TestRandom2dCliqueComplex(t *testing.T) {
 	}
 }
 
+func TestRandomGraph(t *testing.T) {
+	trials := 10
+	minDimC_0 := 1
+	maxDimC_0 := 20
+	verbose := false
+	for i := 0; i < trials; i++ {
+		dimC_0 := rand.Intn(maxDimC_0 - minDimC_0) + minDimC_0
+		R := NewRandomComplexGenerator(dimC_0, verbose)
+		probEdge := 0.3
+		G, err := R.RandomGraph(probEdge)
+		if err != nil {
+			t.Error("wanted no error, got ", err)
+		}
+		d_1 := G.D1()
+		d_2 := G.D2()
+		if d_1.NumRows() != dimC_0 {
+			t.Error("wanted d_1.NumRows() == n, got ", d_1.NumRows())
+		}
+		// Graph should have no triangles (d_2 should be empty)
+		if d_2.NumColumns() != 0 {
+			t.Errorf("wanted d_2.NumColumns() == 0 for graph, got %d", d_2.NumColumns())
+		}
+		// For probability 0.3, expect roughly 30% of possible edges
+		maxPossibleEdges := dimC_0 * (dimC_0 - 1) / 2
+		actualEdges := d_1.NumColumns()
+		if dimC_0 > 1 && actualEdges < 0 {
+			t.Errorf("wanted non-negative edge count, got %d", actualEdges)
+		}
+		if actualEdges > maxPossibleEdges {
+			t.Errorf("wanted edge count <= %d, got %d", maxPossibleEdges, actualEdges)
+		}
+	}
+}
+
 func TestRandomRegularCliqueComplex(t *testing.T) {
 	tests := []struct {
 		numVertices int
