@@ -170,6 +170,8 @@ func writeGraphFiles(complex *golsv.ZComplex[golsv.ElementCalG], args *CalGCayle
 }
 
 func prepareGenerators(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial) []golsv.ElementCalG {
+	// xxx possibly modify this to also return matrix reps, to avoid
+	// potential mixup between ordering?
 	gens := golsv.CartwrightStegerGenerators()
 	a := dumpElements(gens)
 	log.Printf("original generators:\n%s", a)
@@ -217,9 +219,10 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 		fmt.Printf("u=%v b_u=%v rho(b_u)=%v\n", info.U, b_uCalg, info.B_u)
 		combined = append(combined, genInfo{info, b_uCalg, b_uCalgInv})
 	}
-	// xxx we currently haven't fully implemented the calculation of the matrix representation
-	// for the quotient case, as we don't use them elsewhere.  in this case, omit the corresponding column
-	// from the latex output.
+	// xxx FIXME (see GeneratorsV2) xxx we currently haven't fully
+	// implemented the calculation of the matrix representation for
+	// the quotient case, as we don't use them elsewhere.  in this
+	// case, omit the corresponding column from the latex output.
 	var latexTemplate string
 	if args.Quotient {
 		latexTemplate = `\begin{array}{|c|c|}
