@@ -10,6 +10,7 @@ import (
 // Usage:
 //
 //   random-complex -d1 d1.txt -d2 d2.txt -dimC0 100
+//   random-complex -regular -balancing -k 3 -dimC0 50 -iterations 2000
 //
 func main() {
 	args := parseFlags()
@@ -26,7 +27,15 @@ func main() {
 			d_1, d_2 = complex.D1(), complex.D2()
 		}
 	} else if args.Regular {
-		d_1, d_2, err = gen.RandomRegularCliqueComplexWithRetries(args.RegularityDegree, args.MaxRetries)
+		if args.Balancing {
+			var complex *golsv.ZComplex[golsv.ZVertexInt]
+			complex, err = gen.RandomRegularCliqueComplexByBalancing(args.RegularityDegree, args.MaxIterations)
+			if err == nil {
+				d_1, d_2 = complex.D1(), complex.D2()
+			}
+		} else {
+			d_1, d_2, err = gen.RandomRegularCliqueComplexWithRetries(args.RegularityDegree, args.MaxRetries)
+		}
 	} else if args.Clique {
 		var complex *golsv.ZComplex[golsv.ZVertexInt]
 		complex, err = gen.RandomCliqueComplex(args.ProbEdge)
@@ -66,9 +75,11 @@ type Args struct {
 	Clique             bool
 	Regular            bool
 	Circulant          bool
+	Balancing          bool
 	ProbEdge           float64
 	RegularityDegree   int
 	MaxRetries         int
+	MaxIterations      int
 	Verbose            bool
 	golsv.ProfileArgs
 }
@@ -79,6 +90,7 @@ func parseFlags() *Args {
 		Verbose: true,
 		RegularityDegree: 3,
 		MaxRetries: 100,
+		MaxIterations: 1000,
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.BoolVar(&args.Circulant, "circulant", args.Circulant, "Generate a circulant clique complex")
@@ -88,8 +100,10 @@ func parseFlags() *Args {
 	flag.IntVar(&args.DimC0, "dimC0", args.DimC0, fmt.Sprintf("dim C_0 (default %d)", args.DimC0))
 	flag.Float64Var(&args.ProbEdge, "p", args.ProbEdge, "probability of edge in random graph")
 	flag.BoolVar(&args.Regular, "regular", args.Regular, "Generate a regular clique complex")
+	flag.BoolVar(&args.Balancing, "balancing", args.Balancing, "Use balancing algorithm for regular graph generation (requires -regular)")
 	flag.IntVar(&args.RegularityDegree, "k", args.RegularityDegree, fmt.Sprintf("regularity degree for regular complex (default %d)", args.RegularityDegree))
 	flag.IntVar(&args.MaxRetries, "retries", args.MaxRetries, fmt.Sprintf("max retries for regular graph generation (default %d)", args.MaxRetries))
+	flag.IntVar(&args.MaxIterations, "iterations", args.MaxIterations, fmt.Sprintf("max iterations for balancing algorithm (default %d)", args.MaxIterations))
 	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "complex should be simplicial")
 	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "verbose logging")
 	flag.Parse()

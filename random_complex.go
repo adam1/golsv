@@ -2,7 +2,6 @@ package golsv
 
 import (
 	"crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"math/big"
@@ -98,52 +97,11 @@ func (R *RandomComplexGenerator) RandomSimplicialComplex() (d_1, d_2 BinaryMatri
 	return C.D1(), C.D2(), nil
 }
 
-func (R *RandomComplexGenerator) RandomGraph(probEdge float64) (*ZComplex[ZVertexInt], error) {
-	numVertices := R.dimC_0
-	if R.verbose {
-		log.Printf("Generating random graph over %d vertices with edge probability %v", numVertices, probEdge)
-	}
-	if probEdge < 0 || probEdge > 1 {
-		panic("pEdge must be between 0 and 1")
-	}
-	entropyBytesPerBit := 2 // nb. increase if more precision is needed in probEdge
-	entropy := make([]byte, numVertices * entropyBytesPerBit)
-	bytes := make([]byte, 8)
-	maxInt := uint64(1)<<(entropyBytesPerBit * 8) - 1
-	cutoff := uint64(probEdge * float64(maxInt))
-	d_1Sparse := NewSparseBinaryMatrix(numVertices, 0).Sparse()
-	numEdges := 0
-	for i := 0; i < numVertices; i++ {
-		numCols := numVertices - i - 1
-		entropy = entropy[:numCols * entropyBytesPerBit]
-		_, err := rand.Read(entropy)
-		if err != nil {
-			panic(err)
-		}
-		for k := 0; k < len(entropy); k += entropyBytesPerBit {
-			copy(bytes, entropy[k:k+entropyBytesPerBit])
-			num := binary.LittleEndian.Uint64(bytes)
-			if num <= cutoff {
-				M := NewSparseBinaryMatrix(numVertices, 1)
-				M.Set(i, 0, 1)
-				M.Set(i+k/entropyBytesPerBit+1, 0, 1)
-				d_1Sparse.AppendColumn(M)
-				numEdges++
-			}
-		}
-	}
-	C := NewZComplexFromBoundaryMatrices(d_1Sparse, NewSparseBinaryMatrix(numEdges, 0))
-	if R.verbose {
-		log.Printf("Generated d_1: %v\n", d_1Sparse)
-	}
-	return C, nil
-}
-
 func (R *RandomComplexGenerator) RandomCliqueComplex(probEdge float64) (*ZComplex[ZVertexInt], error) {
 	if R.verbose {
 		log.Printf("Generating clique complex over %d vertices with edge probability %v", R.dimC_0, probEdge)
 	}
-	C, err := R.RandomGraph(probEdge)
+	C, err := RandomGraph(R.dimC_0, probEdge, R.verbose)
 	if err != nil {
 		return nil, err
 	}
@@ -441,6 +399,18 @@ func (R *RandomComplexGenerator) RandomCirculantComplex(n, k int) (*ZComplex[ZVe
 	return CirculantComplex(n, steps, R.verbose)
 }
 
+func (R *RandomComplexGenerator) RandomRegularCliqueComplexByBalancing(degree int, maxIterations int) (*ZComplex[ZVertexInt], error) {
+	C, err := RandomRegularGraphByBalancing(R.dimC_0, degree, maxIterations, R.verbose)
+	if err != nil {
+		return nil, err
+	}
+	if R.verbose {
+		log.Printf("Filling cliques")
+	}
+	C.Fill3Cliques()
+	return C, nil
+}
+
 func (R *RandomComplexGenerator) randomizeGeneral_d_1() (d_1 BinaryMatrix, kernelMatrix BinaryMatrix) {
 	density := 0.1
 	for true {
@@ -561,3 +531,4 @@ func randFloat() float64 {
 	}
 	return float64(d.Int64()) / 1000000.0
 }
+
