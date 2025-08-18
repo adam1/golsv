@@ -75,11 +75,11 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 	// seems we should always be able to construct a regular graph by
 	// balancing.
 
+	// TODO: Complete balancing implementation
 	// xxx split the vertices into two slices: underweight and overweight
-	unders, overs := splitVerticesByDegree(G)
-
+	// unders, overs := splitVerticesByDegree(G, regularity)
 	// xxx shuffle unders and overs
-
+	/*
 	for len(overs) > 0 {
 		var o int // xxx shift from overs
 		overage := G.Degree(o) - regularity
@@ -93,10 +93,12 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 			}
 		}
 	}
+	*/
+	return G, nil
 }
 
 func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
-	delta := C.NumEdges() - numEdgesRegular(C.NumVertices(), regularity)
+	delta := G.NumEdges() - numEdgesRegular(G.NumVertices(), regularity)
 	if delta > 0 {
 		if verbose {
 			log.Printf("Pruning %d edges", delta)
@@ -108,7 +110,7 @@ func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
 		
 	} else if delta < 0 {
 		if verbose {
-			log.Printf("Adding %d edges", delta)
+			log.Printf("Adding %d edges", -delta)
 		}
 		panic("xxx Adding edges not implemented")
 		// xxx look for two underweight vertices
@@ -129,7 +131,7 @@ func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
 func vertexDegrees(C *ZComplex[ZVertexInt]) []int {
 	degrees := make([]int, C.NumVertices())
 	for v := 0; v < C.NumVertices(); v++ {
-		degrees[v] = len(C.Neighbors(v)
+		degrees[v] = len(C.Neighbors(v))
 	}
 	return degrees
 }
@@ -163,4 +165,21 @@ func degreeVariance(degrees []int) float64 {
 	}
 	
 	return sumSquaredDiffs / float64(len(degrees))
+}
+
+func numEdgesRegular(numVertices, regularity int) int {
+	return numVertices * regularity / 2
+}
+
+func splitVerticesByDegree(G *ZComplex[ZVertexInt], regularity int) ([]int, []int) {
+	var unders, overs []int
+	for v := 0; v < G.NumVertices(); v++ {
+		degree := len(G.Neighbors(v))
+		if degree < regularity {
+			unders = append(unders, v)
+		} else if degree > regularity {
+			overs = append(overs, v)
+		}
+	}
+	return unders, overs
 }

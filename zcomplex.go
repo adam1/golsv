@@ -537,6 +537,94 @@ func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
 	return C.adjacencyIndex[v]
 }
 
+func (C *ZComplex[T]) Degree(v int) int {
+	return len(C.Neighbors(v))
+}
+
+func (C *ZComplex[T]) IsNeighbor(u, v int) bool {
+	neighbors := C.Neighbors(u)
+	for _, neighbor := range neighbors {
+		if neighbor == v {
+			return true
+		}
+	}
+	return false
+}
+
+func (C *ZComplex[T]) AddEdge(u, v int) {
+	if u < 0 || u >= len(C.vertexBasis) || v < 0 || v >= len(C.vertexBasis) {
+		panic("vertex index out of range")
+	}
+	if u == v {
+		panic("cannot add self-loop")
+	}
+	
+	// Create edge from vertex indices
+	edge := NewZEdge(C.vertexBasis[u], C.vertexBasis[v])
+	
+	// Check if edge already exists
+	for _, existingEdge := range C.edgeBasis {
+		if existingEdge.Equal(edge) {
+			return // Edge already exists
+		}
+	}
+	
+	// Add edge to basis
+	C.edgeBasis = append(C.edgeBasis, edge)
+	
+	// Update adjacency index in place if it exists
+	if C.adjacencyIndex != nil {
+		C.adjacencyIndex[u] = append(C.adjacencyIndex[u], v)
+		C.adjacencyIndex[v] = append(C.adjacencyIndex[v], u)
+	}
+	
+	// Invalidate other cached indices
+	C.edgeIndex = nil
+	C.d1 = nil
+	C.d2 = nil
+}
+
+func (C *ZComplex[T]) DeleteEdge(u, v int) {
+	if u < 0 || u >= len(C.vertexBasis) || v < 0 || v >= len(C.vertexBasis) {
+		panic("vertex index out of range")
+	}
+	
+	// Create edge from vertex indices
+	targetEdge := NewZEdge(C.vertexBasis[u], C.vertexBasis[v])
+	
+	// Find and remove edge
+	for i, edge := range C.edgeBasis {
+		if edge.Equal(targetEdge) {
+			// Remove edge at index i
+			C.edgeBasis = append(C.edgeBasis[:i], C.edgeBasis[i+1:]...)
+			
+			// Update adjacency index in place if it exists
+			if C.adjacencyIndex != nil {
+				// Remove v from u's neighbors
+				for j, neighbor := range C.adjacencyIndex[u] {
+					if neighbor == v {
+						C.adjacencyIndex[u] = append(C.adjacencyIndex[u][:j], C.adjacencyIndex[u][j+1:]...)
+						break
+					}
+				}
+				// Remove u from v's neighbors
+				for j, neighbor := range C.adjacencyIndex[v] {
+					if neighbor == u {
+						C.adjacencyIndex[v] = append(C.adjacencyIndex[v][:j], C.adjacencyIndex[v][j+1:]...)
+						break
+					}
+				}
+			}
+			
+			// Invalidate other cached indices
+			C.edgeIndex = nil
+			C.d1 = nil
+			C.d2 = nil
+			return
+		}
+	}
+}
+
 func (C *ZComplex[T]) NumEdges() int {
 	return len(C.edgeBasis)
 }
