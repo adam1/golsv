@@ -39,26 +39,25 @@ func TestRandomGraph(t *testing.T) {
 	}
 }
 
-func xxxDisableTestRandomRegularGraphByBalancing(t *testing.T) {
+func TestRandomRegularGraphByBalancing(t *testing.T) {
 	tests := []struct {
-		numVertices   int
-		k             int
-		maxIterations int
-		expectError   bool
+		numVertices int
+		k           int
+		expectError bool
 	}{
-		{6, 2, 1000, false},  // 6 vertices, 2-regular
-		{8, 4, 1000, false},  // 8 vertices, 4-regular
-		{10, 3, 1000, false}, // 10 vertices, 3-regular (odd k)
-		{12, 5, 1000, false}, // 12 vertices, 5-regular (odd k)
-		{5, 3, 1000, true},   // 5*3=15 is odd, should fail
-		{4, 4, 1000, true},   // k >= numVertices, should fail
-		{3, 1, 100, true},   // small case, 1-regular
+		{6, 2, false},  // 6 vertices, 2-regular
+		{8, 4, false},  // 8 vertices, 4-regular
+		{10, 3, false}, // 10 vertices, 3-regular (odd k)
+		{12, 5, false}, // 12 vertices, 5-regular (odd k)
+		{5, 3, true},   // 5*3=15 is odd, should fail
+		{4, 4, true},   // k >= numVertices, should fail
+		{4, 1, false},  // 4 vertices, 1-regular
 	}
 
 	verbose := false
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("n=%d_k=%d", test.numVertices, test.k), func(t *testing.T) {
-			G, err := RandomRegularGraphByBalancing(test.numVertices, test.k, test.maxIterations, verbose)
+			G, err := RandomRegularGraphByBalancing(test.numVertices, test.k, 1000, verbose)
 
 			if test.expectError {
 				if err == nil {
@@ -72,40 +71,29 @@ func xxxDisableTestRandomRegularGraphByBalancing(t *testing.T) {
 				return
 			}
 
-			d_1 := G.D1()
-
-			if d_1.NumRows() != test.numVertices {
-				t.Errorf("expected d_1.NumRows()=%d, got %d", test.numVertices, d_1.NumRows())
+			// Verify correct number of vertices
+			if G.NumVertices() != test.numVertices {
+				t.Errorf("expected %d vertices, got %d", test.numVertices, G.NumVertices())
 			}
-			// xxx all tbd
 
-// 			expectedEdges := test.numVertices * test.k / 2
-// 			if d_1.NumColumns() != expectedEdges {
-// 				t.Errorf("expected %d edges, got %d", expectedEdges, d_1.NumColumns())
-// 			}
+			// Verify correct number of edges
+			expectedEdges := test.numVertices * test.k / 2
+			if G.NumEdges() != expectedEdges {
+				t.Errorf("expected %d edges, got %d", expectedEdges, G.NumEdges())
+			}
 
 			// Verify regularity: each vertex should have degree k
-			// xxx tbd
-// 			degrees := make([]int, test.numVertices)
-// 			for j := 0; j < d_1.NumColumns(); j++ {
-// 				vertices := make([]int, 0, 2)
-// 				for i := 0; i < test.numVertices; i++ {
-// 					if d_1.Get(i, j) == 1 {
-// 						vertices = append(vertices, i)
-// 					}
-// 				}
-// 				if len(vertices) != 2 {
-// 					t.Errorf("edge %d should connect exactly 2 vertices, got %d", j, len(vertices))
-// 				}
-// 				degrees[vertices[0]]++
-// 				degrees[vertices[1]]++
-// 			}
+			for i := 0; i < test.numVertices; i++ {
+				degree := G.Degree(i)
+				if degree != test.k {
+					t.Errorf("vertex %d has degree %d, expected %d", i, degree, test.k)
+				}
+			}
 
-// 			for i, degree := range degrees {
-// 				if degree != test.k {
-// 					t.Errorf("vertex %d has degree %d, expected %d", i, degree, test.k)
-// 				}
-// 			}
+			// Verify no triangles (this should be a graph, not a complex)
+			if G.NumTriangles() != 0 {
+				t.Errorf("expected 0 triangles in graph, got %d", G.NumTriangles())
+			}
 		})
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	mathrand "math/rand"
 )	
 
 func RandomGraph(numVertices int, probEdge float64, verbose bool) (*ZComplex[ZVertexInt], error) {
@@ -75,25 +76,52 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 	// seems we should always be able to construct a regular graph by
 	// balancing.
 
-	// TODO: Complete balancing implementation
-	// xxx split the vertices into two slices: underweight and overweight
-	// unders, overs := splitVerticesByDegree(G, regularity)
-	// xxx shuffle unders and overs
-	/*
+	unders, overs := splitVerticesByDegree(G, regularity)
+
+	mathrand.Shuffle(len(unders), func(i, j int) { unders[i], unders[j] = unders[j], unders[i] })
+	mathrand.Shuffle(len(overs), func(i, j int) { overs[i], overs[j] = overs[j], overs[i] })
+
 	for len(overs) > 0 {
-		var o int // xxx shift from overs
+		o := overs[0] // shift from overs
+		overs = overs[1:]
+		
 		overage := G.Degree(o) - regularity
 		for overage > 0 {
 			oNbrs := G.Neighbors(o)
+			moved := false
+			
 			for _, x := range oNbrs {
 				for j, u := range unders {
-					// xxx if x is not a neighbor of u, found an edge
-					// to move.  move (o, x) to (o, u).
+					if u != x && !G.IsNeighbor(x, u) {
+						// move (o, x) to (u, x)
+						G.DeleteEdge(o, x)
+						G.AddEdge(u, x)
+						overage--
+						moved = true
+						
+						// if u is no longer underweight, remove from unders
+						if G.Degree(u) >= regularity {
+							unders = append(unders[:j], unders[j+1:]...)
+						}
+						break
+					}
 				}
+				if moved {
+					break
+				}
+			}
+			
+			if !moved {
+				// couldn't move any edge, put vertex back if still overweight
+// 				if overage > 0 {
+// 					overs = append(overs, o)
+// 				}
+				//				break
+				return nil, fmt.Errorf("failed to find an edge to move")
 			}
 		}
 	}
-	*/
+
 	return G, nil
 }
 
@@ -103,19 +131,69 @@ func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
 		if verbose {
 			log.Printf("Pruning %d edges", delta)
 		}
-		panic("xxx Pruning edges not implemented")
-		// xxx look first for edges between overweight vertices
-
-		// xxx if none available, look for edges between half-overweight vertices
+		// Remove excess edges - prefer edges between high-degree vertices
+		for delta > 0 {
+			maxDegree := -1
+			var edgeToRemove [2]int
+			found := false
+			
+			// Find edge between highest degree vertices
+			for u := 0; u < G.NumVertices(); u++ {
+				neighbors := G.Neighbors(u)
+				for _, v := range neighbors {
+					if u < v { // avoid double counting
+						minDegree := G.Degree(u)
+						if G.Degree(v) < minDegree {
+							minDegree = G.Degree(v)
+						}
+						if minDegree > maxDegree {
+							maxDegree = minDegree
+							edgeToRemove = [2]int{u, v}
+							found = true
+						}
+					}
+				}
+			}
+			
+			if found {
+				G.DeleteEdge(edgeToRemove[0], edgeToRemove[1])
+				delta--
+			} else {
+				panic("could not find edge to remove")
+			}
+		}
 		
 	} else if delta < 0 {
 		if verbose {
 			log.Printf("Adding %d edges", -delta)
 		}
-		panic("xxx Adding edges not implemented")
-		// xxx look for two underweight vertices
-
-		// xxx if none available, panic
+		// Add missing edges - prefer connecting low-degree vertices
+		for delta < 0 {
+			minDegree := G.NumVertices()
+			var edgeToAdd [2]int
+			found := false
+			
+			// Find pair of non-adjacent vertices with lowest combined degree
+			for u := 0; u < G.NumVertices(); u++ {
+				for v := u + 1; v < G.NumVertices(); v++ {
+					if !G.IsNeighbor(u, v) {
+						combinedDegree := G.Degree(u) + G.Degree(v)
+						if combinedDegree < minDegree {
+							minDegree = combinedDegree
+							edgeToAdd = [2]int{u, v}
+							found = true
+						}
+					}
+				}
+			}
+			
+			if found {
+				G.AddEdge(edgeToAdd[0], edgeToAdd[1])
+				delta++
+			} else {
+				panic("could not find vertices to connect")
+			}
+		}
 	}
 }
 
