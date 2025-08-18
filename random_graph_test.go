@@ -103,3 +103,31 @@ func TestRandomRegularGraphByBalancing(t *testing.T) {
 		})
 	}
 }
+
+func TestRandomRegularGraphByBalancingRepeatedTrials(t *testing.T) {
+	numVertices := 100
+	k := 14
+	trials := 10
+	verbose := false
+
+	for trial := 0; trial < trials; trial++ {
+		G, err := RandomRegularGraphByBalancing(numVertices, k, 1000, verbose)
+		if err != nil {
+			t.Errorf("trial %d: unexpected error: %v", trial, err)
+			continue
+		}
+		if !G.IsRegular() {
+			t.Errorf("trial %d: generated graph is not regular", trial)
+		}
+		if numVertices > 0 {
+			actualDegree := G.Degree(0)
+			if actualDegree != k {
+				t.Errorf("trial %d: expected degree %d, got %d", trial, k, actualDegree)
+			}
+		}
+		expectedEdges := numVertices * k / 2
+		if G.NumEdges() != expectedEdges {
+			t.Errorf("trial %d: expected %d edges, got %d", trial, expectedEdges, G.NumEdges())
+		}
+	}
+}
