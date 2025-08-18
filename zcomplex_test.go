@@ -544,6 +544,73 @@ func TestZComplexIsNeighbor(t *testing.T) {
 	}
 }
 
+func TestZComplexIsRegular(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		expected bool    // expected regularity
+	}{
+		{
+			name:     "empty graph",
+			initial:  [][]int{},
+			expected: true,
+		},
+		{
+			name:     "single vertex",
+			initial:  [][]int{{0}},
+			expected: true,
+		},
+		{
+			name:     "two isolated vertices",
+			initial:  [][]int{{0}, {1}},
+			expected: true, // both have degree 0
+		},
+		{
+			name:     "single edge (2-regular)",
+			initial:  [][]int{{0, 1}},
+			expected: true, // both vertices have degree 1
+		},
+		{
+			name:     "triangle (2-regular)",
+			initial:  [][]int{{0, 1, 2}},
+			expected: true, // all vertices have degree 2
+		},
+		{
+			name:     "irregular graph",
+			initial:  [][]int{{0, 1}, {1, 2}}, // vertex 1 has degree 2, others have degree 1
+			expected: false,
+		},
+		{
+			name:     "square (2-regular)",
+			initial:  [][]int{{0, 1}, {1, 2}, {2, 3}, {3, 0}},
+			expected: true, // all vertices have degree 2
+		},
+		{
+			name:     "star graph (irregular)",
+			initial:  [][]int{{0, 1}, {0, 2}, {0, 3}}, // vertex 0 has degree 3, others have degree 1
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var C *ZComplex[ZVertexInt]
+			if len(test.initial) == 0 {
+				// Create empty complex
+				vertices := []ZVertex[ZVertexInt]{}
+				C = NewZComplex(vertices, nil, nil, false, false)
+			} else {
+				C = NewZComplexFromMaximalSimplices(test.initial)
+			}
+			
+			result := C.IsRegular()
+			if result != test.expected {
+				t.Errorf("Expected IsRegular() = %v, got %v", test.expected, result)
+			}
+		})
+	}
+}
+
 func TestZComplexDeleteEdge(t *testing.T) {
 	tests := []struct {
 		name     string

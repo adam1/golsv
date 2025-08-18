@@ -82,11 +82,17 @@ func TestRandomRegularGraphByBalancing(t *testing.T) {
 				t.Errorf("expected %d edges, got %d", expectedEdges, G.NumEdges())
 			}
 
-			// Verify regularity: each vertex should have degree k
-			for i := 0; i < test.numVertices; i++ {
-				degree := G.Degree(i)
-				if degree != test.k {
-					t.Errorf("vertex %d has degree %d, expected %d", i, degree, test.k)
+			// Verify the graph is actually regular
+			if !G.IsRegular() {
+				t.Errorf("generated graph is not regular")
+			}
+
+			// Verify all vertices have the expected degree k
+			expectedDegree := test.k
+			if test.numVertices > 0 {
+				actualDegree := G.Degree(0) // Any vertex will do since graph is regular
+				if actualDegree != expectedDegree {
+					t.Errorf("expected degree %d, got %d", expectedDegree, actualDegree)
 				}
 			}
 

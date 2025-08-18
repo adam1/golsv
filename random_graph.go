@@ -48,7 +48,6 @@ func RandomGraph(numVertices int, probEdge float64, verbose bool) (*ZComplex[ZVe
 	return C, nil
 }
 
-
 func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIterations int, verbose bool) (*ZComplex[ZVertexInt], error) {
 	if regularity < 0 || regularity >= numVertices {
 		return nil, fmt.Errorf("regularity degree %d must be between 0 and %d", regularity, numVertices-1)

@@ -613,6 +613,20 @@ func parseSimplicesString(s string) (simplices [][]int, err error) {
 	return
 }
 
+func (C *ZComplex[T]) IsRegular() bool {
+	if C.NumVertices() == 0 {
+		return true // vacuously true
+	}
+	
+	firstDegree := C.Degree(0)
+	for i := 1; i < C.NumVertices(); i++ {
+		if C.Degree(i) != firstDegree {
+			return false
+		}
+	}
+	return true
+}
+
 func (C *ZComplex[T]) IsNeighbor(u, v int) bool {
 	neighbors := C.Neighbors(u)
 	for _, neighbor := range neighbors {
