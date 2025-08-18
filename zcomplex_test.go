@@ -425,6 +425,125 @@ func equalIntSlices(a, b []int) bool {
 	return true
 }
 
+func TestZComplexDegree(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		vertex   int     // vertex to check degree
+		expected int     // expected degree
+	}{
+		{
+			name:     "isolated vertex",
+			initial:  [][]int{{0}, {1, 2}}, // vertex 0 is isolated
+			vertex:   0,
+			expected: 0,
+		},
+		{
+			name:     "vertex in edge",
+			initial:  [][]int{{0, 1}},
+			vertex:   0,
+			expected: 1,
+		},
+		{
+			name:     "vertex in triangle",
+			initial:  [][]int{{0, 1, 2}},
+			vertex:   0,
+			expected: 2,
+		},
+		{
+			name:     "vertex with multiple connections",
+			initial:  [][]int{{0, 1}, {0, 2}, {0, 3}},
+			vertex:   0,
+			expected: 3,
+		},
+		{
+			name:     "vertex in complex graph",
+			initial:  [][]int{{0, 1}, {1, 2}, {2, 3}, {0, 3}}, // square
+			vertex:   1,
+			expected: 2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			C := NewZComplexFromMaximalSimplices(test.initial)
+			degree := C.Degree(test.vertex)
+			if degree != test.expected {
+				t.Errorf("Expected degree %d for vertex %d, got %d", test.expected, test.vertex, degree)
+			}
+		})
+	}
+}
+
+func TestZComplexIsNeighbor(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		u, v     int     // vertices to check
+		expected bool    // expected result
+	}{
+		{
+			name:     "isolated vertices",
+			initial:  [][]int{{0}, {1}}, // both isolated
+			u:        0,
+			v:        1,
+			expected: false,
+		},
+		{
+			name:     "connected by edge",
+			initial:  [][]int{{0, 1}},
+			u:        0,
+			v:        1,
+			expected: true,
+		},
+		{
+			name:     "connected by edge (reverse)",
+			initial:  [][]int{{0, 1}},
+			u:        1,
+			v:        0,
+			expected: true,
+		},
+		{
+			name:     "connected in triangle",
+			initial:  [][]int{{0, 1, 2}},
+			u:        0,
+			v:        1,
+			expected: true,
+		},
+		{
+			name:     "not connected in triangle",
+			initial:  [][]int{{0, 1, 2}, {3}},
+			u:        0,
+			v:        3,
+			expected: false,
+		},
+		{
+			name:     "connected through multiple paths",
+			initial:  [][]int{{0, 1}, {0, 2}, {1, 2}}, // triangle
+			u:        1,
+			v:        2,
+			expected: true,
+		},
+		{
+			name:     "self-check",
+			initial:  [][]int{{0, 1}},
+			u:        0,
+			v:        0,
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			C := NewZComplexFromMaximalSimplices(test.initial)
+			result := C.IsNeighbor(test.u, test.v)
+			if result != test.expected {
+				t.Errorf("Expected IsNeighbor(%d, %d) = %v, got %v", test.u, test.v, test.expected, result)
+			}
+		})
+	}
+}
+
 func TestZComplexDeleteEdge(t *testing.T) {
 	tests := []struct {
 		name     string

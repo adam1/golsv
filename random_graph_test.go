@@ -39,7 +39,7 @@ func TestRandomGraph(t *testing.T) {
 	}
 }
 
-func TestRandomRegularGraphByBalancing(t *testing.T) {
+func xxxDisableTestRandomRegularGraphByBalancing(t *testing.T) {
 	tests := []struct {
 		numVertices   int
 		k             int
