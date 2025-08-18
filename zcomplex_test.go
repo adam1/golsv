@@ -425,6 +425,164 @@ func equalIntSlices(a, b []int) bool {
 	return true
 }
 
+func TestZComplexDeleteEdge(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  [][]int // maximal simplices for initial complex
+		u, v     int     // vertices to disconnect
+		expected [][]int // expected neighbors after deleting edge
+	}{
+		{
+			name:    "delete edge from graph",
+			initial: [][]int{{0, 1}, {0, 2}}, // edges only, no triangles
+			u:       0,
+			v:       1,
+			expected: [][]int{
+				{2}, // neighbors of vertex 0
+				{},  // neighbors of vertex 1
+				{0}, // neighbors of vertex 2
+			},
+		},
+		{
+			name:    "delete edge from disconnected components",
+			initial: [][]int{{0, 1}, {2, 3}},
+			u:       0,
+			v:       1,
+			expected: [][]int{
+				{},  // neighbors of vertex 0
+				{},  // neighbors of vertex 1
+				{3}, // neighbors of vertex 2
+				{2}, // neighbors of vertex 3
+			},
+		},
+		{
+			name:    "delete edge from complex graph",
+			initial: [][]int{{0, 1}, {1, 2}, {2, 3}, {0, 3}},
+			u:       1,
+			v:       2,
+			expected: [][]int{
+				{1, 3}, // neighbors of vertex 0
+				{0},    // neighbors of vertex 1
+				{3},    // neighbors of vertex 2
+				{0, 2}, // neighbors of vertex 3
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			C := NewZComplexFromMaximalSimplices(test.initial)
+			initialEdgeCount := C.NumEdges()
+
+			// Verify edge exists before deletion
+			if !C.IsNeighbor(test.u, test.v) {
+				t.Fatalf("Edge (%d,%d) should exist before deletion", test.u, test.v)
+			}
+
+			C.DeleteEdge(test.u, test.v)
+
+			// Check edge was removed
+			if C.NumEdges() != initialEdgeCount-1 {
+				t.Errorf("Expected %d edges, got %d", initialEdgeCount-1, C.NumEdges())
+			}
+
+			// Check neighbors are correct
+			for vertex, expectedNeighbors := range test.expected {
+				if vertex >= len(C.vertexBasis) {
+					continue
+				}
+				neighbors := C.Neighbors(vertex)
+				if !equalIntSlices(neighbors, expectedNeighbors) {
+					t.Errorf("Vertex %d: expected neighbors %v, got %v", vertex, expectedNeighbors, neighbors)
+				}
+			}
+
+			// Check that vertices are no longer neighbors
+			if C.IsNeighbor(test.u, test.v) {
+				t.Errorf("Vertices %d and %d should not be neighbors after deletion", test.u, test.v)
+			}
+			if C.IsNeighbor(test.v, test.u) {
+				t.Errorf("Vertices %d and %d should not be neighbors after deletion", test.v, test.u)
+			}
+		})
+	}
+}
+
+func TestZComplexDeleteEdgeNonExistent(t *testing.T) {
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1}, {2, 3}})
+	initialEdgeCount := C.NumEdges()
+
+	// Deleting non-existent edge should not change edge count
+	C.DeleteEdge(0, 2) // no edge between 0 and 2
+	if C.NumEdges() != initialEdgeCount {
+		t.Errorf("Expected %d edges after deleting non-existent edge, got %d", initialEdgeCount, C.NumEdges())
+	}
+
+	// Neighbors should remain unchanged
+	expectedNeighbors := map[int][]int{
+		0: {1},
+		1: {0},
+		2: {3},
+		3: {2},
+	}
+	for vertex, expected := range expectedNeighbors {
+		neighbors := C.Neighbors(vertex)
+		if !equalIntSlices(neighbors, expected) {
+			t.Errorf("Vertex %d: expected neighbors %v, got %v", vertex, expected, neighbors)
+		}
+	}
+}
+
+func TestZComplexDeleteEdgeRoundTrip(t *testing.T) {
+	// Test that adding and then deleting an edge returns to original state
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2}}) // edges only, no triangles
+	
+	// Record original state
+	originalEdgeCount := C.NumEdges()
+	originalNeighbors := make(map[int][]int)
+	for i := 0; i < 4; i++ {
+		if i < len(C.vertexBasis) {
+			neighbors := C.Neighbors(i)
+			originalNeighbors[i] = make([]int, len(neighbors))
+			copy(originalNeighbors[i], neighbors)
+		}
+	}
+
+	// Add vertex 3 to have somewhere to connect
+	vertices := []ZVertex[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2), ZVertexInt(3)}
+	edges := C.EdgeBasis()
+	C = NewZComplex(vertices, edges, nil, false, false)
+
+	// Add an edge then delete it
+	C.AddEdge(0, 3)
+	C.DeleteEdge(0, 3)
+
+	// Check we're back to original state (for vertices that existed originally)
+	if C.NumEdges() != originalEdgeCount {
+		t.Errorf("Expected %d edges after round trip, got %d", originalEdgeCount, C.NumEdges())
+	}
+
+	for vertex, expectedNeighbors := range originalNeighbors {
+		neighbors := C.Neighbors(vertex)
+		if !equalIntSlices(neighbors, expectedNeighbors) {
+			t.Errorf("Vertex %d: expected neighbors %v after round trip, got %v", vertex, expectedNeighbors, neighbors)
+		}
+	}
+}
+
+func TestZComplexDeleteEdgeTrianglePanic(t *testing.T) {
+	// Test that DeleteEdge panics when used on complex with triangles
+	C := NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}}) // This creates a triangle
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic when deleting edge from complex with triangles")
+		}
+	}()
+	
+	C.DeleteEdge(0, 1) // Should panic
+}
+
 func TestZComplexTrianglesContainingVertex(t *testing.T) {
 	T := ZTriangle[ZVertexInt]{ZVertexInt(0), ZVertexInt(1), ZVertexInt(2)}
 	U := ZTriangle[ZVertexInt]{ZVertexInt(3), ZVertexInt(1), ZVertexInt(0)}

@@ -588,6 +588,9 @@ func (C *ZComplex[T]) DeleteEdge(u, v int) {
 	if u < 0 || u >= len(C.vertexBasis) || v < 0 || v >= len(C.vertexBasis) {
 		panic("vertex index out of range")
 	}
+	if len(C.triangleBasis) > 0 {
+		panic("DeleteEdge can only be used on graphs without triangles")
+	}
 	
 	// Create edge from vertex indices
 	targetEdge := NewZEdge(C.vertexBasis[u], C.vertexBasis[v])
