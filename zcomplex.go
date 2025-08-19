@@ -283,7 +283,6 @@ func (C *ZComplex[T]) AddEdge(u, v int) {
 			return // Edge already exists
 		}
 	}
-	
 	// Add edge to basis
 	C.edgeBasis = append(C.edgeBasis, edge)
 	
@@ -292,9 +291,8 @@ func (C *ZComplex[T]) AddEdge(u, v int) {
 		C.adjacencyIndex[u] = append(C.adjacencyIndex[u], v)
 		C.adjacencyIndex[v] = append(C.adjacencyIndex[v], u)
 	}
-	
-	// Invalidate other cached indices
-	C.computeEdgeIndex() // xxx improve this
+	C.computeEdgeIndex()
+	// Invalidate
 	C.d1 = nil
 	C.d2 = nil
 }
@@ -453,8 +451,8 @@ func (C *ZComplex[T]) DeleteEdge(idx int) {
 			}
 		}
 	}
-	// Invalidate other cached indices
-	C.computeEdgeIndex() // xxx improve this
+	C.computeEdgeIndex()
+	// Invalidate
 	C.d1 = nil
 	C.d2 = nil
 	return
