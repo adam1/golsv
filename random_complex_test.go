@@ -440,14 +440,12 @@ func TestRandomRegularCliqueComplexByBalancing(t *testing.T) {
 			if C.NumVertices() != test.numVertices {
 				t.Errorf("expected %d vertices, got %d", test.numVertices, C.NumVertices())
 			}
-			if !C.IsRegular() {
+			isRegular, actualDegree := C.IsRegular()
+			if !isRegular {
 				t.Errorf("generated graph is not regular")
 			}
-			if test.numVertices > 0 {
-				actualDegree := C.Degree(0)
-				if actualDegree != test.degree {
-					t.Errorf("expected degree %d, got %d", test.degree, actualDegree)
-				}
+			if test.numVertices > 0 && actualDegree != test.degree {
+				t.Errorf("expected degree %d, got %d", test.degree, actualDegree)
 			}
 			expectedEdges := test.numVertices * test.degree / 2
 			if C.NumEdges() != expectedEdges {

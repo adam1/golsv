@@ -83,17 +83,14 @@ func TestRandomRegularGraphByBalancing(t *testing.T) {
 			}
 
 			// Verify the graph is actually regular
-			if !G.IsRegular() {
+			isRegular, actualDegree := G.IsRegular()
+			if !isRegular {
 				t.Errorf("generated graph is not regular")
 			}
 
 			// Verify all vertices have the expected degree k
-			expectedDegree := test.k
-			if test.numVertices > 0 {
-				actualDegree := G.Degree(0) // Any vertex will do since graph is regular
-				if actualDegree != expectedDegree {
-					t.Errorf("expected degree %d, got %d", expectedDegree, actualDegree)
-				}
+			if test.numVertices > 0 && actualDegree != test.k {
+				t.Errorf("expected degree %d, got %d", test.k, actualDegree)
 			}
 
 			// Verify no triangles (this should be a graph, not a complex)
@@ -116,7 +113,8 @@ func TestRandomRegularGraphByBalancingRepeatedTrials(t *testing.T) {
 			t.Errorf("trial %d: unexpected error: %v", trial, err)
 			continue
 		}
-		if !G.IsRegular() {
+		isRegular, _ := G.IsRegular()
+		if !isRegular {
 			t.Errorf("trial %d: generated graph is not regular", trial)
 		}
 		if numVertices > 0 {

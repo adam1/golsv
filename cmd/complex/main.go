@@ -24,6 +24,7 @@ type ComplexArgs struct {
 	EdgeBasisFile         string
 	DepthFiltration       bool
 	GraphvizFile          string
+	ReportRegularity      bool
 	SubcomplexByDepth     int
 	SubcomplexByEdgesFile string
 	OutComplexD1File      string
@@ -46,6 +47,7 @@ func parseFlags() ComplexArgs {
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", "", "The file containing the edge basis")
 	flag.BoolVar(&args.DepthFiltration, "depth-filtration", false, "Compute filtration subcomplexes by depth; output filenames will have '-d' appended with d=depth")
 	flag.StringVar(&args.GraphvizFile, "graphviz", "", "The file to write the graphviz output to")
+	flag.BoolVar(&args.ReportRegularity, "regular", false, "Report whether the complex is regular and its degree")
 	flag.IntVar(&args.SubcomplexByDepth, "subcomplex-depth", -1, "The depth of the subcomplex to extract by BFS from first vertex")
 	flag.StringVar(&args.SubcomplexByEdgesFile, "subcomplex-by-edges-matrix", "", "The input matrix file whose columns define edges to include in the subcomplex")
 	flag.StringVar(&args.OutComplexD1File, "out-d1", "", "The output file for the D1 boundary matrix of the subcomplex")
@@ -121,6 +123,9 @@ func handleComplexByBoundaryMatrices(args ComplexArgs) {
 	if args.GraphvizFile != "" {
 		golsv.WriteComplexGraphvizFile(complex, args.GraphvizFile, args.Verbose)
 	}
+	if args.ReportRegularity {
+		reportRegularity(complex)
+	}
 }
 
 func handleComplexByBases(args ComplexArgs) {
@@ -167,6 +172,9 @@ func handleComplexByBases(args ComplexArgs) {
 	}
 	if args.GraphvizFile != "" {
 		golsv.WriteComplexGraphvizFile(complex, args.GraphvizFile, args.Verbose)
+	}
+	if args.ReportRegularity {
+		reportRegularity(complex)
 	}
 }
 
@@ -297,4 +305,13 @@ func addTagDepthTag(s string, d int) string {
 	}
 	parts[0] = fmt.Sprintf("%s_%d", parts[0], d)
 	return strings.Join(parts, "-")
+}
+
+func reportRegularity[T any](complex *golsv.ZComplex[T]) {
+	isRegular, degree := complex.IsRegular()
+	if isRegular {
+		fmt.Printf("Complex is regular with degree %d\n", degree)
+	} else {
+		fmt.Printf("Complex is not regular\n")
+	}
 }

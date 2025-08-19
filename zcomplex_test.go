@@ -603,7 +603,7 @@ func TestZComplexIsRegular(t *testing.T) {
 				C = NewZComplexFromMaximalSimplices(test.initial)
 			}
 			
-			result := C.IsRegular()
+			result, _ := C.IsRegular()
 			if result != test.expected {
 				t.Errorf("Expected IsRegular() = %v, got %v", test.expected, result)
 			}

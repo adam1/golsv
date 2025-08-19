@@ -623,18 +623,18 @@ func parseSimplicesString(s string) (simplices [][]int, err error) {
 	return
 }
 
-func (C *ZComplex[T]) IsRegular() bool {
+func (C *ZComplex[T]) IsRegular() (bool, int) {
 	if C.NumVertices() == 0 {
-		return true // vacuously true
+		return true, 0 // vacuously true, degree 0
 	}
 	
 	firstDegree := C.Degree(0)
 	for i := 1; i < C.NumVertices(); i++ {
 		if C.Degree(i) != firstDegree {
-			return false
+			return false, -1 // not regular, degree is undefined
 		}
 	}
-	return true
+	return true, firstDegree
 }
 
 func (C *ZComplex[T]) IndexOfEdge(u, v int) (int, bool) {
