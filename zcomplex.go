@@ -294,7 +294,7 @@ func (C *ZComplex[T]) AddEdge(u, v int) {
 	}
 	
 	// Invalidate other cached indices
-	C.edgeIndex = nil
+	C.edgeIndex = nil // xxx improve this
 	C.d1 = nil
 	C.d2 = nil
 }
@@ -454,7 +454,7 @@ func (C *ZComplex[T]) DeleteEdge(u, v int) {
 			}
 			
 			// Invalidate other cached indices
-			C.edgeIndex = nil
+			C.edgeIndex = nil // xxx improve this
 			C.d1 = nil
 			C.d2 = nil
 			return

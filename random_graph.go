@@ -130,6 +130,8 @@ func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
 		if verbose {
 			log.Printf("Pruning %d edges", delta)
 		}
+		// xxx modify this to just prune random edges
+		
 		// Remove excess edges - prefer edges between high-degree vertices
 		for delta > 0 {
 			maxDegree := -1
@@ -166,6 +168,8 @@ func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
 		if verbose {
 			log.Printf("Adding %d edges", -delta)
 		}
+		// xxx modify this to just add random edges
+
 		// Add missing edges - prefer connecting low-degree vertices
 		for delta < 0 {
 			minDegree := G.NumVertices()

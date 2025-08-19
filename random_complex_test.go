@@ -407,3 +407,57 @@ func TestRandomCirculantComplex(t *testing.T) {
 	}
 }
 
+
+func TestRandomRegularCliqueComplexByBalancing(t *testing.T) {
+	tests := []struct {
+		numVertices int
+		degree      int
+		expectError bool
+	}{
+		{6, 2, false},  // 6 vertices, 2-regular
+		{8, 3, false},  // 8 vertices, 3-regular
+		{10, 4, false}, // 10 vertices, 4-regular
+		{5, 3, true},   // 5*3=15 is odd, should fail
+		{4, 4, true},   // degree >= numVertices, should fail
+		//{60480, 14, false},
+	}
+	verbose := false
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("n=%d_k=%d", test.numVertices, test.degree), func(t *testing.T) {
+			R := NewRandomComplexGenerator(test.numVertices, verbose)
+			C, err := R.RandomRegularCliqueComplexByBalancing(test.degree, 1000)
+
+			if test.expectError {
+				if err == nil {
+					t.Errorf("expected error for n=%d, degree=%d", test.numVertices, test.degree)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if C.NumVertices() != test.numVertices {
+				t.Errorf("expected %d vertices, got %d", test.numVertices, C.NumVertices())
+			}
+			if !C.IsRegular() {
+				t.Errorf("generated graph is not regular")
+			}
+			if test.numVertices > 0 {
+				actualDegree := C.Degree(0)
+				if actualDegree != test.degree {
+					t.Errorf("expected degree %d, got %d", test.degree, actualDegree)
+				}
+			}
+			expectedEdges := test.numVertices * test.degree / 2
+			if C.NumEdges() != expectedEdges {
+				t.Errorf("expected %d edges, got %d", expectedEdges, C.NumEdges())
+			}
+			// xxx there may or may not be triangles
+// 			if C.NumTriangles() == 0 && test.numVertices > 2 {
+// 				t.Errorf("expected triangles in clique complex, got 0")
+// 			}
+		})
+	}
+}

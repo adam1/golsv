@@ -412,6 +412,9 @@ func (R *RandomComplexGenerator) RandomRegularCliqueComplexByBalancing(degree in
 		log.Printf("Filling cliques")
 	}
 	C.Fill3Cliques()
+	if R.verbose {
+		log.Printf("Generated: %v", C)
+	}
 	return C, nil
 }
 
