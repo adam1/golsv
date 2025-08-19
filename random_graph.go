@@ -72,9 +72,7 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 	}
 	correctNumEdges(G, regularity, verbose)
 	
-	// seems we should always be able to construct a regular graph by
-	// balancing.
-
+	// We can always construct a regular graph by balancing.
 	unders, overs := splitVerticesByDegree(G, regularity)
 
 	mathrand.Shuffle(len(unders), func(i, j int) { unders[i], unders[j] = unders[j], unders[i] })
@@ -109,19 +107,47 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 					break
 				}
 			}
-			
 			if !moved {
-				// couldn't move any edge, put vertex back if still overweight
-// 				if overage > 0 {
-// 					overs = append(overs, o)
-// 				}
-				//				break
+				// shouldn't happen
 				return nil, fmt.Errorf("failed to find an edge to move")
 			}
 		}
 	}
-
 	return G, nil
+}
+
+func deleteRandomEdge(G *ZComplex[ZVertexInt]) bool {
+	edges := G.EdgeBasis()
+	if len(edges) == 0 {
+		return false
+	}
+	edgeIdx := mathrand.Intn(len(edges))
+	edge := edges[edgeIdx]
+	vertexIndex := G.VertexIndex()
+	u := vertexIndex[edge[0]]
+	v := vertexIndex[edge[1]]
+	G.DeleteEdge(u, v)
+	return true
+}
+
+func addRandomEdge(G *ZComplex[ZVertexInt]) bool {
+	// Find all possible edges to add
+	possibleEdges := make([][2]int, 0)
+	for u := 0; u < G.NumVertices(); u++ {
+		for v := u + 1; v < G.NumVertices(); v++ {
+			if !G.IsNeighbor(u, v) {
+				possibleEdges = append(possibleEdges, [2]int{u, v})
+			}
+		}
+	}
+	if len(possibleEdges) == 0 {
+		return false
+	}
+	// Pick a random edge to add
+	edgeIdx := mathrand.Intn(len(possibleEdges))
+	edge := possibleEdges[edgeIdx]
+	G.AddEdge(edge[0], edge[1])
+	return true
 }
 
 func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
@@ -130,84 +156,24 @@ func correctNumEdges(G *ZComplex[ZVertexInt], regularity int, verbose bool) {
 		if verbose {
 			log.Printf("Pruning %d edges", delta)
 		}
-		// xxx modify this to just prune random edges
-		
-		// Remove excess edges - prefer edges between high-degree vertices
 		for delta > 0 {
-			maxDegree := -1
-			var edgeToRemove [2]int
-			found := false
-			
-			// Find edge between highest degree vertices
-			for u := 0; u < G.NumVertices(); u++ {
-				neighbors := G.Neighbors(u)
-				for _, v := range neighbors {
-					if u < v { // avoid double counting
-						minDegree := G.Degree(u)
-						if G.Degree(v) < minDegree {
-							minDegree = G.Degree(v)
-						}
-						if minDegree > maxDegree {
-							maxDegree = minDegree
-							edgeToRemove = [2]int{u, v}
-							found = true
-						}
-					}
-				}
-			}
-			
-			if found {
-				G.DeleteEdge(edgeToRemove[0], edgeToRemove[1])
-				delta--
-			} else {
+			if !deleteRandomEdge(G) {
 				panic("could not find edge to remove")
 			}
+			delta--
 		}
-		
 	} else if delta < 0 {
 		if verbose {
 			log.Printf("Adding %d edges", -delta)
 		}
-		// xxx modify this to just add random edges
-
-		// Add missing edges - prefer connecting low-degree vertices
 		for delta < 0 {
-			minDegree := G.NumVertices()
-			var edgeToAdd [2]int
-			found := false
-			
-			// Find pair of non-adjacent vertices with lowest combined degree
-			for u := 0; u < G.NumVertices(); u++ {
-				for v := u + 1; v < G.NumVertices(); v++ {
-					if !G.IsNeighbor(u, v) {
-						combinedDegree := G.Degree(u) + G.Degree(v)
-						if combinedDegree < minDegree {
-							minDegree = combinedDegree
-							edgeToAdd = [2]int{u, v}
-							found = true
-						}
-					}
-				}
-			}
-			
-			if found {
-				G.AddEdge(edgeToAdd[0], edgeToAdd[1])
-				delta++
-			} else {
+			if !addRandomEdge(G) {
 				panic("could not find vertices to connect")
 			}
+			delta++
 		}
 	}
 }
-
-
-// func vertexDegrees(adjacency []map[int]bool) []int {
-// 	degrees := make([]int, len(adjacency))
-// 	for v := 0; v < len(adjacency); v++ {
-// 		degrees[v] = len(adjacency[v])
-// 	}
-// 	return degrees
-// }
 
 func vertexDegrees(C *ZComplex[ZVertexInt]) []int {
 	degrees := make([]int, C.NumVertices())
@@ -217,34 +183,22 @@ func vertexDegrees(C *ZComplex[ZVertexInt]) []int {
 	return degrees
 }
 
-// xxx deprecated
-// func degreesDistribution(vertexDegree []int) map[int]int {
-// 	distribution := make(map[int]int)
-// 	for _, degree := range vertexDegree {
-// 		distribution[degree]++
-// 	}
-// 	return distribution
-// }
-
 func degreeVariance(degrees []int) float64 {
 	if len(degrees) == 0 {
 		return 0
 	}
-	
 	// Calculate mean
 	sum := 0
 	for _, degree := range degrees {
 		sum += degree
 	}
 	mean := float64(sum) / float64(len(degrees))
-	
 	// Calculate variance
 	sumSquaredDiffs := 0.0
 	for _, degree := range degrees {
 		diff := float64(degree) - mean
 		sumSquaredDiffs += diff * diff
 	}
-	
 	return sumSquaredDiffs / float64(len(degrees))
 }
 
