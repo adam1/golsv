@@ -294,7 +294,7 @@ func (C *ZComplex[T]) AddEdge(u, v int) {
 	}
 	
 	// Invalidate other cached indices
-	C.edgeIndex = nil // xxx improve this
+	C.computeEdgeIndex() // xxx improve this
 	C.d1 = nil
 	C.d2 = nil
 }
@@ -418,6 +418,7 @@ func (C *ZComplex[T]) Degree(v int) int {
 	return len(C.Neighbors(v))
 }
 
+// xxx modify this to take edge index instead 
 func (C *ZComplex[T]) DeleteEdge(u, v int) {
 	if u < 0 || u >= len(C.vertexBasis) || v < 0 || v >= len(C.vertexBasis) {
 		panic("vertex index out of range")
@@ -454,7 +455,7 @@ func (C *ZComplex[T]) DeleteEdge(u, v int) {
 			}
 			
 			// Invalidate other cached indices
-			C.edgeIndex = nil // xxx improve this
+			C.computeEdgeIndex() // xxx improve this
 			C.d1 = nil
 			C.d2 = nil
 			return

@@ -419,7 +419,6 @@ func TestRandomRegularCliqueComplexByBalancing(t *testing.T) {
 		{10, 4, false}, // 10 vertices, 4-regular
 		{5, 3, true},   // 5*3=15 is odd, should fail
 		{4, 4, true},   // degree >= numVertices, should fail
-		//{60480, 14, false},
 	}
 	verbose := false
 	for _, test := range tests {
@@ -457,7 +456,9 @@ func TestRandomRegularCliqueComplexByBalancing(t *testing.T) {
 			// xxx there may or may not be triangles
 // 			if C.NumTriangles() == 0 && test.numVertices > 2 {
 // 				t.Errorf("expected triangles in clique complex, got 0")
-// 			}
+			// 			}
+			C.D1()
+			C.D2()
 		})
 	}
 }
