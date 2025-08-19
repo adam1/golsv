@@ -423,8 +423,14 @@ simplicial-cosystole: d1.txt d2.txt Z1.txt Z^1.txt B^1.txt
 coboundary-decoder-threshold: d1.txt d2.txt Z1.txt
 	coboundary-decoder -find-threshold -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -verbose -results results-$(log).json 2>&1 | tee coboundary-decoder-threshold.$(log)
 
+random:
+	random-complex -dimC0 60480 -p 0.0002315 -d1 d1.txt -d2 d2.txt 2>&1 | tee random.$(log)
+
+random-regular:
+	random-complex -dimC0 60480 -regular 14 -d1 d1.txt -d2 d2.txt 2>&1 | tee random-regular.$(log)
+
 circulant:
-	random-complex -dimC0 60480 -circulant -regular -k 14 -d1 d1.txt -d2 d2.txt 2>&1 | tee circulant.$(log)
+	random-complex -dimC0 60480 -circulant -regular 14 -d1 d1.txt -d2 d2.txt 2>&1 | tee circulant.$(log)
 
 really-clean:
 		rm -f B1.txt B1colops.txt B1rowops.txt B1smith.txt C.txt F.txt FG.txt G.txt K.txt KB1.txt KS.txt \
