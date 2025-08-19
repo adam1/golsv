@@ -97,8 +97,7 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 						if !ok {
 							panic("Edge not found")
 						}
-						G.DeleteEdge(eidx)
-						G.AddEdge(u, x)
+						G.MoveEdge(eidx, u, x)
 						overage--
 						moved = true
 						

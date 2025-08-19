@@ -611,6 +611,151 @@ func TestZComplexIsRegular(t *testing.T) {
 	}
 }
 
+func TestZComplexMoveEdge(t *testing.T) {
+	tests := []struct {
+		name        string
+		initial     [][]int // maximal simplices for initial complex
+		edgeToMove  [2]int  // vertices of edge to move
+		newVertices [2]int  // new vertices for the edge
+		expected    [][]int // expected neighbors after moving edge
+	}{
+		{
+			name:        "move edge in simple graph",
+			initial:     [][]int{{0, 1}, {2, 3}}, // two separate edges
+			edgeToMove:  [2]int{0, 1},
+			newVertices: [2]int{1, 2}, // move edge (0,1) to (1,2)
+			expected: [][]int{
+				{},      // neighbors of vertex 0
+				{2},     // neighbors of vertex 1
+				{1, 3},  // neighbors of vertex 2
+				{2},     // neighbors of vertex 3
+			},
+		},
+		{
+			name:        "move edge in connected graph",
+			initial:     [][]int{{0, 1}, {1, 2}, {2, 3}}, // path graph
+			edgeToMove:  [2]int{1, 2},
+			newVertices: [2]int{0, 3}, // move middle edge to connect endpoints
+			expected: [][]int{
+				{1, 3},  // neighbors of vertex 0
+				{0},     // neighbors of vertex 1
+				{3},     // neighbors of vertex 2
+				{0, 2},  // neighbors of vertex 3
+			},
+		},
+		{
+			name:        "move edge to create different topology",
+			initial:     [][]int{{0, 1}, {0, 2}, {1, 2}}, // triangle edges
+			edgeToMove:  [2]int{0, 1},
+			newVertices: [2]int{0, 3}, // move edge to new vertex
+			expected: [][]int{
+				{2, 3},  // neighbors of vertex 0
+				{2},     // neighbors of vertex 1
+				{0, 1},  // neighbors of vertex 2
+				{0},     // neighbors of vertex 3
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Find the maximum vertex needed for this test
+			maxVertex := 0
+			for _, edge := range test.initial {
+				for _, v := range edge {
+					if v > maxVertex {
+						maxVertex = v
+					}
+				}
+			}
+			for _, v := range test.edgeToMove {
+				if v > maxVertex {
+					maxVertex = v
+				}
+			}
+			for _, v := range test.newVertices {
+				if v > maxVertex {
+					maxVertex = v
+				}
+			}
+			
+			// Create all vertices we need
+			vertices := []ZVertex[ZVertexInt]{}
+			for i := 0; i <= maxVertex; i++ {
+				vertices = append(vertices, ZVertexInt(i))
+			}
+			
+			// Create edges from test.initial
+			edges := []ZEdge[ZVertexInt]{}
+			for _, edge := range test.initial {
+				if len(edge) == 2 {
+					edges = append(edges, NewZEdge(ZVertexInt(edge[0]), ZVertexInt(edge[1])))
+				}
+			}
+			
+			// Create the complex with vertices and edges
+			C := NewZComplex(vertices, edges, nil, false, false)
+
+			initialEdgeCount := C.NumEdges()
+
+			// Find the edge to move
+			edgeIdx, ok := C.IndexOfEdge(test.edgeToMove[0], test.edgeToMove[1])
+			if !ok {
+				t.Fatalf("Edge (%d,%d) not found for moving", test.edgeToMove[0], test.edgeToMove[1])
+			}
+
+			// Verify original edge exists
+			if !C.IsNeighbor(test.edgeToMove[0], test.edgeToMove[1]) {
+				t.Fatalf("Original edge (%d,%d) should exist", test.edgeToMove[0], test.edgeToMove[1])
+			}
+
+			// Move the edge
+			C.MoveEdge(edgeIdx, test.newVertices[0], test.newVertices[1])
+
+			// Verify edge count remains the same
+			if C.NumEdges() != initialEdgeCount {
+				t.Errorf("Expected %d edges after moving, got %d", initialEdgeCount, C.NumEdges())
+			}
+
+			// Verify original edge no longer exists
+			if C.IsNeighbor(test.edgeToMove[0], test.edgeToMove[1]) {
+				t.Errorf("Original edge (%d,%d) should no longer exist", test.edgeToMove[0], test.edgeToMove[1])
+			}
+
+			// Verify new edge exists
+			if !C.IsNeighbor(test.newVertices[0], test.newVertices[1]) {
+				t.Errorf("New edge (%d,%d) should exist", test.newVertices[0], test.newVertices[1])
+			}
+
+			// Check all neighbors are as expected
+			for vertex, expectedNeighbors := range test.expected {
+				if vertex >= len(C.vertexBasis) {
+					continue
+				}
+				neighbors := C.Neighbors(vertex)
+				if !equalIntSlices(neighbors, expectedNeighbors) {
+					t.Errorf("Vertex %d: expected neighbors %v, got %v", vertex, expectedNeighbors, neighbors)
+				}
+			}
+
+			// Verify edge index is correctly updated
+			newEdgeIdx, ok := C.IndexOfEdge(test.newVertices[0], test.newVertices[1])
+			if !ok {
+				t.Errorf("New edge (%d,%d) not found in edge index", test.newVertices[0], test.newVertices[1])
+			}
+			if newEdgeIdx != edgeIdx {
+				t.Errorf("Expected moved edge to have same index %d, got %d", edgeIdx, newEdgeIdx)
+			}
+
+			// Verify old edge is not in index
+			_, ok = C.IndexOfEdge(test.edgeToMove[0], test.edgeToMove[1])
+			if ok {
+				t.Errorf("Old edge (%d,%d) should not be in edge index after moving", test.edgeToMove[0], test.edgeToMove[1])
+			}
+		})
+	}
+}
+
 func TestZComplexDeleteEdge(t *testing.T) {
 	tests := []struct {
 		name     string

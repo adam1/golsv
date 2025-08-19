@@ -452,8 +452,9 @@ func (C *ZComplex[T]) DeleteEdge(idx int) {
 			}
 		}
 	}
-	C.deleteEdgeFromEdgeIndex(edge, idx)
+	//C.deleteEdgeFromEdgeIndex(edge, idx)
 	// Invalidate
+	C.edgeIndex = nil // this is optimized for deleting many edges without reading from the edgeIndex
 	C.d1 = nil
 	C.d2 = nil
 	return
@@ -655,6 +656,46 @@ func (C *ZComplex[T]) IsNeighbor(u, v int) bool {
 		}
 	}
 	return false
+}
+
+func (C *ZComplex[T]) MoveEdge(idx, u, v int) {
+	edgeIndex := C.EdgeIndex()
+	oldEdge := C.edgeBasis[idx]
+	
+	// Update adjacency index: remove old edge connections
+	if C.adjacencyIndex != nil {
+		oldU, okU := C.vertexIndex[oldEdge[0]]
+		oldV, okV := C.vertexIndex[oldEdge[1]]
+		if okU && okV {
+			// Remove oldV from oldU's neighbors
+			for i, neighbor := range C.adjacencyIndex[oldU] {
+				if neighbor == oldV {
+					C.adjacencyIndex[oldU] = append(C.adjacencyIndex[oldU][:i], C.adjacencyIndex[oldU][i+1:]...)
+					break
+				}
+			}
+			// Remove oldU from oldV's neighbors
+			for i, neighbor := range C.adjacencyIndex[oldV] {
+				if neighbor == oldU {
+					C.adjacencyIndex[oldV] = append(C.adjacencyIndex[oldV][:i], C.adjacencyIndex[oldV][i+1:]...)
+					break
+				}
+			}
+		}
+	}
+	
+	delete(edgeIndex, oldEdge)
+	a := C.vertexBasis[u]
+	b := C.vertexBasis[v]
+	newEdge := NewZEdge(a, b)
+	C.edgeBasis[idx] = newEdge
+	edgeIndex[newEdge] = idx
+	
+	// Update adjacency index: add new edge connections
+	if C.adjacencyIndex != nil {
+		C.adjacencyIndex[u] = append(C.adjacencyIndex[u], v)
+		C.adjacencyIndex[v] = append(C.adjacencyIndex[v], u)
+	}
 }
 
 func (C *ZComplex[T]) Neighbors(v int) (nabes []int) {
