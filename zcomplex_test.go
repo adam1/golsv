@@ -665,7 +665,13 @@ func TestZComplexDeleteEdge(t *testing.T) {
 				t.Fatalf("Edge (%d,%d) should exist before deletion", test.u, test.v)
 			}
 
-			C.DeleteEdge(test.u, test.v)
+			// Find edge index
+			edgeIdx, ok := C.IndexOfEdge(test.u, test.v)
+			if !ok {
+				t.Fatalf("Edge (%d,%d) not found in edge index", test.u, test.v)
+			}
+
+			C.DeleteEdge(edgeIdx)
 
 			// Check edge was removed
 			if C.NumEdges() != initialEdgeCount-1 {
@@ -699,7 +705,11 @@ func TestZComplexDeleteEdgeNonExistent(t *testing.T) {
 	initialEdgeCount := C.NumEdges()
 
 	// Deleting non-existent edge should not change edge count
-	C.DeleteEdge(0, 2) // no edge between 0 and 2
+	edgeIdx, ok := C.IndexOfEdge(0, 2) // no edge between 0 and 2
+	if ok {
+		C.DeleteEdge(edgeIdx)
+	}
+	// Note: If edge doesn't exist, we don't call DeleteEdge at all
 	if C.NumEdges() != initialEdgeCount {
 		t.Errorf("Expected %d edges after deleting non-existent edge, got %d", initialEdgeCount, C.NumEdges())
 	}
@@ -741,7 +751,11 @@ func TestZComplexDeleteEdgeRoundTrip(t *testing.T) {
 
 	// Add an edge then delete it
 	C.AddEdge(0, 3)
-	C.DeleteEdge(0, 3)
+	edgeIdx, ok := C.IndexOfEdge(0, 3)
+	if !ok {
+		t.Fatalf("Edge (0,3) not found after adding")
+	}
+	C.DeleteEdge(edgeIdx)
 
 	// Check we're back to original state (for vertices that existed originally)
 	if C.NumEdges() != originalEdgeCount {
@@ -766,7 +780,12 @@ func TestZComplexDeleteEdgeTrianglePanic(t *testing.T) {
 		}
 	}()
 	
-	C.DeleteEdge(0, 1) // Should panic
+	edgeIdx, ok := C.IndexOfEdge(0, 1)
+	if ok {
+		C.DeleteEdge(edgeIdx) // Should panic
+	} else {
+		t.Errorf("Expected edge (0,1) to exist in triangle complex")
+	}
 }
 
 func TestZComplexTrianglesContainingVertex(t *testing.T) {

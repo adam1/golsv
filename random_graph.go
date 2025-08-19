@@ -91,7 +91,11 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 				for j, u := range unders {
 					if u != x && !G.IsNeighbor(x, u) {
 						// move (o, x) to (u, x)
-						G.DeleteEdge(o, x)
+						eidx, ok := G.IndexOfEdge(o, x)
+						if !ok {
+							panic("Edge not found")
+						}
+						G.DeleteEdge(eidx)
 						G.AddEdge(u, x)
 						overage--
 						moved = true
@@ -122,11 +126,7 @@ func deleteRandomEdge(G *ZComplex[ZVertexInt]) bool {
 		return false
 	}
 	edgeIdx := mathrand.Intn(len(edges))
-	edge := edges[edgeIdx]
-	vertexIndex := G.VertexIndex()
-	u := vertexIndex[edge[0]]
-	v := vertexIndex[edge[1]]
-	G.DeleteEdge(u, v)
+	G.DeleteEdge(edgeIdx)
 	return true
 }
 
