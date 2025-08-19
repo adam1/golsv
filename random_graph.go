@@ -71,10 +71,12 @@ func RandomRegularGraphByBalancing(numVertices int, regularity int, maxIteration
 		log.Printf("Initial degree variance: %.3f", degreeVariance(degrees))
 	}
 	correctNumEdges(G, regularity, verbose)
-	
+
 	// We can always construct a regular graph by balancing.
 	unders, overs := splitVerticesByDegree(G, regularity)
-
+	if verbose {
+		log.Printf("Initiating degree balancing")
+	}
 	mathrand.Shuffle(len(unders), func(i, j int) { unders[i], unders[j] = unders[j], unders[i] })
 	mathrand.Shuffle(len(overs), func(i, j int) { overs[i], overs[j] = overs[j], overs[i] })
 

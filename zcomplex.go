@@ -292,8 +292,8 @@ func (C *ZComplex[T]) AddEdge(u, v int) {
 		C.adjacencyIndex[u] = append(C.adjacencyIndex[u], v)
 		C.adjacencyIndex[v] = append(C.adjacencyIndex[v], u)
 	}
+	C.edgeIndex[edge] = len(C.edgeBasis) - 1
 	// Invalidate
-	C.edgeIndex = nil
 	C.d1 = nil
 	C.d2 = nil
 }
@@ -452,11 +452,20 @@ func (C *ZComplex[T]) DeleteEdge(idx int) {
 			}
 		}
 	}
+	C.deleteEdgeFromEdgeIndex(edge, idx)
 	// Invalidate
-	C.edgeIndex = nil
 	C.d1 = nil
 	C.d2 = nil
 	return
+}
+
+func (C *ZComplex[T]) deleteEdgeFromEdgeIndex(edge ZEdge[T], idx int) {
+	delete(C.edgeIndex, edge)
+	for e, i := range C.edgeIndex {
+		if i > idx {
+			C.edgeIndex[e]--
+		}
+	}
 }
 
 func (C *ZComplex[T]) EdgeBasis() []ZEdge[T] {
