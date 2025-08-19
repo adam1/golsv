@@ -254,10 +254,11 @@ func (C *ZComplex[T]) computeD2() {
 	if C.verbose {
 		log.Printf("computing d2 boundary matrix")
 	}
+	edgeIndex := C.EdgeIndex()
 	C.d2 = NewSparseBinaryMatrix(len(C.edgeBasis), len(C.triangleBasis))
 	for j, t := range C.triangleBasis {
 		for _, e := range t.Edges() {
-			row, ok := C.edgeIndex[e]
+			row, ok := edgeIndex[e]
 			if !ok {
 				panic(fmt.Sprintf("edge %v not in edge index", e))
 			}
@@ -291,8 +292,8 @@ func (C *ZComplex[T]) AddEdge(u, v int) {
 		C.adjacencyIndex[u] = append(C.adjacencyIndex[u], v)
 		C.adjacencyIndex[v] = append(C.adjacencyIndex[v], u)
 	}
-	C.computeEdgeIndex()
 	// Invalidate
+	C.edgeIndex = nil
 	C.d1 = nil
 	C.d2 = nil
 }
@@ -451,8 +452,8 @@ func (C *ZComplex[T]) DeleteEdge(idx int) {
 			}
 		}
 	}
-	C.computeEdgeIndex()
 	// Invalidate
+	C.edgeIndex = nil
 	C.d1 = nil
 	C.d2 = nil
 	return
@@ -474,6 +475,9 @@ func (C *ZComplex[T]) EdgesContainingVertex(v ZVertex[T]) []ZEdge[T] {
 }
 
 func (C *ZComplex[T]) EdgeIndex() map[ZEdge[T]]int {
+	if C.edgeIndex == nil {
+		C.computeEdgeIndex()
+	}
 	return C.edgeIndex
 }
 
@@ -673,9 +677,10 @@ func (C *ZComplex[T]) TrianglesContainingVertex(v ZVertex[T]) []ZTriangle[T] {
 
 // xxx test
 func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
+	edgeIndex := C.EdgeIndex()
 	v := NewBinaryVector(len(C.edgeBasis))
 	for _, e := range path {
-		if i, ok := C.edgeIndex[e]; ok {
+		if i, ok := edgeIndex[e]; ok {
 			v.Set(i, 1)
 		} else {
 			panic(fmt.Sprintf("edge %v not in edge index", e))
