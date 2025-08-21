@@ -320,7 +320,7 @@ func (g ElementCalG) Latex() string {
 
 func (g ElementCalG) LatexMatrix() string {
 	var buf bytes.Buffer
-	buf.WriteString("\\begin{pmatrix}\n")
+	buf.WriteString("\\left \\langle \\begin{matrix}\n")
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
 			f := g[i*3+j]
@@ -331,7 +331,7 @@ func (g ElementCalG) LatexMatrix() string {
 		}
 		buf.WriteString("\\\\\n")
 	}
-	buf.WriteString("\\end{pmatrix}\n")
+	buf.WriteString("\\end{matrix}\\right \\rangle \n")
 	return buf.String()
 }
 

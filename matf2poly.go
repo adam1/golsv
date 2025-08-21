@@ -47,7 +47,7 @@ func (M MatF2Poly) Equal(N MatF2Poly) bool {
 }
 
 func (M MatF2Poly) Latex(varName string) string {
-	s := "\\begin{bmatrix}"
+	s := "\\begin{pmatrix}"
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
 			s += M[i*3+j].Latex(varName)
@@ -59,7 +59,7 @@ func (M MatF2Poly) Latex(varName string) string {
 			s += " \\\\ "
 		}
 	}
-	s += "\\end{bmatrix}"
+	s += "\\end{pmatrix}"
 	return s
 }
 
