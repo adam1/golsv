@@ -229,6 +229,14 @@ func (p F2Polynomial) IsZero() bool {
 	return true
 }
 
+func (p F2Polynomial) IsZeroModf(f F2Polynomial) bool {
+	return p.Modf(f).IsZero()
+}
+
+func (p F2Polynomial) IsOneModf(f F2Polynomial) bool {
+	return p.Add(F2PolynomialOne).IsZeroModf(f)
+}
+
 func (p F2Polynomial) Latex(varName string) string {
 	if p.IsZero() {
 		return "0"

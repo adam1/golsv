@@ -927,3 +927,20 @@ func TestCSCartwrightStegerEmbedPolynomialLinearity(t *testing.T) {
 		}
 	}
 }
+
+func TestCSGeneratorL2DeterminantsModf(t *testing.T) {
+	f := NewF2Polynomial("111") // 1 + y + y^2
+	table := CartwrightStegerGeneratorsWithMatrixReps(f)
+	
+	for i, info := range table {
+		det := info.B_uRep.Determinant()
+		detInv := info.B_uInvRep.Determinant()
+		product := det.Mul(detInv)
+		
+		if !product.IsOneModf(f) {
+			t.Errorf("generator %d: det(B_uRep) * det(B_uInvRep) = %v * %v = %v, not 1 mod %v", 
+				i, det, detInv, product, f)
+		}
+	}
+}
+

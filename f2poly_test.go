@@ -275,6 +275,55 @@ func TestF2PolynomialIsZero(t *testing.T) {
 	}
 }
 
+func TestF2PolynomialIsZeroModf(t *testing.T) {
+	tests := []struct {
+		p, f F2Polynomial
+		want bool
+	}{
+		{F2PolynomialZero, F2PolynomialOne, true},
+		{F2PolynomialZero, F2PolynomialY, true},
+		{F2PolynomialOne, F2PolynomialOne, true},
+		{F2PolynomialOne, F2PolynomialY, false},
+		{F2PolynomialY, F2PolynomialY, true},
+		{F2PolynomialOnePlusY, F2PolynomialOnePlusY, true},
+		{F2PolynomialOnePlusY, F2PolynomialY, false},
+		{NewF2Polynomial("111"), F2Polynomial111, true},
+		{NewF2Polynomial("111"), F2PolynomialY, false},
+		{NewF2PolynomialFromSupport(0,1,3,4), NewF2PolynomialFromSupport(0,1,4), false},
+		{NewF2PolynomialFromSupport(1,11,17), NewF2PolynomialFromSupport(0,1,2), false},
+	}
+	for n, test := range tests {
+		got := test.p.IsZeroModf(test.f)
+		if got != test.want {
+			t.Errorf("test %d: (%v).IsZeroModf(%v) got: %v want: %v", n, test.p, test.f, got, test.want)
+		}
+	}
+}
+
+func TestF2PolynomialIsOneModf(t *testing.T) {
+	tests := []struct {
+		p, f F2Polynomial
+		want bool
+	}{
+		{F2PolynomialOne, F2PolynomialY, true},
+		{F2PolynomialZero, F2PolynomialY, false},
+		{F2PolynomialY, F2PolynomialY, false},
+		{F2PolynomialOne, F2PolynomialOnePlusY, true},
+		{F2PolynomialZero, F2PolynomialOnePlusY, false},
+		{F2PolynomialOnePlusY, F2PolynomialOnePlusY, false},
+		{NewF2Polynomial("101"), NewF2Polynomial("100"), true},
+		{NewF2Polynomial("110"), NewF2Polynomial("111"), false},
+		{NewF2Polynomial("010"), NewF2Polynomial("111"), false},
+		{NewF2Polynomial("0111001"), NewF2Polynomial("1111001"), true},
+	}
+	for n, test := range tests {
+		got := test.p.IsOneModf(test.f)
+		if got != test.want {
+			t.Errorf("test %d: (%v).IsOneModf(%v) got: %v want: %v", n, test.p, test.f, got, test.want)
+		}
+	}
+}
+
 func TestF2PolynomialLess(t *testing.T) {
 	p := NewF2PolynomialFromSupport(1,2,3,48)
 	q := NewF2PolynomialFromSupport(1,2,3,48,70,127)
