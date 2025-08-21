@@ -893,7 +893,7 @@ func TestCSCartwrightStegerEmbedPolynomial(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := cartwrightStegerEmbedPolynomial(tt.input)
+			got := CartwrightStegerEmbedPolynomial(tt.input)
 			if !got.Equal(tt.want) {
 				t.Errorf("cartwrightStegerEmbedPolynomial(%v) = %v, want %v", tt.input, got, tt.want)
 			}
@@ -915,9 +915,9 @@ func TestCSCartwrightStegerEmbedPolynomialLinearity(t *testing.T) {
 				continue // avoid duplicate tests
 			}
 			sum := a.Add(b)
-			embeddedSum := cartwrightStegerEmbedPolynomial(sum)
-			embeddedA := cartwrightStegerEmbedPolynomial(a)
-			embeddedB := cartwrightStegerEmbedPolynomial(b)
+			embeddedSum := CartwrightStegerEmbedPolynomial(sum)
+			embeddedA := CartwrightStegerEmbedPolynomial(a)
+			embeddedB := CartwrightStegerEmbedPolynomial(b)
 			expectedSum := embeddedA.Add(embeddedB)
 
 			if !embeddedSum.Equal(expectedSum) {

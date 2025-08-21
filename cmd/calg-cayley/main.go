@@ -179,7 +179,11 @@ func prepareGenerators(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial) []gol
 	for _, inf := range genTable {
 		gens = append(gens, inf.B_u, inf.B_uInv)
 	}
+		
 	//log.Printf("prepared generators:\n%s", gens)
+	if args.Determinant {
+		printGeneratorsDeterminants(args, f, genTable)
+	}
 	if args.GeneratorsLatexFile != "" {
 		produceGeneratorsLatexFile(args, genTable)
 	}
@@ -195,6 +199,35 @@ func dumpElements(els []golsv.ElementCalG) string {
 		s += el.String()
 	}
 	return s
+}
+
+func printGeneratorsDeterminants(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, genTable []golsv.CartwrightStegerGenInfo) {
+	for _, inf := range genTable {
+		var b_uRepDet golsv.F2Polynomial
+		var b_uInvRepDet golsv.F2Polynomial
+		var yxModulus golsv.F2Polynomial
+		if args.Quotient {
+			yxModulus = golsv.CartwrightStegerEmbedPolynomial(f)
+		}
+		if args.Quotient {
+			b_uRepDet = inf.B_uRep.Determinant().Modf(yxModulus)
+		} else {
+			b_uRepDet = inf.B_uRep.Determinant()
+		}
+		if args.Quotient {
+			b_uInvRepDet = inf.B_uInvRep.Determinant().Modf(yxModulus)
+		} else {
+			b_uInvRepDet = inf.B_uInvRep.Determinant()
+		}
+		log.Printf("u = %s:", inf.U.String())
+		log.Printf("  b_u = %s", inf.B_u.String())
+		log.Printf("  matrix rep: %s", inf.B_uRep.String())
+		log.Printf("  determinant: %s", b_uRepDet.String())
+		log.Printf("  b_u^{-1} = %s", inf.B_uInv.String())
+		log.Printf("  matrix rep: %s", inf.B_uInvRep.String())
+		log.Printf("  determinant: %s", b_uInvRepDet.String())
+		log.Printf("")
+	}
 }
 
 func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, genTable []golsv.CartwrightStegerGenInfo) {
@@ -225,9 +258,9 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, genTable []golsv.C
 		},
 		"RepSet": func() string {
 			if args.Quotient {
-				return `\PGL_3(R/I)`
+				return `\PGL_3(\bar{R}/\bar{I})`
 			} else {
-				return `\PGL_3(R)`
+				return `\PGL_3(\bar{R})`
 			}
 		},
 	}
@@ -251,6 +284,7 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, genTable []golsv.C
 type CalGCayleyExpanderArgs struct {
 	D1File                  string
 	D2File                  string
+	Determinant             bool
 	EdgeBasisFile           string
 	FillTriangles           bool
 	GeneratorsLatexFile     string
@@ -277,6 +311,7 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", args.D1File, "d1 input/output file (sparse column support txt format)")
 	flag.StringVar(&args.D2File, "d2", args.D2File, "d2 output file (sparse column support txt format)")
+	flag.BoolVar(&args.Determinant, "determinant", args.Determinant, "print matrix representation and determinant of each generator")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", args.EdgeBasisFile, "edge basis output file (text)")
 	flag.BoolVar(&args.FillTriangles, "fill-triangles", args.FillTriangles, "read vertex and edge bases, compute triangle basis and d2.txt")
 	flag.StringVar(&args.GeneratorsLatexFile, "generators-latex-file", args.GeneratorsLatexFile, "write table of generators to this file (latex)")

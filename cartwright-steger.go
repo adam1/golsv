@@ -850,7 +850,7 @@ func CartwrightStegerGeneratorsWithMatrixReps(modulus F2Polynomial) []Cartwright
 		uInvRep := ProjMatF2Poly(cartwrightStegerMatrixRepFieldElement(uStd.InverseModf(cartwrightStegerModulus)))
 		// b_u = u b u^{-1}
 		b_uRep := uRep.Mul(repB).Mul(uInvRep)
-		var yxModulus F2Polynomial = cartwrightStegerEmbedPolynomial(modulus)
+		var yxModulus F2Polynomial = CartwrightStegerEmbedPolynomial(modulus)
 		if yxModulus != F2PolynomialZero {
 			b_uRep = b_uRep.ReduceModf(yxModulus)
 		}
@@ -956,7 +956,7 @@ func coeffToPoly(c int) F2Polynomial {
 	}
 }
 
-func cartwrightStegerEmbedPolynomial(f_of_y F2Polynomial) (f_of_y_of_x F2Polynomial) {
+func CartwrightStegerEmbedPolynomial(f_of_y F2Polynomial) (f_of_y_of_x F2Polynomial) {
 	var sum F2Polynomial = F2PolynomialZero
 	for i := 0; i <= f_of_y.Degree(); i++ {
 		if f_of_y.Coefficient(i) == 1 {

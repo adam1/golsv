@@ -120,6 +120,33 @@ func TestMatF2PolyTrace(t *testing.T) {
 	}
 }
 
+func TestMatF2PolyDeterminant(t *testing.T) {
+	tests := []struct {
+		M	MatF2Poly
+		want	F2Polynomial
+	}{
+		{ MatF2Poly{}, F2PolynomialZero },
+		{ MatF2PolyIdentity, F2PolynomialOne },
+		{ NewMatF2Poly(
+			NewF2Polynomial("1"), F2PolynomialZero, F2PolynomialZero,
+			F2PolynomialZero, NewF2Polynomial("1"), F2PolynomialZero,
+			F2PolynomialZero, F2PolynomialZero, NewF2Polynomial("01")),
+			NewF2Polynomial("01") },
+		{ NewMatF2Poly(
+			NewF2Polynomial("1"), NewF2Polynomial("1"), F2PolynomialZero,
+			F2PolynomialZero, NewF2Polynomial("1"), F2PolynomialZero,
+			F2PolynomialZero, F2PolynomialZero, NewF2Polynomial("1")),
+			NewF2Polynomial("1") },
+		{ NewMatF2PolyFromString("[11 0 01 01 11 01 0 01 11]"),
+			NewF2Polynomial("1101") },
+	}
+	for _, test := range tests {
+		if got := test.M.Determinant(); !got.Equal(test.want) {
+			t.Errorf("MatF2Poly.Determinant() M=%v got=%v want=%v", test.M, got, test.want)
+		}
+	}
+}
+
 func TestProjMatF2PolyEqual(t *testing.T) {
 	tests := []struct {
 		M1, M2	ProjMatF2Poly
@@ -160,6 +187,25 @@ func TestProjMatF2PolyReduceModf(t *testing.T) {
 	for _, test := range tests {
 		if got := test.M.ReduceModf(test.f); !got.Equal(test.want) {
 			t.Errorf("ProjMatF2Poly.ReduceModf() M=%v f=%v got=%v want=%v", test.M, test.f, got, test.want)
+		}
+	}
+}
+
+func TestProjMatF2PolyDeterminant(t *testing.T) {
+	tests := []struct {
+		M	ProjMatF2Poly
+		want	F2Polynomial
+	}{
+		{ ProjMatF2Poly{}, F2PolynomialZero },
+		{ ProjMatF2PolyIdentity, F2PolynomialOne },
+		{ NewProjMatF2PolyFromString("[11 0 01 01 11 01 0 01 11]"),
+			NewF2Polynomial("1101") },
+		{ NewProjMatF2PolyFromString("[1 1 0 0 1 0 0 0 1]"),
+			NewF2Polynomial("1") },
+	}
+	for _, test := range tests {
+		if got := test.M.Determinant(); !got.Equal(test.want) {
+			t.Errorf("ProjMatF2Poly.Determinant() M=%v got=%v want=%v", test.M, got, test.want)
 		}
 	}
 }
