@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"golsv"
 	"log"
 	"os"
@@ -170,26 +169,19 @@ func writeGraphFiles(complex *golsv.ZComplex[golsv.ElementCalG], args *CalGCayle
 }
 
 func prepareGenerators(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial) []golsv.ElementCalG {
-	// xxx possibly modify this to also return matrix reps, to avoid
-	// potential mixup between ordering?
-	gens := golsv.CartwrightStegerGenerators()
-	a := dumpElements(gens)
-	log.Printf("original generators:\n%s", a)
-	if args.TruncateGenerators > 0 {
-		log.Printf("truncating generators to %d", args.TruncateGenerators)
-		gens = gens[:args.TruncateGenerators]
-	}
 	if args.Quotient {
-		log.Printf("reducing generators modulo %v", f)
-		for i := range gens {
-			gens[i] = gens[i].Modf(f)
-		}
+		log.Printf("will reduce generators modulo %v", f)
+	} else {
+		f = golsv.F2PolynomialZero
 	}
-	b := dumpElements(gens)
-	log.Printf("prepared generators (modified=%v):\n%s", a != b, b)
-
+	genTable := golsv.CartwrightStegerGeneratorsWithMatrixReps(f)
+	gens := make([]golsv.ElementCalG, 0)
+	for _, inf := range genTable {
+		gens = append(gens, inf.B_u, inf.B_uInv)
+	}
+	//log.Printf("prepared generators:\n%s", gens)
 	if args.GeneratorsLatexFile != "" {
-		produceGeneratorsLatexFile(args, gens)
+		produceGeneratorsLatexFile(args, genTable)
 	}
 	return gens
 }
@@ -205,47 +197,18 @@ func dumpElements(els []golsv.ElementCalG) string {
 	return s
 }
 
-// note that we implicitly assume that the generators are in the same order as
-// the matrix reps, which is true.
-func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.ElementCalG) {
-	// combine the (algebraic) generators with their matrix representations
-	// so as to produce a nice table.
-	_, genMatrixReps := golsv.CartwrightStegerGeneratorsMatrixReps()
-	log.Printf("Generator matrix reps:")
-	combined := make([]genInfo, 0)
-	for i, info := range genMatrixReps {
-		b_uCalg := gens[2*i]
-		b_uCalgInv := gens[2*i+1]
-		fmt.Printf("u=%v b_u=%v rho(b_u)=%v\n", info.U, b_uCalg, info.B_u)
-		combined = append(combined, genInfo{info, b_uCalg, b_uCalgInv})
-	}
-	// xxx FIXME (see GeneratorsV2) xxx we currently haven't fully
-	// implemented the calculation of the matrix representation for
-	// the quotient case, as we don't use them elsewhere.  in this
-	// case, omit the corresponding column from the latex output.
+func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, genTable []golsv.CartwrightStegerGenInfo) {
 	var latexTemplate string
-	if args.Quotient {
-		latexTemplate = `\begin{array}{|c|c|}
+	latexTemplate = `\begin{array}{|c|c|c|}
 	\hline
-	u & b_u, \quad b_u^{-1} \\
+	u \in \F_4^\times/\F_2^\times & b_u , b_u^{-1} \in {{GenSet}} & \rho(b_u), \rho(b_u^{-1}) \in {{RepSet}}\\
 	\hline
 	{{range .}}
-	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.LatexMatrix}} \quad {{.B_uInvCalG.LatexMatrix}} \\
+	{{F2PolyLatexWithVar .U "v"}} & {{.B_u.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .B_uRep "x"}} \\
+	                              & {{.B_uInv.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .B_uInvRep "x"}} \\
 	{{end}}
 	\hline
 \end{array}`
-	} else {
-		latexTemplate = `\begin{array}{|c|c|c|}
-	\hline
-	u & b_u, \quad b_u^{-1} & \rho(b_u), \quad \rho(b_u^{-1})\\
-	\hline
-	{{range .}}
-	{{F2PolyLatexWithVar .MInfo.U "v"}} & {{.B_uCalG.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_u "y"}} \\
-	                                        & {{.B_uInvCalG.LatexMatrix}} & {{ProjMatF2PolyLatexWithVar .MInfo.B_uInv "y"}} \\
-	{{end}}
-	\hline
-\end{array}`
-	}
 	funcMap := template.FuncMap{
 		"F2PolyLatexWithVar": func(p golsv.F2Polynomial, varName string) string {
 			return p.Latex(varName)
@@ -253,14 +216,27 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 		"ProjMatF2PolyLatexWithVar": func(m golsv.ProjMatF2Poly, varName string) string {
 			return m.Latex(varName)
 		},
-
+		"GenSet": func() string {
+			if args.Quotient {
+				return `\mathcal{G}(R/I)`
+			} else {
+				return `\mathcal{G}(R)`
+			}
+		},
+		"RepSet": func() string {
+			if args.Quotient {
+				return `\PGL_3(R/I)`
+			} else {
+				return `\PGL_3(R)`
+			}
+		},
 	}
 	tpl, err := template.New("gens").Funcs(funcMap).Parse(latexTemplate)
 	if err != nil {
 		log.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := tpl.Execute(&out, combined); err != nil {
+	if err := tpl.Execute(&out, genTable); err != nil {
 		log.Fatal(err)
 	}
 	err = os.WriteFile(args.GeneratorsLatexFile, []byte(out.String()), 0644)
@@ -270,11 +246,6 @@ func produceGeneratorsLatexFile(args *CalGCayleyExpanderArgs, gens []golsv.Eleme
 	if args.Verbose {
 		log.Printf("wrote generator matrix info to %s", args.GeneratorsLatexFile)
 	}
-}
-
-type genInfo struct {
-	MInfo golsv.CartwrightStegerGenMatrixInfo
-	B_uCalG, B_uInvCalG golsv.ElementCalG
 }
 
 type CalGCayleyExpanderArgs struct {

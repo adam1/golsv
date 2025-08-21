@@ -80,11 +80,11 @@ calg-cayley-systolic-candidates S.txt: vertex-basis.txt edge-basis.txt
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
 		--systolic-candidates S.txt  2>&1 | tee calg-cayley-systolic-candidates.$(log)
 
-gens-global.tex:
-	calg-cayley -modulus `cat modulus.txt` -max-depth 1 -generators-latex-file gens-global.tex 2>&1 | tee gens-global.$(log)
+table-gens-global.tex:
+	calg-cayley -graph -modulus `cat modulus.txt` -max-depth 1 -generators-latex-file table-gens-global.tex 2>&1 | tee table-gens-global.$(log)
 
-gens-quotient.tex:
-	calg-cayley -modulus `cat modulus.txt` -quotient -max-depth 1 -generators-latex-file gens-quotient.tex 2>&1 | tee gens-quotient.$(log)
+table-gens-quotient.tex:
+	calg-cayley -graph -modulus `cat modulus.txt` -quotient -max-depth 1 -generators-latex-file table-gens-quotient.tex 2>&1 | tee table-gens-quotient.$(log)
 
 # Many of the following targets can be used to compute homology from
 # the d1.txt and d2.txt matrix files regardless of where they came
