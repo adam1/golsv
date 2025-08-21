@@ -726,7 +726,7 @@ func cartwrightStegerGenBInv() ElementCalG {
 		F2PolynomialOnePlusY, F2PolynomialOne, F2PolynomialOne)
 }
 
-// xxx deprecate
+// xxx deprecated
 func CartwrightStegerGenerators() []ElementCalG {
 	gens := make([]ElementCalG, 0)
 	b := cartwrightStegerGenB()
@@ -780,7 +780,7 @@ type CartwrightStegerGenMatrixInfo struct {
 	B_u, B_uInv ProjMatF2Poly
 }
 
-// xxx deprecate
+// xxx deprecated
 func CartwrightStegerGeneratorsMatrixReps() (gens []ProjMatF2Poly, table []CartwrightStegerGenMatrixInfo) {
 	// per the example in LSV section 10, we don't need to use the
 	// normal basis of F_8; we can use the standard basis instead.
