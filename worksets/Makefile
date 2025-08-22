@@ -435,6 +435,15 @@ circulant:
 psl.txt:
 	calg-cayley -graph -psl psl.txt -quotient -modulus `cat modulus.txt` -max-depth 2 2>&1 | tee check-psl.$(log)
 
+psl-cayley:
+	calg-cayley -graph -generators psl.txt -quotient -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt\
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt 2>&1 | tee psl-cayley.$(log)
+
+psl-fill-triangles: d1.txt
+	calg-cayley -fill-triangles -generators psl.txt -quotient -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt \
+		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
+		-triangle-basis triangle-basis.txt 2>&1 | tee psl-cayley-fill-triangles.$(log)
+
 really-clean:
 		rm -f B1.txt B1colops.txt B1rowops.txt B1smith.txt C.txt F.txt FG.txt G.txt K.txt KB1.txt KS.txt \
 		KSdiffs.txt KSsmith.txt KT.txt KTsmith.txt M.txt Mcolops.txt Mrowops.txt Msmith.txt P1.txt \

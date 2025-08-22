@@ -174,24 +174,47 @@ func writeGraphFiles(complex *golsv.ZComplex[golsv.ElementCalG], args *CalGCayle
 }
 
 func prepareGenerators(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial) []golsv.ElementCalG {
-	if args.Quotient {
-		log.Printf("will reduce generators modulo %v", f)
+	var gens []golsv.ElementCalG
+	
+	if args.GeneratorsFile != "" {
+		if args.Verbose {
+			log.Printf("reading generators from file %s", args.GeneratorsFile)
+		}
+		vertexGens := golsv.ReadElementCalGVertexFile(args.GeneratorsFile)
+		gens = make([]golsv.ElementCalG, len(vertexGens))
+		for i, v := range vertexGens {
+			gens[i] = v.(golsv.ElementCalG)
+		}
+		if args.Quotient {
+			log.Printf("will reduce generators modulo %v", f)
+			for i := range gens {
+				gens[i] = gens[i].Modf(f)
+			}
+		}
+		if args.Verbose {
+			log.Printf("loaded %d generators from file", len(gens))
+		}
 	} else {
-		f = golsv.F2PolynomialZero
-	}
-	genTable := golsv.CartwrightStegerGeneratorsWithMatrixReps(f)
-	gens := make([]golsv.ElementCalG, 0)
-	for _, inf := range genTable {
-		gens = append(gens, inf.B_u, inf.B_uInv)
+		if args.Quotient {
+			log.Printf("will reduce generators modulo %v", f)
+		} else {
+			f = golsv.F2PolynomialZero
+		}
+		genTable := golsv.CartwrightStegerGeneratorsWithMatrixReps(f)
+		gens = make([]golsv.ElementCalG, 0)
+		for _, inf := range genTable {
+			gens = append(gens, inf.B_u, inf.B_uInv)
+		}
+		
+		if args.Determinant {
+			printGeneratorsDeterminants(args, f, genTable)
+		}
+		if args.GeneratorsLatexFile != "" {
+			produceGeneratorsLatexFile(args, genTable)
+		}
 	}
 		
 	//log.Printf("prepared generators:\n%s", gens)
-	if args.Determinant {
-		printGeneratorsDeterminants(args, f, genTable)
-	}
-	if args.GeneratorsLatexFile != "" {
-		produceGeneratorsLatexFile(args, genTable)
-	}
 	return gens
 }
 
@@ -292,6 +315,7 @@ type CalGCayleyExpanderArgs struct {
 	Determinant             bool
 	EdgeBasisFile           string
 	FillTriangles           bool
+	GeneratorsFile          string
 	GeneratorsLatexFile     string
 	Graph                   bool
 	MaxDepth                int
@@ -320,6 +344,7 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	flag.BoolVar(&args.Determinant, "determinant", args.Determinant, "print matrix representation and determinant of each generator")
 	flag.StringVar(&args.EdgeBasisFile, "edge-basis", args.EdgeBasisFile, "edge basis output file (text)")
 	flag.BoolVar(&args.FillTriangles, "fill-triangles", args.FillTriangles, "read vertex and edge bases, compute triangle basis and d2.txt")
+	flag.StringVar(&args.GeneratorsFile, "generators", args.GeneratorsFile, "read generators from file (one ElementCalG per line)")
 	flag.StringVar(&args.GeneratorsLatexFile, "generators-latex-file", args.GeneratorsLatexFile, "write table of generators to this file (latex)")
 	flag.BoolVar(&args.Graph, "graph", args.Graph, "do Cayley expansion to produce d1.txt")
 	flag.IntVar(&args.MaxDepth, "max-depth", args.MaxDepth, "maximum depth")

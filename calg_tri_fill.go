@@ -245,9 +245,9 @@ func (F *CalGTriangleFiller) triangleWorker(worker *triangleWorkerData, triangle
 			return
 		}
 		mutex.Lock()
-		if F.verbose {
-			log.Printf("worker %d synchronizing %d triangles", worker.id, len(worker.triangles))
-		}
+// 		if F.verbose {
+// 			log.Printf("worker %d synchronizing %d triangles", worker.id, len(worker.triangles))
+// 		}
 		for _, triangle := range worker.triangles {
 			if _, ok := triangleSet[triangle]; !ok {
 				triangleSet[triangle] = nil
