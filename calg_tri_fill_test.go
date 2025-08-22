@@ -11,7 +11,8 @@ func TestCalGTriangleFillerTriangleOrder(t *testing.T) {
 	var modulus F2Polynomial = NewF2Polynomial("111")
 	quotient := true
 	var observer CalGObserver
-	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer)
+	checkPSL := false
+	E := NewCalGCayleyExpander(gens, maxDepth, verbose, &modulus, quotient, observer, checkPSL)
 	E.Graph()
 	edgeChecks := true
 	F := NewCalGTriangleFiller(E.vertexBasis, E.edgeBasis, E.gens, E.verbose, E.modulus, E.quotient, edgeChecks)

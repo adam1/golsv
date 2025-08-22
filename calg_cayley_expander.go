@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// xxx rename CalGCayleyComplex?
-// xxx genericise to use any group with comparable element type?
 type CalGCayleyExpander struct {
 	gens                       []ElementCalG
 	maxDepth                   int
@@ -23,6 +21,8 @@ type CalGCayleyExpander struct {
 	edgeBasis                  []ZEdge[ElementCalG]
 	congruenceSubgroupElements []ElementCalG
 	observer                   CalGObserver
+	checkPSL                   bool
+	pslGenDepth                int
 }
 
 type CalGObserver interface {
@@ -45,7 +45,7 @@ type vertexWrapper struct {
 }
 
 func NewCalGCayleyExpander(generators []ElementCalG, maxDepth int,
-	verbose bool, modulus *F2Polynomial, quotient bool, observer CalGObserver) *CalGCayleyExpander {
+	verbose bool, modulus *F2Polynomial, quotient bool, observer CalGObserver, checkPSL bool) *CalGCayleyExpander {
 	if quotient {
 		k := modulus.MaxYFactor()
 		if k > 0 {
@@ -64,6 +64,7 @@ func NewCalGCayleyExpander(generators []ElementCalG, maxDepth int,
 		edgeSet:     make(map[ZEdge[ElementCalG]]any),
 		edgeBasis:   make([]ZEdge[ElementCalG], 0),
 		observer:    observer,
+		checkPSL:    checkPSL,
 	}
 }
 
@@ -141,10 +142,87 @@ func (E *CalGCayleyExpander) getOrSetVertex(u ElementCalG, genIndex int, uDepth 
 			log.Printf("depth=%d found=%d; subgroup element: %v", uDepth, len(E.congruenceSubgroupElements), u)
 		}
 	}
+	// xxx experimental
+	if E.checkPSL && E.quotient && (E.pslGenDepth == 0 || uDepth <= E.pslGenDepth) && !u.IsIdentity() {
+		if E.elementIsInPSL(u) {
+			if E.pslGenDepth == 0 {
+				E.pslGenDepth = uDepth
+			}
+			log.Printf("element at depth=%d is in PSL: %v", uDepth, u)
+			// xxx now we need to extract these elements (and possibly deduplicate them)
+		}
+	}
 	if E.observer != nil {
 		E.observer.Vertex(u, uId, uDepth)
 	}
 	return uId, true
+}
+
+func (E *CalGCayleyExpander) elementGeneratorPath(u ElementCalG) []int {
+	// walk backwards from u to the identity, collecting generator indices
+	v := u.Dup()
+	generatorIndices := make([]int, 0)
+	
+	for {
+		wrapper, ok := E.attendance[v]
+		if !ok {
+			panic(fmt.Sprintf("elementGeneratorPath: not in attendance: v=%v", v))
+		}
+		if wrapper.generator < 0 {
+			// reached identity (generator = -1)
+			break
+		}
+		generatorIndices = append(generatorIndices, wrapper.generator)
+		
+		// compute previous vertex toward identity
+		gInv := CartwrightStegerGeneratorsInverse(E.gens, wrapper.generator)
+		tmp := NewElementCalGIdentity()
+		tmp.Mul(v, gInv)
+		if E.quotient {
+			tmp = tmp.Modf(*E.modulus)
+		}
+		v.Copy(tmp)
+	}
+	
+	// reverse the slice to get forward path from identity to u
+	for i, j := 0, len(generatorIndices)-1; i < j; i, j = i+1, j-1 {
+		generatorIndices[i], generatorIndices[j] = generatorIndices[j], generatorIndices[i]
+	}
+	
+	return generatorIndices
+}
+
+func (E *CalGCayleyExpander) elementIsInPSL(u ElementCalG) bool {
+	// get the generator path from identity to u
+	genPath := E.elementGeneratorPath(u)
+	
+	// get matrix representations of generators
+	genTable := CartwrightStegerGeneratorsWithMatrixReps(*E.modulus)
+	
+	// compute the matrix representation of u by multiplying generator matrices
+	matRep := ProjMatF2Poly(MatF2PolyIdentity)
+	for _, genIndex := range genPath {
+		pairIndex := genIndex / 2
+		if pairIndex >= len(genTable) {
+			panic(fmt.Sprintf("generator pair index %d out of range", pairIndex))
+		}
+		
+		var genMatRep ProjMatF2Poly
+		if genIndex%2 == 0 {
+			// even index: use B_uRep (generator)
+			genMatRep = genTable[pairIndex].B_uRep
+		} else {
+			// odd index: use B_uInvRep (generator inverse)
+			genMatRep = genTable[pairIndex].B_uInvRep
+		}
+		
+		// multiply on the right: matRep = matRep * generator
+		matRep = matRep.Mul(genMatRep)
+	}
+	
+	// compute determinant and check if it's 1 mod f
+	det := matRep.Determinant()
+	return det.IsOneModf(*E.modulus)
 }
 
 func (E *CalGCayleyExpander) elementInverse(u ElementCalG) (ElementCalG, ZPath[ElementCalG]) {
