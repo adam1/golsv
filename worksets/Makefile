@@ -432,8 +432,8 @@ random-regular-clique-complex:
 circulant:
 	random-complex -dimC0 60480 -circulant -regular 14 -d1 d1.txt -d2 d2.txt 2>&1 | tee circulant.$(log)
 
-check-psl:
-	calg-cayley -graph -psl -quotient -modulus `cat modulus.txt` 2>&1 | tee check-psl.$(log)
+psl.txt:
+	calg-cayley -graph -psl psl.txt -quotient -modulus `cat modulus.txt` -max-depth 2 2>&1 | tee check-psl.$(log)
 
 really-clean:
 		rm -f B1.txt B1colops.txt B1rowops.txt B1smith.txt C.txt F.txt FG.txt G.txt K.txt KB1.txt KS.txt \

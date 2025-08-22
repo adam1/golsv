@@ -23,6 +23,7 @@ type CalGCayleyExpander struct {
 	observer                   CalGObserver
 	checkPSL                   bool
 	pslGenDepth                int
+	pslElements                []ElementCalG
 }
 
 type CalGObserver interface {
@@ -65,6 +66,7 @@ func NewCalGCayleyExpander(generators []ElementCalG, maxDepth int,
 		edgeBasis:   make([]ZEdge[ElementCalG], 0),
 		observer:    observer,
 		checkPSL:    checkPSL,
+		pslElements: make([]ElementCalG, 0),
 	}
 }
 
@@ -149,7 +151,7 @@ func (E *CalGCayleyExpander) getOrSetVertex(u ElementCalG, genIndex int, uDepth 
 				E.pslGenDepth = uDepth
 			}
 			log.Printf("element at depth=%d is in PSL: %v", uDepth, u)
-			// xxx now we need to extract these elements (and possibly deduplicate them)
+			E.pslElements = append(E.pslElements, u)
 		}
 	}
 	if E.observer != nil {
@@ -346,6 +348,10 @@ func (E *CalGCayleyExpander) setEdge(h, u ElementCalG) {
 
 func (E *CalGCayleyExpander) NumVertices() int {
 	return len(E.attendance)
+}
+
+func (E *CalGCayleyExpander) PslGenerators() []ElementCalG {
+	return E.pslElements
 }
 
 // xxx test?

@@ -33,9 +33,14 @@ func handleGraphMode(args *CalGCayleyExpanderArgs, f golsv.F2Polynomial, gens []
 	}
 	E := golsv.NewCalGCayleyExpander(gens,
 		args.MaxDepth, args.Verbose, &f, args.Quotient,
-		observer, args.Psl)
+		observer, args.PslFile != "")
 	graph := E.Graph()
 	writeGraphFiles(graph, args)
+	if args.PslFile != "" {
+		pslElements := E.PslGenerators()
+		log.Printf("writing %d PSL elements to %s", len(pslElements), args.PslFile)
+		golsv.WriteStringFile(pslElements, args.PslFile)
+	}
 	log.Printf("done")
 }
 
@@ -75,7 +80,7 @@ func handleSystolicCandidatesMode(args *CalGCayleyExpanderArgs, f golsv.F2Polyno
 	// generators.  their length is \ell_i in our terminology.
 	quotient := false
 	maxDepth := args.MaxDepth
-	E := golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil, args.Psl)
+	E := golsv.NewCalGCayleyExpander(gens, maxDepth, args.Verbose, &f, quotient, nil, args.PslFile != "")
 	E.Graph()
 	lifts := E.SystolicCandidateLifts()
 	lens := make(map[int]int)
@@ -292,7 +297,7 @@ type CalGCayleyExpanderArgs struct {
 	MaxDepth                int
 	MeshFile                string
 	Modulus                 string
-	Psl                     bool
+	PslFile                 string
 	Quotient                bool
 	SystolicCandidatesFile  string
 	TriangleBasisFile       string
@@ -320,7 +325,7 @@ func parseFlags() *CalGCayleyExpanderArgs {
 	flag.IntVar(&args.MaxDepth, "max-depth", args.MaxDepth, "maximum depth")
 	flag.StringVar(&args.MeshFile, "mesh", args.MeshFile, "mesh output file (OFF Object File Format text)")
 	flag.StringVar(&args.Modulus, "modulus", args.Modulus, "modulus corresponding to a principle congruence subgroup")
-	flag.BoolVar(&args.Psl, "psl", args.Psl, "check which elements are in PSL during Cayley expansion")
+	flag.StringVar(&args.PslFile, "psl", args.PslFile, "output file for PSL elements found during Cayley expansion")
 	flag.BoolVar(&args.Quotient, "quotient", args.Quotient, "construct finite quotient complex by first reducing generators modulo the given modulus")
 	flag.StringVar(&args.SystolicCandidatesFile, "systolic-candidates", args.SystolicCandidatesFile, "systolic candidates output file (text)")
 	flag.StringVar(&args.TriangleBasisFile, "triangle-basis", args.TriangleBasisFile, "triangle basis output file (text)")
