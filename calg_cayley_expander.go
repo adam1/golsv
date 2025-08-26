@@ -144,13 +144,12 @@ func (E *CalGCayleyExpander) getOrSetVertex(u ElementCalG, genIndex int, uDepth 
 			log.Printf("depth=%d found=%d; subgroup element: %v", uDepth, len(E.congruenceSubgroupElements), u)
 		}
 	}
-	// xxx experimental
 	if E.checkPSL && E.quotient && (E.pslGenDepth == 0 || uDepth <= E.pslGenDepth) && !u.IsIdentity() {
 		if E.elementIsInPSL(u) {
 			if E.pslGenDepth == 0 {
 				E.pslGenDepth = uDepth
 			}
-			log.Printf("element at depth=%d is in PSL: %v", uDepth, u)
+			//log.Printf("element at depth=%d is in PSL: %v", uDepth, u)
 			E.pslElements = append(E.pslElements, u)
 		}
 	}
@@ -351,6 +350,114 @@ func (E *CalGCayleyExpander) NumVertices() int {
 }
 
 func (E *CalGCayleyExpander) PslGenerators() []ElementCalG {
+	// experimental mode #1 - there is a 1:3 (14:42) ratio between
+	// generators of G (isomorphic to PGL) and elements of subgroup H
+	// of G (isomorphic to PSL). we find these at depth 2. we expect
+	// that for each generator s of G (depth 1), there are three
+	// elements a, b, c of H at depth 2 adjacent to s.  (note that a,
+	// b, c could and probably are adjacent to other generators s_j at
+	// depth 1.)  the experiment is to take the first such element a
+	// found for each generator s.  so we produce a list of 14
+	// elements in H.  do they generate H?
+	doExperiment1 := false
+	if doExperiment1 {
+		log.Printf("experiment 1: taking the first PSL element found at depth 2 for each generator s")
+		result := make([]ElementCalG, 0)
+		for i, s := range E.gens {
+			found := false
+			var h ElementCalG
+			for _, t := range E.gens {
+				prod := NewElementCalGIdentity()
+				prod.Mul(s, t)
+				if E.quotient {
+					prod = prod.Modf(*E.modulus)
+				}
+				for _, p := range E.pslElements {
+					if prod == p {
+						found = true
+						h = p
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if !found {
+				panic(fmt.Sprintf("did not find psl element for generator %d", i))
+			}
+			log.Printf("i=%d: %v", i, h)
+			result = append(result, h)
+		}
+		return result
+	}
+
+	// experiment2: iterate over genTable since its paired by inverses.
+	// attempt to form a symmetric set by taking each element and its inverse
+	doExperiment2 := false
+	if doExperiment2 {
+		log.Printf("experiment 2: taking the first PSL element pair (with inverse) found at depth 2 for each generator s with inverse")
+		result := make([]ElementCalG, 0)
+		resultMap := make(map[ElementCalG]any)
+		genTable := CartwrightStegerGeneratorsWithMatrixReps(*E.modulus)
+		for i, pairA := range genTable {
+			found := false
+			var h, hInv ElementCalG
+			for _, pairB := range genTable {
+				// xxx we may need to check AB, ABInv, AInvB, AInvBInv?
+				prod := NewElementCalGIdentity()
+				prod.Mul(pairA.B_u, pairB.B_u)
+				if E.quotient {
+					prod = prod.Modf(*E.modulus)
+				}
+				for _, p := range E.pslElements {
+					_, seen := resultMap[p]
+					if prod == p && !p.IsIdentity() && !seen {
+						found = true
+						h = p
+						hInv = NewElementCalGIdentity()
+						hInv.Mul(pairB.B_uInv, pairA.B_uInv)
+						if E.quotient {
+							hInv = hInv.Modf(*E.modulus)
+						}
+						break
+					}
+				}
+				if found {
+					break
+				}
+				// xxx for the second generator in the word, we may need to test both B_u and B_uInv
+				prod.Mul(pairA.B_u, pairB.B_uInv)
+				if E.quotient {
+					prod = prod.Modf(*E.modulus)
+				}
+				for _, p := range E.pslElements {
+					_, seen := resultMap[p]
+					if prod == p && !p.IsIdentity() && !seen {
+						found = true
+						h = p
+						hInv = NewElementCalGIdentity()
+						hInv.Mul(pairB.B_u, pairA.B_uInv)
+						if E.quotient {
+							hInv = hInv.Modf(*E.modulus)
+						}
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if !found {
+				panic(fmt.Sprintf("did not find psl elements for generator pair %d", i))
+			}
+			resultMap[h] = nil
+			resultMap[hInv] = nil
+			result = append(result, h, hInv)
+		}
+		return result
+	}
+
 	return E.pslElements
 }
 
