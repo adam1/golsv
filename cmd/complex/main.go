@@ -39,7 +39,9 @@ type ComplexArgs struct {
 }
 
 func parseFlags() ComplexArgs {
-	args := ComplexArgs{}
+	args := ComplexArgs{
+		Verbose: true,
+	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", "", "The file containing the D1 boundary matrix")
 	flag.StringVar(&args.D2File, "d2", "", "The file containing the D2 boundary matrix")
