@@ -98,12 +98,18 @@ def cmd_name(instance_id, args):
         print("Usage: name [instance] [new_name]")
         sys.exit(1)
 
-def cmd_state(instance_id):
+def cmd_state(instance_id, args):
     """Report the instance state"""
+    # Determine which instance to query
+    if len(args) > 0:
+        target_instance_id = resolve_instance_id(args[0])
+    else:
+        target_instance_id = instance_id
+    
     try:
         result = subprocess.run([
             'aws', 'ec2', 'describe-instances',
-            '--instance-id', instance_id,
+            '--instance-id', target_instance_id,
             '--query', 'Reservations[].Instances[].State.Name',
             '--output', 'text'
         ], capture_output=True, text=True, check=True)
@@ -208,12 +214,18 @@ def cmd_stop(instance_id, args):
         print(f"Error running AWS command: {e}")
         sys.exit(1)
 
-def cmd_ip(instance_id):
+def cmd_ip(instance_id, args):
     """Report the public IP address"""
+    # Determine which instance to query
+    if len(args) > 0:
+        target_instance_id = resolve_instance_id(args[0])
+    else:
+        target_instance_id = instance_id
+    
     try:
         result = subprocess.run([
             'aws', 'ec2', 'describe-instances',
-            '--instance-id', instance_id,
+            '--instance-id', target_instance_id,
             '--query', 'Reservations[].Instances[].PublicIpAddress',
             '--output', 'text'
         ], capture_output=True, text=True, check=True)
@@ -464,12 +476,18 @@ def cmd_list():
         print(f"Error parsing instance data: {e}")
         sys.exit(1)
 
-def cmd_clone_mod_reduce_volume(instance_id):
+def cmd_clone_mod_reduce_volume(instance_id, args):
     """Clone instance with reduced 100GB volume"""
-    print(f"Cloning instance {instance_id} with 100GB volume...")
+    # Determine which instance to clone
+    if len(args) > 0:
+        target_instance_id = resolve_instance_id(args[0])
+    else:
+        target_instance_id = instance_id
+    
+    print(f"Cloning instance {target_instance_id} with 100GB volume...")
     
     # Get source instance configuration
-    config = get_instance_config(instance_id)
+    config = get_instance_config(target_instance_id)
     print(f"Source instance config: AMI {config['image_id']}, type {config['instance_type']}")
     
     # Build run-instances command
@@ -531,12 +549,12 @@ def main():
         print("  list           - List all EC2 instances with ID, Name, and IP")
         print("  type [instance] [new_type] - Get or set instance type")
         print("  name [instance] [new_name] - Get or set instance Name tag")
-        print("  state          - Report the instance state")
+        print("  state [name|id] - Report the instance state (uses INSTANCE_ID if no arg)")
         print("  start [name|id] - Start the instance (uses INSTANCE_ID if no arg)")
         print("  stop [name|id] - Stop the instance (uses INSTANCE_ID if no arg)")
-        print("  ip             - Report the public IP address")
+        print("  ip [name|id]   - Report the public IP address (uses INSTANCE_ID if no arg)")
         print("  volume-size [size] - Report current volume size or resize to [size] GB")
-        print("  clone-mod-reduce-volume - Clone instance with 100GB volume")
+        print("  clone-mod-reduce-volume [name|id] - Clone instance with 100GB volume (uses INSTANCE_ID if no arg)")
         sys.exit(1)
     
     command = sys.argv[1]
@@ -559,17 +577,17 @@ def main():
     elif command == "name":
         cmd_name(instance_id, args)
     elif command == "state":
-        cmd_state(instance_id)
+        cmd_state(instance_id, args)
     elif command == "start":
         cmd_start(instance_id, args)
     elif command == "stop":
         cmd_stop(instance_id, args)
     elif command == "ip":
-        cmd_ip(instance_id)
+        cmd_ip(instance_id, args)
     elif command == "volume-size":
         cmd_volume_size(instance_id, args)
     elif command == "clone-mod-reduce-volume":
-        cmd_clone_mod_reduce_volume(instance_id)
+        cmd_clone_mod_reduce_volume(instance_id, args)
     else:
         print(f"Unknown command: {command}")
         print("Available commands: list, type, name, state, start, stop, ip, volume-size, clone-mod-reduce-volume")
