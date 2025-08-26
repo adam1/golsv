@@ -36,9 +36,67 @@ def cmd_type_set(instance_id, instance_type):
 def cmd_type(instance_id, args):
     """Report or set the instance type"""
     if len(args) == 0:
+        # No args: get type of current instance
         cmd_type_get(instance_id)
+    elif len(args) == 1:
+        # One arg: get type of specified instance
+        target_instance_id = resolve_instance_id(args[0])
+        cmd_type_get(target_instance_id)
+    elif len(args) == 2:
+        # Two args: set type of specified instance
+        target_instance_id = resolve_instance_id(args[0])
+        cmd_type_set(target_instance_id, args[1])
     else:
-        cmd_type_set(instance_id, args[0])
+        print("Usage: type [instance] [new_type]")
+        sys.exit(1)
+
+def cmd_name_get(instance_id):
+    """Report the instance Name tag"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--instance-id', instance_id,
+            '--query', 'Reservations[].Instances[].Tags[?Key==`Name`].Value',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        name = result.stdout.strip()
+        if name and name != "None":
+            print(name)
+        else:
+            print("(no name)")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_name_set(instance_id, name):
+    """Set the instance Name tag"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'create-tags',
+            '--resources', instance_id,
+            '--tags', f'Key=Name,Value={name}'
+        ], capture_output=True, text=True, check=True)
+        print(f"Instance name set to '{name}'")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+
+def cmd_name(instance_id, args):
+    """Report or set the instance Name tag"""
+    if len(args) == 0:
+        # No args: get name of current instance
+        cmd_name_get(instance_id)
+    elif len(args) == 1:
+        # One arg: get name of specified instance
+        target_instance_id = resolve_instance_id(args[0])
+        cmd_name_get(target_instance_id)
+    elif len(args) == 2:
+        # Two args: set name of specified instance
+        target_instance_id = resolve_instance_id(args[0])
+        cmd_name_set(target_instance_id, args[1])
+    else:
+        print("Usage: name [instance] [new_name]")
+        sys.exit(1)
 
 def cmd_state(instance_id):
     """Report the instance state"""
@@ -103,21 +161,27 @@ def cmd_start(instance_id):
         print(f"Error running AWS command: {e}")
         sys.exit(1)
 
-def cmd_stop(instance_id):
+def cmd_stop(instance_id, args):
     """Stop the instance and wait until it's stopped"""
+    # Determine which instance to stop
+    if len(args) > 0:
+        target_instance_id = resolve_instance_id(args[0])
+    else:
+        target_instance_id = instance_id
+    
     try:
         # Issue stop command
         result = subprocess.run([
             'aws', 'ec2', 'stop-instances',
-            '--instance-ids', instance_id
+            '--instance-ids', target_instance_id
         ], capture_output=True, text=True, check=True)
-        print(f"Stopping instance {instance_id}")
+        print(f"Stopping instance {target_instance_id}")
         
         # Poll state until stopped
         while True:
             result = subprocess.run([
                 'aws', 'ec2', 'describe-instances',
-                '--instance-id', instance_id,
+                '--instance-id', target_instance_id,
                 '--query', 'Reservations[].Instances[].State.Name',
                 '--output', 'text'
             ], capture_output=True, text=True, check=True)
@@ -300,6 +364,100 @@ def get_instance_config(instance_id):
         print(f"Error parsing instance data: {e}")
         sys.exit(1)
 
+def resolve_instance_id(identifier):
+    """Resolve instance name or ID to actual instance ID"""
+    # If it looks like an instance ID, return as-is
+    if identifier.startswith('i-') and len(identifier) == 19:
+        return identifier
+    
+    # Otherwise, treat it as a name and look up by Name tag
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--filters', f'Name=tag:Name,Values={identifier}',
+            '--query', 'Reservations[].Instances[?State.Name!=`terminated`].InstanceId',
+            '--output', 'json'
+        ], capture_output=True, text=True, check=True)
+        
+        data = json.loads(result.stdout)
+        instance_ids = [item for sublist in data for item in sublist]  # Flatten
+        
+        if len(instance_ids) == 0:
+            print(f"Error: No instance found with name '{identifier}'")
+            sys.exit(1)
+        elif len(instance_ids) > 1:
+            print(f"Error: Multiple instances found with name '{identifier}': {', '.join(instance_ids)}")
+            sys.exit(1)
+        
+        return instance_ids[0]
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing instance data: {e}")
+        sys.exit(1)
+
+def cmd_list():
+    """List all EC2 instances with ID, Name, and IP"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--output', 'json'
+        ], capture_output=True, text=True, check=True)
+        
+        data = json.loads(result.stdout)
+        
+        instances = []
+        for reservation in data['Reservations']:
+            for instance in reservation['Instances']:
+                # Skip terminated instances
+                if instance['State']['Name'] == 'terminated':
+                    continue
+                    
+                instance_id = instance['InstanceId']
+                state = instance['State']['Name']
+                instance_type = instance['InstanceType']
+                
+                # Get Name tag if it exists
+                name = None
+                for tag in instance.get('Tags', []):
+                    if tag['Key'] == 'Name':
+                        name = tag['Value']
+                        break
+                
+                # Get public IP
+                public_ip = instance.get('PublicIpAddress', 'None')
+                
+                instances.append({
+                    'id': instance_id,
+                    'name': name,
+                    'state': state,
+                    'type': instance_type,
+                    'ip': public_ip
+                })
+        
+        if not instances:
+            print("No instances found")
+            return
+            
+        # Print header
+        print(f"{'Instance ID':<19} {'Name':<20} {'Type':<12} {'State':<10} {'Public IP'}")
+        print("-" * 85)
+        
+        # Print instances
+        for inst in instances:
+            name_display = inst['name'] if inst['name'] else '(no name)'
+            ip_display = inst['ip'] if inst['ip'] != 'None' else '(none)'
+            print(f"{inst['id']:<19} {name_display:<20} {inst['type']:<12} {inst['state']:<10} {ip_display}")
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing instance data: {e}")
+        sys.exit(1)
+
 def cmd_clone_mod_reduce_volume(instance_id):
     """Clone instance with reduced 100GB volume"""
     print(f"Cloning instance {instance_id} with 100GB volume...")
@@ -364,10 +522,12 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: ec2 <command> [args]")
         print("Commands:")
-        print("  type [type]    - Report current instance type or set to [type]")
+        print("  list           - List all EC2 instances with ID, Name, and IP")
+        print("  type [instance] [new_type] - Get or set instance type")
+        print("  name [instance] [new_name] - Get or set instance Name tag")
         print("  state          - Report the instance state")
         print("  start          - Start the instance")
-        print("  stop           - Stop the instance")
+        print("  stop [name|id] - Stop the instance (uses INSTANCE_ID if no arg)")
         print("  ip             - Report the public IP address")
         print("  volume-size [size] - Report current volume size or resize to [size] GB")
         print("  clone-mod-reduce-volume - Clone instance with 100GB volume")
@@ -376,7 +536,12 @@ def main():
     command = sys.argv[1]
     args = sys.argv[2:]
     
-    # Check for required environment variable
+    # Commands that don't require INSTANCE_ID
+    if command == "list":
+        cmd_list()
+        return
+    
+    # Check for required environment variable for other commands
     instance_id = os.environ.get('INSTANCE_ID')
     if not instance_id:
         print("Error: INSTANCE_ID environment variable is not set")
@@ -385,12 +550,14 @@ def main():
     # Command dispatch
     if command == "type":
         cmd_type(instance_id, args)
+    elif command == "name":
+        cmd_name(instance_id, args)
     elif command == "state":
         cmd_state(instance_id)
     elif command == "start":
         cmd_start(instance_id)
     elif command == "stop":
-        cmd_stop(instance_id)
+        cmd_stop(instance_id, args)
     elif command == "ip":
         cmd_ip(instance_id)
     elif command == "volume-size":
@@ -399,7 +566,7 @@ def main():
         cmd_clone_mod_reduce_volume(instance_id)
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: type, state, start, stop, ip, volume-size, clone-mod-reduce-volume")
+        print("Available commands: list, type, name, state, start, stop, ip, volume-size, clone-mod-reduce-volume")
         sys.exit(1)
 
 if __name__ == "__main__":
