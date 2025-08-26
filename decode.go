@@ -211,10 +211,7 @@ func (D *CoboundaryDecoder[T]) chooseVertices(f BinaryVector, triLocalToGlobal m
 func (D *CoboundaryDecoder[T]) incidentTriangles(edgeIndices []int) []int {
 	set := make(map[int]struct{})
 	for _, e := range edgeIndices {
-		incidentTriangles, ok := D.edgeToTriangles[e]
-		if !ok {
-			panic("edge not found in edgeToTriangles map")
-		}
+		incidentTriangles, _ := D.edgeToTriangles[e]
 		for _, t := range incidentTriangles {
 			set[t] = struct{}{}
 		}
@@ -297,10 +294,7 @@ func (D *CoboundaryDecoder[T]) coboundaryOfEdges(edgeBits BinaryVector, edgeSet 
 			continue
 		}
 		edgeIndex := edgeSet[i]
-		incidentTriangles, ok := D.edgeToTriangles[edgeIndex]
-		if !ok {
-			panic("edge not found in edgeToTriangles map")
-		}
+		incidentTriangles, _ := D.edgeToTriangles[edgeIndex]
 		for _, t := range incidentTriangles {
 			tBitIndex, ok := triGlobalToLocal[t]
 			if !ok {
