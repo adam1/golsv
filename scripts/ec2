@@ -112,21 +112,27 @@ def cmd_state(instance_id):
         print(f"Error running AWS command: {e}")
         sys.exit(1)
 
-def cmd_start(instance_id):
+def cmd_start(instance_id, args):
     """Start the instance and wait until it's running, then report IP"""
+    # Determine which instance to start
+    if len(args) > 0:
+        target_instance_id = resolve_instance_id(args[0])
+    else:
+        target_instance_id = instance_id
+    
     try:
         # Issue start command
         result = subprocess.run([
             'aws', 'ec2', 'start-instances',
-            '--instance-ids', instance_id
+            '--instance-ids', target_instance_id
         ], capture_output=True, text=True, check=True)
-        print(f"Starting instance {instance_id}")
+        print(f"Starting instance {target_instance_id}")
         
         # Poll state until running
         while True:
             result = subprocess.run([
                 'aws', 'ec2', 'describe-instances',
-                '--instance-id', instance_id,
+                '--instance-id', target_instance_id,
                 '--query', 'Reservations[].Instances[].State.Name',
                 '--output', 'text'
             ], capture_output=True, text=True, check=True)
@@ -140,7 +146,7 @@ def cmd_start(instance_id):
                 # Get and report public IP
                 ip_result = subprocess.run([
                     'aws', 'ec2', 'describe-instances',
-                    '--instance-id', instance_id,
+                    '--instance-id', target_instance_id,
                     '--query', 'Reservations[].Instances[].PublicIpAddress',
                     '--output', 'text'
                 ], capture_output=True, text=True, check=True)
@@ -526,7 +532,7 @@ def main():
         print("  type [instance] [new_type] - Get or set instance type")
         print("  name [instance] [new_name] - Get or set instance Name tag")
         print("  state          - Report the instance state")
-        print("  start          - Start the instance")
+        print("  start [name|id] - Start the instance (uses INSTANCE_ID if no arg)")
         print("  stop [name|id] - Stop the instance (uses INSTANCE_ID if no arg)")
         print("  ip             - Report the public IP address")
         print("  volume-size [size] - Report current volume size or resize to [size] GB")
@@ -555,7 +561,7 @@ def main():
     elif command == "state":
         cmd_state(instance_id)
     elif command == "start":
-        cmd_start(instance_id)
+        cmd_start(instance_id, args)
     elif command == "stop":
         cmd_stop(instance_id, args)
     elif command == "ip":
