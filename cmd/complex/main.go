@@ -58,7 +58,7 @@ func parseFlags() ComplexArgs {
 	flag.StringVar(&args.OutEdgeBasisFile, "out-edge-basis", "", "The output file for the edge basis of the subcomplex")
 	flag.StringVar(&args.OutTriangleBasisFile, "out-triangle-basis", "", "The output file for the triangle basis of the subcomplex")
 	flag.StringVar(&args.TriangleBasisFile, "triangle-basis", "", "The file containing the triangle basis")
-	flag.BoolVar(&args.Verbose, "verbose", false, "Print verbose output")
+	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "Print verbose output")
 	flag.StringVar(&args.VertexBasisFile, "vertex-basis", "", "The file containing the vertex basis")
 	flag.Parse()
 
