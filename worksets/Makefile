@@ -439,7 +439,7 @@ psl-cayley:
 	calg-cayley -graph -generators psl.txt -quotient -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt\
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt 2>&1 | tee psl-cayley.$(log)
 
-psl-fill-triangles: d1.txt
+psl-fill: d1.txt
 	calg-cayley -fill-triangles -generators psl.txt -quotient -modulus `cat modulus.txt` -d1 d1.txt -d2 d2.txt \
 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt \
 		-triangle-basis triangle-basis.txt 2>&1 | tee psl-cayley-fill-triangles.$(log)
