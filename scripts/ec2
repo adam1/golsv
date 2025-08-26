@@ -4,6 +4,7 @@ import os
 import sys
 import subprocess
 import time
+import json
 
 def cmd_type_get(instance_id):
     """Report the instance type"""
@@ -265,6 +266,100 @@ def cmd_volume_size(instance_id, args):
     else:
         cmd_volume_size_set(volume_id, args[0])
 
+def get_instance_config(instance_id):
+    """Get instance configuration needed for cloning"""
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--instance-id', instance_id,
+            '--output', 'json'
+        ], capture_output=True, text=True, check=True)
+        
+        data = json.loads(result.stdout)
+        if not data['Reservations'] or not data['Reservations'][0]['Instances']:
+            print("Error: Instance not found")
+            sys.exit(1)
+            
+        instance = data['Reservations'][0]['Instances'][0]
+        
+        config = {
+            'image_id': instance['ImageId'],
+            'instance_type': instance['InstanceType'], 
+            'key_name': instance.get('KeyName'),
+            'security_groups': [sg['GroupId'] for sg in instance['SecurityGroups']],
+            'subnet_id': instance.get('SubnetId'),
+            'iam_role': instance.get('IamInstanceProfile', {}).get('Arn')
+        }
+        
+        return config
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing instance data: {e}")
+        sys.exit(1)
+
+def cmd_clone_mod_reduce_volume(instance_id):
+    """Clone instance with reduced 100GB volume"""
+    print(f"Cloning instance {instance_id} with 100GB volume...")
+    
+    # Get source instance configuration
+    config = get_instance_config(instance_id)
+    print(f"Source instance config: AMI {config['image_id']}, type {config['instance_type']}")
+    
+    # Build run-instances command
+    cmd_args = [
+        'aws', 'ec2', 'run-instances',
+        '--image-id', config['image_id'],
+        '--instance-type', config['instance_type'],
+        '--block-device-mappings', 
+        '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":100,"VolumeType":"gp3","DeleteOnTermination":true}}]'
+    ]
+    
+    # Add optional parameters
+    if config['key_name']:
+        cmd_args.extend(['--key-name', config['key_name']])
+    
+    if config['security_groups']:
+        cmd_args.extend(['--security-group-ids'] + config['security_groups'])
+        
+    if config['subnet_id']:
+        cmd_args.extend(['--subnet-id', config['subnet_id']])
+        
+    if config['iam_role']:
+        role_name = config['iam_role'].split('/')[-1]
+        cmd_args.extend(['--iam-instance-profile', f'Name={role_name}'])
+    
+    try:
+        result = subprocess.run(cmd_args, capture_output=True, text=True, check=True)
+        
+        # Parse instance ID from response
+        instance_result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--filters', 'Name=instance-state-name,Values=pending,running',
+            '--query', 'Reservations[].Instances[].[InstanceId,LaunchTime]',
+            '--output', 'text'
+        ], capture_output=True, text=True, check=True)
+        
+        # Get the most recently launched instance
+        lines = instance_result.stdout.strip().split('\n')
+        if lines:
+            newest_instance = sorted(lines, key=lambda x: x.split('\t')[1])[-1]
+            new_instance_id = newest_instance.split('\t')[0]
+            print(f"New instance created: {new_instance_id}")
+            print(f"Volume size: 100GB")
+            return new_instance_id
+        else:
+            print("Error: Could not determine new instance ID")
+            sys.exit(1)
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error creating instance: {e}")
+        if e.stderr:
+            print(f"Error details: {e.stderr}")
+        sys.exit(1)
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: ec2 <command> [args]")
@@ -275,6 +370,7 @@ def main():
         print("  stop           - Stop the instance")
         print("  ip             - Report the public IP address")
         print("  volume-size [size] - Report current volume size or resize to [size] GB")
+        print("  clone-mod-reduce-volume - Clone instance with 100GB volume")
         sys.exit(1)
     
     command = sys.argv[1]
@@ -299,9 +395,11 @@ def main():
         cmd_ip(instance_id)
     elif command == "volume-size":
         cmd_volume_size(instance_id, args)
+    elif command == "clone-mod-reduce-volume":
+        cmd_clone_mod_reduce_volume(instance_id)
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: type, state, start, stop, ip, volume-size")
+        print("Available commands: type, state, start, stop, ip, volume-size, clone-mod-reduce-volume")
         sys.exit(1)
 
 if __name__ == "__main__":
