@@ -420,7 +420,7 @@ simplicial-cosystole: d1.txt d2.txt Z1.txt Z^1.txt B^1.txt
 # 		-vertex-basis vertex-basis.txt -edge-basis edge-basis.txt -triangle-basis triangle-basis.txt \
 # 		-modulus `cat modulus.txt` -verbose | tee simp-cosys-coho-orbits.$(log)
 
-coboundary-decoder-threshold: d1.txt d2.txt Z1.txt
+coboundary-threshold: d1.txt d2.txt Z1.txt
 	coboundary-decoder -find-threshold -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -verbose -results results-$(log).json 2>&1 | tee coboundary-decoder-threshold.$(log)
 
 random-clique-complex:
