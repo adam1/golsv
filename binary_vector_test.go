@@ -270,3 +270,36 @@ func TestEnumerateBinaryVectors(t *testing.T) {
 	}
 }
 
+func TestCountBits64(t *testing.T) {
+	tests := []struct {
+		input []byte
+		want  int
+	}{
+		{input: []byte{}, want: 0},
+		{input: []byte{0x00}, want: 0},
+		{input: []byte{0x01}, want: 1},
+		{input: []byte{0x03}, want: 2},
+		{input: []byte{0x07}, want: 3},
+		{input: []byte{0x0F}, want: 4},
+		{input: []byte{0x1F}, want: 5},
+		{input: []byte{0x3F}, want: 6},
+		{input: []byte{0x7F}, want: 7},
+		{input: []byte{0xFF}, want: 8},
+		{input: []byte{0x00, 0x01}, want: 1},
+		{input: []byte{0xFF, 0xFF}, want: 16},
+		{input: []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, want: 64},
+		{input: []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01}, want: 65},
+		{input: []byte{0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80}, want: 8},
+		{input: []byte{0x55, 0xAA}, want: 8},
+		{input: []byte{0x49, 0x92}, want: 6},
+		{input: []byte{0xB6, 0x6D}, want: 10},
+		{input: []byte{0x0F, 0xF0, 0x33, 0xCC, 0x99, 0x66, 0x5A, 0xA5, 0x01, 0x80}, want: 34},
+	}
+	for i, tt := range tests {
+		got := countBits64(tt.input)
+		if got != tt.want {
+			t.Errorf("%d: countBits64(%x) = %d, want %d", i, tt.input, got, tt.want)
+		}
+	}
+}
+

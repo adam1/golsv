@@ -3,6 +3,7 @@ package golsv
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"math/bits"
@@ -206,13 +207,21 @@ func (v BinaryVector) Toggle(i int) {
 	v.Set(i, 1-v.Get(i))
 }
 
-// xxx test
 func (v BinaryVector) Weight() int {
-	weight := 0
-	for _, b := range v.data {
-		weight += bits.OnesCount8(b)
+	return countBits64(v.data)
+}
+
+// xxx test
+func countBits64(b []byte) int {
+	n := len(b)
+	total := 0
+	for i := 0; i+8 <= n; i += 8 {
+		total += bits.OnesCount64(binary.LittleEndian.Uint64(b[i:]))
 	}
-	return weight
+	for i := n - n%8; i < n; i++ {
+		total += bits.OnesCount8(b[i])
+	}
+	return total
 }
 
 func randomBitVector(length int) BinaryVector {
