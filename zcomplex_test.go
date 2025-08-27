@@ -1526,6 +1526,24 @@ func TestZComplexVertexToEdgeIncidenceMap(t *testing.T) {
 				2: {1, 2},
 			},
 		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2}, {2, 3}}),
+			map[int][]int{
+				0: {0},
+				1: {0, 1},
+				2: {1, 2},
+				3: {2},
+			},
+		},
+		{
+			NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {0, 1, 3}}),
+			map[int][]int{
+				0: {0, 1, 2},
+				1: {0, 3, 4},
+				2: {1, 3},
+				3: {2, 4},
+			},
+		},
 	}
 	for n, test := range tests {
 		got := test.C.VertexToEdgeIncidenceMap()

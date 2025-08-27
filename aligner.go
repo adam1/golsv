@@ -92,7 +92,7 @@ func (a *Aligner) Align() BinaryMatrix {
 	Z := a.Z1
 	rows := Z.NumRows()
 
-	statInterval := 1
+	statInterval := 100
 	timeStart := time.Now()
 	timeLastReport := timeStart
 	doneLastReport := 0
@@ -113,9 +113,9 @@ func (a *Aligner) Align() BinaryMatrix {
 			cRate := float64(doneLastReport) / reportElapsed.Seconds()
 			tRate := float64(j) / totalElapsed.Seconds()
 			if a.verbose {
-				log.Printf("align: processed %d/%d (%.2f%%) cols; crate=%1.0f trate=%1.0f found=%d",
+				log.Printf("align: processed %d/%d (%.2f%%) cols; crate=%1.0f trate=%1.0f found=%d minWeight=%d",
 					j, Z.NumColumns(), 100.0 * float64(j) / float64(Z.NumColumns()),
-					cRate, tRate, a.U.NumColumns())
+					cRate, tRate, a.U.NumColumns(), a.minWeight)
 			}
 			timeLastReport = now
 			doneLastReport = 0
@@ -134,9 +134,9 @@ func (a *Aligner) Align() BinaryMatrix {
 
 func (a *Aligner) handleIndependentVector(v BinaryMatrix, w BinaryMatrix, Brank int, k int) {
 	a.U.(*Sparse).AppendColumn(v)
-	if a.verbose {
-		log.Printf("found independent vector; found=%d total", a.U.NumColumns())
-	}
+// 	if a.verbose {
+// 		log.Printf("found independent vector; found=%d total", a.U.NumColumns())
+// 	}
 	// sneak peak at systole
 	weight := v.(*Sparse).ColumnWeight(0)
 	if weight < a.minWeight {
@@ -147,13 +147,13 @@ func (a *Aligner) handleIndependentVector(v BinaryMatrix, w BinaryMatrix, Brank 
 	}
 	a.B1smith.AppendColumn(w)
 	a.makePivot(Brank, k)
-	if a.verbose {
-		log.Printf("clearing column")
-	}
+// 	if a.verbose {
+// 		log.Printf("clearing column")
+// 	}
 	a.clearColumn(Brank)
-	if a.verbose {
-		log.Printf("done clearing column")
-	}
+// 	if a.verbose {
+// 		log.Printf("done clearing column")
+// 	}
 }
 
 func (a *Aligner) makePivot(Brank int, k int) {
@@ -181,12 +181,12 @@ func (a *Aligner) clearColumn(Brank int) {
 		row++
 		ops++
 		if ops % reportInterval == 0 {
-			if a.verbose {
-				log.Printf("did %d row ops", ops)
-			}
+// 			if a.verbose {
+// 				log.Printf("did %d row ops", ops)
+// 			}
 		}
 	}
-	if a.verbose {
-		log.Printf("did %d row ops", ops)
-	}
+// 	if a.verbose {
+// 		log.Printf("did %d row ops", ops)
+// 	}
 }

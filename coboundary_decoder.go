@@ -1,10 +1,8 @@
 package golsv
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"time"
 )
 
@@ -76,10 +74,10 @@ func (D *CoboundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorVe
 	if syndrome.Length() != D.complex.NumTriangles() {
 		panic("syndrome length does not match number of triangles")
 	}
-	if syndrome.IsZero() {
-		return nil, NewBinaryVector(D.complex.NumEdges())
-	}
 	curError := NewBinaryVector(D.complex.NumEdges())
+	if syndrome.IsZero() {
+		return nil, curError
+	}
 	f := syndrome
 	fWeight := f.Weight()
 	originalFWeight := fWeight
@@ -319,6 +317,7 @@ func (D *CoboundaryDecoder[T]) Length() int {
 	return D.complex.NumEdges()
 }
 
+// e is typically an error vector and c is a decoded error vector
 func (D *CoboundaryDecoder[T]) SameCoset(e, c BinaryVector) bool {
 	u := e.Add(c)
 	// Check whether diff u is in the image of $\delta_0$.
@@ -343,184 +342,6 @@ func (D *CoboundaryDecoder[T]) Syndrome(error BinaryVector) BinaryVector {
 	return D.delta_1.MultiplyRight(error.SparseBinaryMatrix()).ColumnVector(0)
 }
 
-type Decoder interface {
-	Decode(syndrome BinaryVector) (err error, errorVec BinaryVector)
-	Length() int
-	SameCoset(e, c BinaryVector) bool
-	Syndrome(error BinaryVector) BinaryVector
+func (D *CoboundaryDecoder[T]) Name() string {
+	return "CoboundaryDecoder"
 }
-
-type DecoderSampler struct {
-	decoder Decoder
-	errorWeight int
-	samplesPerWeight int
-	results DecoderSamplerResults
-	resultsFilename string
-	verbose bool
-	failFast bool
-}
-
-type DecoderSamplerResults struct {
-	ErrorWeight int
-	SuccessCount int
-	FailCount int
-	EqualCount int
-	SameCosetCount int
-}
-
-func NewDecoderSampler(decoder Decoder, errorWeight int, samplesPerWeight int, resultsFilename string, verbose bool, failFast bool) *DecoderSampler {
-	return &DecoderSampler{
-		decoder: decoder,
-		errorWeight: errorWeight,
-		samplesPerWeight: samplesPerWeight,
-		resultsFilename: resultsFilename,
-		verbose: verbose,
-		failFast: failFast,
-	}
-}
-
-func (S *DecoderSampler) Run() {
-	n := S.decoder.Length()
-	log.Printf("Sampling error weight=%d samples=%d", S.errorWeight, S.samplesPerWeight)
-	S.results.ErrorWeight = S.errorWeight
-	S.results.SuccessCount = 0
-	S.results.EqualCount = 0
-	S.results.SameCosetCount = 0
-	S.results.FailCount = 0
-	for i := 0; i < S.samplesPerWeight; i++ {
-		errorVec := NewBinaryVector(n)
-		errorVec.RandomizeWithWeight(S.errorWeight)
-		syndrome := S.decoder.Syndrome(errorVec)
-		before := time.Now()
-		err, decodedErrorVec := S.decoder.Decode(syndrome)
-		status := "failure"
-		now := time.Now()
-		elapsed := now.Sub(before)
-		if err != nil {
-			S.results.FailCount++
-		} else if decodedErrorVec.Equal(errorVec) {
-			status = "success"
-			S.results.SuccessCount++
-			S.results.EqualCount++
-		} else if S.decoder.SameCoset(errorVec, decodedErrorVec) {
-			status = "success"
-			S.results.SuccessCount++
-			S.results.SameCosetCount++
-		} else {
-			S.results.FailCount++
-		}
-		if S.verbose {
-			log.Printf("Decode %s: errweight=%d equal=%d sameCoset=%d fail=%d success=%d/%d/%d successrate=%1.1f%% dur=%d",
-				status, S.errorWeight, S.results.EqualCount, S.results.SameCosetCount, S.results.FailCount, S.results.SuccessCount, i+1, S.samplesPerWeight,
-				float64(S.results.SuccessCount*100)/float64(i+1), int(elapsed.Seconds()))
-		}
-		S.writeResultsFile()
-		if S.failFast && S.results.FailCount > 0 {
-			if S.verbose {
-				log.Printf("FailFast mode: stopping after first failure at sample %d/%d", i+1, S.samplesPerWeight)
-			}
-			break
-		}
-	}
-}
-
-func (S *DecoderSampler) writeResultsFile() {
-	if S.resultsFilename == "" {
-		return
-	}
-	jsonData, err := json.MarshalIndent(S.results, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	err = os.WriteFile(S.resultsFilename, jsonData, 0644)
-	if err != nil {
-		panic(err)
-	}
-	log.Printf("Wrote file %s", S.resultsFilename)
-}
-
-type DecoderThresholdFinder struct {
-	decoder Decoder
-	minErrorWeight int
-	maxErrorWeight int
-	samplesPerWeight int
-	verbose bool
-}
-
-type DecoderThresholdResults struct {
-	ThresholdWeight int
-	MaxSuccessWeight int
-	MinFailureWeight int
-	TotalSamples int
-	BinarySearchSteps int
-}
-
-func NewDecoderThresholdFinder(decoder Decoder, minErrorWeight int, maxErrorWeight int, samplesPerWeight int, verbose bool) *DecoderThresholdFinder {
-	return &DecoderThresholdFinder{
-		decoder: decoder,
-		minErrorWeight: minErrorWeight,
-		maxErrorWeight: maxErrorWeight,
-		samplesPerWeight: samplesPerWeight,
-		verbose: verbose,
-	}
-}
-
-func (F *DecoderThresholdFinder) FindThreshold() DecoderThresholdResults {
-	results := DecoderThresholdResults{
-		ThresholdWeight: -1,
-		MaxSuccessWeight: -1,
-		MinFailureWeight: -1,
-		TotalSamples: 0,
-		BinarySearchSteps: 0,
-	}
-	
-	left := F.minErrorWeight
-	right := F.maxErrorWeight
-	maxSuccessWeight := -1
-	minFailureWeight := -1
-	
-	log.Printf("Starting binary search for decoder threshold between weights %d and %d", left, right)
-	
-	for left <= right {
-		results.BinarySearchSteps++
-		mid := (left + right) / 2
-		
-		if F.verbose {
-			log.Printf("Binary search step %d: testing weight %d (range [%d, %d])", results.BinarySearchSteps, mid, left, right)
-		}
-		
-		sampler := NewDecoderSampler(F.decoder, mid, F.samplesPerWeight, "", F.verbose, true)
-		sampler.Run()
-		actualSamples := sampler.results.SuccessCount + sampler.results.FailCount
-		results.TotalSamples += actualSamples
-		
-		successRate := float64(sampler.results.SuccessCount) / float64(actualSamples)
-		
-		if F.verbose {
-			log.Printf("Weight %d: success rate = %1.2f%% (%d/%d)", mid, successRate*100, sampler.results.SuccessCount, actualSamples)
-		}
-		
-		if sampler.results.FailCount == 0 {
-			maxSuccessWeight = mid
-			left = mid + 1
-		} else {
-			minFailureWeight = mid
-			right = mid - 1
-		}
-	}
-	
-	results.MaxSuccessWeight = maxSuccessWeight
-	results.MinFailureWeight = minFailureWeight
-	
-	if maxSuccessWeight != -1 && minFailureWeight != -1 {
-		results.ThresholdWeight = maxSuccessWeight
-	} else if minFailureWeight != -1 {
-		results.ThresholdWeight = minFailureWeight
-	}
-	
-	log.Printf("Threshold search completed: maxSuccessWeight=%d, minFailureWeight=%d, threshold=%d, steps=%d, totalSamples=%d", 
-		results.MaxSuccessWeight, results.MinFailureWeight, results.ThresholdWeight, results.BinarySearchSteps, results.TotalSamples)
-	
-	return results
-}
-
