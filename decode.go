@@ -76,10 +76,10 @@ func (D *CoboundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorVe
 	if syndrome.Length() != D.complex.NumTriangles() {
 		panic("syndrome length does not match number of triangles")
 	}
-	if syndrome.IsZero() {
-		return nil, NewBinaryVector(D.complex.NumEdges())
-	}
 	curError := NewBinaryVector(D.complex.NumEdges())
+	if syndrome.IsZero() {
+		return nil, curError
+	}
 	f := syndrome
 	fWeight := f.Weight()
 	originalFWeight := fWeight
@@ -319,6 +319,7 @@ func (D *CoboundaryDecoder[T]) Length() int {
 	return D.complex.NumEdges()
 }
 
+// e is typically an error vector and c is a decoded error vector
 func (D *CoboundaryDecoder[T]) SameCoset(e, c BinaryVector) bool {
 	u := e.Add(c)
 	// Check whether diff u is in the image of $\delta_0$.
