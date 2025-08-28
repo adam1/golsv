@@ -178,7 +178,19 @@ func (D *SSFBoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorV
 				found = true
 				fWeight = f.Weight()
 				if D.verbose {
-					log.Printf("xxx round=%d after v=%d fWeight=%d", round, i, fWeight)
+					log.Printf("xxx round=%d after greedy v=%d fWeight=%d", round, i, fWeight)
+				}
+			}
+		}
+		if !found {
+			// try a round with flipping 2 edges on and 1 edge off
+			for i, _ := range vertexBasis {
+				if D.processVertexFlip21(i, &f, &curError) {
+					found = true
+					fWeight = f.Weight()
+					if D.verbose {
+						log.Printf("xxx round=%d after flip21 v=%d fWeight=%d", round, i, fWeight)
+					}
 				}
 			}
 		}
@@ -243,6 +255,71 @@ func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVe
 	}
 	return true
 }
+
+// xxx EXPERIMENTAL
+//
+// processVertexFlip21 attempts to turn two edges off whose other
+// endpoints were on in the syndrome and turn one edge on whose other
+// endpoint was off in the syndrome.
+//
+// Returns true if any edges were flipped, false otherwise
+func (D *SSFBoundaryDecoder[T]) processVertexFlip21(vertexIndex int, f *BinaryVector, curError *BinaryVector) bool {
+	incidentEdges := D.vertexToEdges[vertexIndex]
+	edgeBasis := D.graph.EdgeBasis()
+	vertexIndexMap := D.graph.VertexIndex()
+	vertexBasis := D.graph.VertexBasis()
+	vertex_v := vertexBasis[vertexIndex]
+	
+	edgesFromOnToFlip := []int{}
+	edgesFromOffToFlip := []int{}
+
+	for _, edgeIndex := range incidentEdges {
+		edge := edgeBasis[edgeIndex]
+		otherVertex := edge.OtherVertex(vertex_v)
+		otherVertexIndex := vertexIndexMap[otherVertex]
+
+		if f.Get(otherVertexIndex) == 1 {
+			if len(edgesFromOnToFlip) < 2 {
+				edgesFromOnToFlip = append(edgesFromOnToFlip, edgeIndex)
+			}
+		} else {
+			if len(edgesFromOffToFlip) < 1 {
+				edgesFromOffToFlip = append(edgesFromOffToFlip, edgeIndex)
+			}
+		}
+		if len(edgesFromOnToFlip) == 2 && len(edgesFromOffToFlip) == 1 {
+			break
+		}
+	}
+	if len(edgesFromOnToFlip) != 2 || len(edgesFromOffToFlip) != 1 {
+		return false
+	}
+	// let y = the three edges.
+	// reduce the syndrome by the boundary of y.
+	for _, edgeIndex := range edgesFromOnToFlip {
+		edge := edgeBasis[edgeIndex]
+		v1Index := vertexIndexMap[edge[0]]
+		v2Index := vertexIndexMap[edge[1]]
+		f.Toggle(v1Index)
+		f.Toggle(v2Index)
+	}
+	for _, edgeIndex := range edgesFromOffToFlip {
+		edge := edgeBasis[edgeIndex]
+		v1Index := vertexIndexMap[edge[0]]
+		v2Index := vertexIndexMap[edge[1]]
+		f.Toggle(v1Index)
+		f.Toggle(v2Index)
+	}
+	// toggle y in the current error.
+	for _, edgeIndex := range edgesFromOnToFlip {
+		curError.Toggle(edgeIndex)
+	}
+	for _, edgeIndex := range edgesFromOffToFlip {
+		curError.Toggle(edgeIndex)
+	}
+	return true
+}
+
 
 // processVertex handles the decoding logic for a single vertex
 // Returns true if any edges were flipped, false otherwise
