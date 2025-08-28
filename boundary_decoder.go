@@ -183,13 +183,13 @@ func (D *SSFBoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorV
 			}
 		}
 		if !found {
-			// try a round with flipping 2 edges on and 1 edge off
+			// try a round of exhaustive
 			for i, _ := range vertexBasis {
-				if D.processVertexFlip21(i, &f, &curError) {
+				if D.processVertexExhaustive(i, &f, &curError) {
 					found = true
 					fWeight = f.Weight()
 					if D.verbose {
-						log.Printf("xxx round=%d after flip21 v=%d fWeight=%d", round, i, fWeight)
+						log.Printf("xxx round=%d after exhaustive v=%d fWeight=%d", round, i, fWeight)
 					}
 				}
 			}
@@ -323,7 +323,7 @@ func (D *SSFBoundaryDecoder[T]) processVertexFlip21(vertexIndex int, f *BinaryVe
 
 // processVertex handles the decoding logic for a single vertex
 // Returns true if any edges were flipped, false otherwise
-func (D *SSFBoundaryDecoder[T]) processVertex(vertexIndex int, f *BinaryVector, curError *BinaryVector) bool {
+func (D *SSFBoundaryDecoder[T]) processVertexExhaustive(vertexIndex int, f *BinaryVector, curError *BinaryVector) bool {
 	// let S = Star(v) \subset E.  we'll check every subset of
 	// Star(v).  if it reduces the syndrome, we'll use it.
 	incidentEdges := D.vertexToEdges[vertexIndex]
