@@ -172,7 +172,7 @@ func (D *SSFBoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorV
 		round++
 		found := false
 		for i, _ := range vertexBasis {
-			if D.processVertex(i, &f, &curError) {
+			if D.processVertexGreedy(i, &f, &curError) {
 				found = true
 				fWeight = f.Weight()
 			}
@@ -184,6 +184,49 @@ func (D *SSFBoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorV
 		}
 	}
 	return nil, curError
+}
+
+// xxx EXPERIMENTAL
+// processVertexGreedy handles the decoding logic for a single vertex using a greedy approach
+// Returns true if any edges were flipped, false otherwise
+func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVector, curError *BinaryVector) bool {
+	// let y = all edges incident to v whose other vertex is on in the syndrome f.
+	incidentEdges := D.vertexToEdges[vertexIndex]
+	edgeBasis := D.graph.EdgeBasis()
+	vertexIndexMap := D.graph.VertexIndex()
+	vertexBasis := D.graph.VertexBasis()
+	vertex_v := vertexBasis[vertexIndex]
+	
+	edgesToFlip := []int{}
+	
+	for _, edgeIndex := range incidentEdges {
+		edge := edgeBasis[edgeIndex]
+		otherVertex := edge.OtherVertex(vertex_v)
+		otherVertexIndex := vertexIndexMap[otherVertex]
+		if f.Get(otherVertexIndex) == 1 {
+			edgesToFlip = append(edgesToFlip, edgeIndex)
+		}
+	}
+	
+	if len(edgesToFlip) == 0 {
+		return false
+	}
+	
+	// reduce the syndrome by the boundary of y.
+	for _, edgeIndex := range edgesToFlip {
+		edge := edgeBasis[edgeIndex]
+		v1Index := vertexIndexMap[edge[0]]
+		v2Index := vertexIndexMap[edge[1]]
+		f.Toggle(v1Index)
+		f.Toggle(v2Index)
+	}
+	
+	// toggle y in the current error.
+	for _, edgeIndex := range edgesToFlip {
+		curError.Toggle(edgeIndex)
+	}
+	
+	return true
 }
 
 // processVertex handles the decoding logic for a single vertex
