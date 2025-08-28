@@ -476,6 +476,102 @@ def cmd_list():
         print(f"Error parsing instance data: {e}")
         sys.exit(1)
 
+def cmd_clone(instance_id, args):
+    """Clone instance by creating AMI and launching new instance"""
+    if len(args) == 0:
+        print("Usage: clone <name|id>")
+        sys.exit(1)
+    
+    target_instance_id = resolve_instance_id(args[0])
+    
+    print(f"Cloning instance {target_instance_id}...")
+    
+    # Get source instance configuration
+    config = get_instance_config(target_instance_id)
+    print(f"Source instance config: type {config['instance_type']}")
+    
+    # Create AMI from source instance
+    ami_name = f"clone-{target_instance_id}-{int(time.time())}"
+    print(f"Creating AMI: {ami_name}")
+    
+    try:
+        ami_result = subprocess.run([
+            'aws', 'ec2', 'create-image',
+            '--instance-id', target_instance_id,
+            '--name', ami_name,
+            '--description', f'AMI created for cloning instance {target_instance_id}',
+            '--no-reboot'
+        ], capture_output=True, text=True, check=True)
+        
+        ami_data = json.loads(ami_result.stdout)
+        ami_id = ami_data['ImageId']
+        print(f"AMI created: {ami_id}")
+        print("Waiting for AMI to be available...")
+        
+        # Wait for AMI to be available
+        while True:
+            ami_status_result = subprocess.run([
+                'aws', 'ec2', 'describe-images',
+                '--image-ids', ami_id,
+                '--query', 'Images[].State',
+                '--output', 'text'
+            ], capture_output=True, text=True, check=True)
+            
+            state = ami_status_result.stdout.strip()
+            print(f"AMI state: {state}")
+            
+            if state == "available":
+                break
+            elif state == "pending":
+                time.sleep(10)
+            elif state == "failed":
+                print("AMI creation failed")
+                sys.exit(1)
+            else:
+                print(f"Unexpected AMI state: {state}")
+                sys.exit(1)
+        
+        print("AMI is available, launching new instance...")
+        
+        # Build run-instances command
+        cmd_args = [
+            'aws', 'ec2', 'run-instances',
+            '--image-id', ami_id,
+            '--instance-type', config['instance_type']
+        ]
+        
+        # Add optional parameters
+        if config['key_name']:
+            cmd_args.extend(['--key-name', config['key_name']])
+        
+        if config['security_groups']:
+            cmd_args.extend(['--security-group-ids'] + config['security_groups'])
+            
+        if config['subnet_id']:
+            cmd_args.extend(['--subnet-id', config['subnet_id']])
+            
+        if config['iam_role']:
+            role_name = config['iam_role'].split('/')[-1]
+            cmd_args.extend(['--iam-instance-profile', f'Name={role_name}'])
+        
+        result = subprocess.run(cmd_args, capture_output=True, text=True, check=True)
+        
+        # Parse instance ID from response
+        launch_data = json.loads(result.stdout)
+        new_instance_id = launch_data['Instances'][0]['InstanceId']
+        print(f"New instance created: {new_instance_id}")
+        print(f"AMI used: {ami_id}")
+        return new_instance_id
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error during cloning: {e}")
+        if e.stderr:
+            print(f"Error details: {e.stderr}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing AWS response: {e}")
+        sys.exit(1)
+
 def cmd_clone_mod_reduce_volume(instance_id, args):
     """Clone instance with reduced 100GB volume"""
     # Determine which instance to clone
@@ -554,6 +650,7 @@ def main():
         print("  stop [name|id] - Stop the instance (uses INSTANCE_ID if no arg)")
         print("  ip [name|id]   - Report the public IP address (uses INSTANCE_ID if no arg)")
         print("  volume-size [size] - Report current volume size or resize to [size] GB")
+        print("  clone <name|id> - Clone instance by creating AMI and launching new instance")
         print("  clone-mod-reduce-volume [name|id] - Clone instance with 100GB volume (uses INSTANCE_ID if no arg)")
         sys.exit(1)
     
@@ -563,6 +660,9 @@ def main():
     # Commands that don't require INSTANCE_ID
     if command == "list":
         cmd_list()
+        return
+    elif command == "clone":
+        cmd_clone(None, args)
         return
     
     # Check for required environment variable for other commands
@@ -590,7 +690,7 @@ def main():
         cmd_clone_mod_reduce_volume(instance_id, args)
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: list, type, name, state, start, stop, ip, volume-size, clone-mod-reduce-volume")
+        print("Available commands: clone, clone-mod-reduce-volume, ip, list, name, start, state, stop, type, volume-size")
         sys.exit(1)
 
 if __name__ == "__main__":
