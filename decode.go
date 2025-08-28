@@ -453,7 +453,7 @@ type DecoderThresholdResults struct {
 	MaxSuccessWeight int
 	MinFailureWeight int
 	TotalSamples int
-	BinarySearchSteps int
+	SearchSteps int
 }
 
 func NewDecoderThresholdFinder(decoder Decoder, minErrorWeight int, maxErrorWeight int, samplesPerWeight int, verbose bool) *DecoderThresholdFinder {
@@ -472,25 +472,25 @@ func (F *DecoderThresholdFinder) FindThreshold() DecoderThresholdResults {
 		MaxSuccessWeight: -1,
 		MinFailureWeight: -1,
 		TotalSamples: 0,
-		BinarySearchSteps: 0,
+		SearchSteps: 0,
 	}
 	
-	left := F.minErrorWeight
-	right := F.maxErrorWeight
 	maxSuccessWeight := -1
 	minFailureWeight := -1
 	
-	log.Printf("Starting binary search for decoder threshold between weights %d and %d", left, right)
+	// Start with minimum error weight and double until we find failures
+	currentWeight := F.minErrorWeight
 	
-	for left <= right {
-		results.BinarySearchSteps++
-		mid := (left + right) / 2
+	log.Printf("Starting doubling search for decoder threshold from weight %d", currentWeight)
+	
+	for currentWeight <= F.maxErrorWeight {
+		results.SearchSteps++
 		
 		if F.verbose {
-			log.Printf("Binary search step %d: testing weight %d (range [%d, %d])", results.BinarySearchSteps, mid, left, right)
+			log.Printf("Doubling search step %d: testing weight %d", results.SearchSteps, currentWeight)
 		}
 		
-		sampler := NewDecoderSampler(F.decoder, mid, F.samplesPerWeight, "", F.verbose, true)
+		sampler := NewDecoderSampler(F.decoder, currentWeight, F.samplesPerWeight, "", F.verbose, true)
 		sampler.Run()
 		actualSamples := sampler.results.SuccessCount + sampler.results.FailCount
 		results.TotalSamples += actualSamples
@@ -498,15 +498,26 @@ func (F *DecoderThresholdFinder) FindThreshold() DecoderThresholdResults {
 		successRate := float64(sampler.results.SuccessCount) / float64(actualSamples)
 		
 		if F.verbose {
-			log.Printf("Weight %d: success rate = %1.2f%% (%d/%d)", mid, successRate*100, sampler.results.SuccessCount, actualSamples)
+			log.Printf("Weight %d: success rate = %1.2f%% (%d/%d)", currentWeight, successRate*100, sampler.results.SuccessCount, actualSamples)
 		}
 		
 		if sampler.results.FailCount == 0 {
-			maxSuccessWeight = mid
-			left = mid + 1
+			// All samples succeeded, continue doubling
+			maxSuccessWeight = currentWeight
+			// Special case: go from 0 to 1, then double normally
+			if currentWeight == 0 {
+				currentWeight = 1
+			} else {
+				currentWeight *= 2
+			}
+			// Don't exceed the maximum weight
+			if currentWeight > F.maxErrorWeight {
+				currentWeight = F.maxErrorWeight
+			}
 		} else {
-			minFailureWeight = mid
-			right = mid - 1
+			// Found failures, this is our first failure point
+			minFailureWeight = currentWeight
+			break
 		}
 	}
 	
@@ -520,7 +531,7 @@ func (F *DecoderThresholdFinder) FindThreshold() DecoderThresholdResults {
 	}
 	
 	log.Printf("Threshold search completed: maxSuccessWeight=%d, minFailureWeight=%d, threshold=%d, steps=%d, totalSamples=%d", 
-		results.MaxSuccessWeight, results.MinFailureWeight, results.ThresholdWeight, results.BinarySearchSteps, results.TotalSamples)
+		results.MaxSuccessWeight, results.MinFailureWeight, results.ThresholdWeight, results.SearchSteps, results.TotalSamples)
 	
 	return results
 }

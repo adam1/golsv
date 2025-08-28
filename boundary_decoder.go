@@ -162,7 +162,9 @@ func (D *SSFBoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorV
 	fWeight := f.Weight()
 	vertexBasis := D.graph.VertexBasis()
 
-	log.Printf("Begin SSF decoding syndrome; fWeight=%d", fWeight)
+	if D.verbose {
+		log.Printf("Begin SSF decoding syndrome; fWeight=%d", fWeight)
+	}
 	round := 0
 
 	for fWeight > 0 {

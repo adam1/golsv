@@ -41,9 +41,11 @@ func parseFlags() DecoderSamplerArgs {
 	args := DecoderSamplerArgs{
 		DecoderType:      "coboundary",
 		ErrorWeight:      10,
-		SamplesPerWeight: 100,
+		SamplesPerWeight: 1,
 		MinErrorWeight:   0,
 		MaxErrorWeight:   -1, // -1 means use code length
+		Verbose:          true,
+		FindThreshold:    true,
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.StringVar(&args.D1File, "d1", "", "D1 matrix file")
@@ -54,13 +56,12 @@ func parseFlags() DecoderSamplerArgs {
 	flag.IntVar(&args.SamplesPerWeight, "samples-per-weight", args.SamplesPerWeight, "Number of samples per weight")
 	flag.StringVar(&args.ErrorsFile, "errors", args.ErrorsFile, "Errors file. Decode these errors instead of sampling.")
 	flag.StringVar(&args.ResultsFile, "results", "", "Results file")
-	flag.BoolVar(&args.FindThreshold, "find-threshold", false, "Find error weight threshold using binary search")
+	flag.BoolVar(&args.FindThreshold, "find-threshold", args.FindThreshold, "Find error weight threshold using binary search")
 	flag.IntVar(&args.MinErrorWeight, "min-error-weight", args.MinErrorWeight, "Minimum error weight for threshold search")
 	flag.IntVar(&args.MaxErrorWeight, "max-error-weight", args.MaxErrorWeight, "Maximum error weight for threshold search (-1 = code length)")
-	flag.BoolVar(&args.Verbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&args.Verbose, "verbose", args.Verbose, "Verbose output")
 	flag.Parse()
 
-	// Validate flags based on decoder type
 	ok := true
 	if args.D1File == "" {
 		fmt.Println("D1 matrix file is required")
@@ -137,7 +138,7 @@ func main() {
 		finder := golsv.NewDecoderThresholdFinder(decoder, args.MinErrorWeight, maxErrorWeight, args.SamplesPerWeight, args.Verbose)
 		results := finder.FindThreshold()
 		log.Printf("Threshold search results: threshold=%d, maxSuccess=%d, minFailure=%d, steps=%d, samples=%d", 
-			results.ThresholdWeight, results.MaxSuccessWeight, results.MinFailureWeight, results.BinarySearchSteps, results.TotalSamples)
+			results.ThresholdWeight, results.MaxSuccessWeight, results.MinFailureWeight, results.SearchSteps, results.TotalSamples)
 	} else {
 		sampler := golsv.NewDecoderSampler(decoder, args.ErrorWeight, args.SamplesPerWeight, args.ResultsFile, args.Verbose, false)
 		sampler.Run()
