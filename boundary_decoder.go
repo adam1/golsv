@@ -202,9 +202,9 @@ func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVe
 	vertexBasis := D.graph.VertexBasis()
 	vertex_v := vertexBasis[vertexIndex]
 
-	if D.verbose {
-		log.Printf("xxx v=%d incident=%d", vertexIndex, len(incidentEdges))
-	}
+// 	if D.verbose {
+// 		log.Printf("xxx v=%d incident=%d", vertexIndex, len(incidentEdges))
+// 	}
 	
 	edgesToFlip := []int{}
 	
@@ -225,12 +225,11 @@ func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVe
 		return false
 	}
 
-	if D.verbose {
-		log.Printf("xxx v=%d flip=%d", vertexIndex, len(edgesToFlip))
-	}
+// 	if D.verbose {
+// 		log.Printf("xxx v=%d flip=%d", vertexIndex, len(edgesToFlip))
+// 	}
 	
 	// reduce the syndrome by the boundary of y.
-	fwBefore := f.Weight()
 	for _, edgeIndex := range edgesToFlip {
 		edge := edgeBasis[edgeIndex]
 		v1Index := vertexIndexMap[edge[0]]
@@ -238,16 +237,10 @@ func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVe
 		f.Toggle(v1Index)
 		f.Toggle(v2Index)
 	}
-	fwAfter := f.Weight()
-	if fwAfter >= fwBefore {
-		panic("xxx didn't reduce syndrome weight!")
-	}
-	
 	// toggle y in the current error.
 	for _, edgeIndex := range edgesToFlip {
 		curError.Toggle(edgeIndex)
 	}
-	
 	return true
 }
 
