@@ -196,6 +196,10 @@ func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVe
 	vertexIndexMap := D.graph.VertexIndex()
 	vertexBasis := D.graph.VertexBasis()
 	vertex_v := vertexBasis[vertexIndex]
+
+	if D.verbose {
+		log.Printf("xxx v=%d incident=%d", vertexIndex, len(incidentEdges))
+	}
 	
 	edgesToFlip := []int{}
 	
@@ -210,6 +214,10 @@ func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVe
 	
 	if len(edgesToFlip) == 0 {
 		return false
+	}
+
+	if D.verbose {
+		log.Printf("xxx v=%d flip=%d", vertexIndex, len(edgesToFlip))
 	}
 	
 	// reduce the syndrome by the boundary of y.
