@@ -168,13 +168,18 @@ func (D *SSFBoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorV
 	round := 0
 
 	for fWeight > 0 {
-		//log.Printf("xxx round %d; fWeight=%d", round, fWeight)
+		if D.verbose {
+			log.Printf("xxx round=%d fWeight=%d", round, fWeight)
+		}
 		round++
 		found := false
 		for i, _ := range vertexBasis {
 			if D.processVertexGreedy(i, &f, &curError) {
 				found = true
 				fWeight = f.Weight()
+				if D.verbose {
+					log.Printf("xxx round=%d after v=%d fWeight=%d", round, i, fWeight)
+				}
 			}
 		}
 		if !found {
