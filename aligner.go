@@ -92,7 +92,7 @@ func (a *Aligner) Align() BinaryMatrix {
 	Z := a.Z1
 	rows := Z.NumRows()
 
-	statInterval := 1
+	statInterval := 10
 	timeStart := time.Now()
 	timeLastReport := timeStart
 	doneLastReport := 0
