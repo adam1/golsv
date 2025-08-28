@@ -8,3 +8,5 @@ cpu.pdf
 golsv.test
 runs
 *~
+.DS_Store
+misc
