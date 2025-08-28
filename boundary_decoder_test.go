@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-func TestBoundaryDecoderDecodeK3(t *testing.T) {
+func TestSSFBoundaryDecoderDecodeK3(t *testing.T) {
 	graph := NewZComplexFromMaximalSimplices([][]int{{0, 1}, {1, 2}, {2, 0}})
-	decoder := NewBoundaryDecoder(graph, false)
+	decoder := NewSSFBoundaryDecoder(graph, false)
 
 	errorVec := NewBinaryVector(graph.NumEdges())
 	errorVec.Set(0, 1)
@@ -27,7 +27,7 @@ func TestBoundaryDecoderDecodeK3(t *testing.T) {
 	}
 }
 
-func TestBoundaryDecoderDecodeK6(t *testing.T) {
+func TestSSFBoundaryDecoderDecodeK6(t *testing.T) {
 	graph := NewZComplexFromMaximalSimplices([][]int{
 		{0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5},
 		{1, 2}, {1, 3}, {1, 4}, {1, 5},
@@ -35,7 +35,7 @@ func TestBoundaryDecoderDecodeK6(t *testing.T) {
 		{3, 4}, {3, 5},
 		{4, 5},
 	})
-	decoder := NewBoundaryDecoder(graph, false)
+	decoder := NewSSFBoundaryDecoder(graph, false)
 
 	errorVec := NewBinaryVector(graph.NumEdges())
 // 	edge1 := rand.Intn(graph.NumEdges())
