@@ -7,6 +7,8 @@ import (
 	"log"
 )
 
+// xxx DEPRECATED. this has been subsumed by cmd/sample-decoder
+
 // Input:
 //
 //   - the boundary matrices defining the LSV complex
