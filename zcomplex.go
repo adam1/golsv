@@ -1315,44 +1315,49 @@ func NewZComplexFromBoundaryMatrices(d_1, d_2 BinaryMatrix) *ZComplex[ZVertexInt
 		edgeBasis = append(edgeBasis, edge)
 		edgeIndex[edge] = j
 	}
-	numTriangles := d_2.NumColumns()
-	triangleBasis := make([]ZTriangle[ZVertexInt], 0, numTriangles)
-	for j := 0; j < numTriangles; j++ {
-		e0 := d_2.ScanDown(0, j)
-		if e0 < 0 {
-			panic("expected edge")
-		}
-		e1 := d_2.ScanDown(e0+1, j)
-		if e1 < 0 {
-			panic("expected edge")
-		}
-		e2 := d_2.ScanDown(e1+1, j)
-		if e2 < 0 {
-			panic("expected edge")
-		}
-		if d_2.ScanDown(e2+1, j) >= 0 {
-			panic("too many ones in column")
-		}
-		v0 := edgeBasis[e0][0]
-		v1 := edgeBasis[e0][1]
-		var v2 ZVertex[ZVertexInt]
-		found := false
-		k := 0
-		if edgeBasis[e1][k] != v0 && edgeBasis[e1][k] != v1 {
-			v2 = edgeBasis[e1][k]
-			found = true
-		}
-		if !found {
-			k = 1
+	var triangleBasis []ZTriangle[ZVertexInt]
+	if d_2 != nil {
+		numTriangles := d_2.NumColumns()
+		triangleBasis = make([]ZTriangle[ZVertexInt], 0, numTriangles)
+		for j := 0; j < numTriangles; j++ {
+			e0 := d_2.ScanDown(0, j)
+			if e0 < 0 {
+				panic("expected edge")
+			}
+			e1 := d_2.ScanDown(e0+1, j)
+			if e1 < 0 {
+				panic("expected edge")
+			}
+			e2 := d_2.ScanDown(e1+1, j)
+			if e2 < 0 {
+				panic("expected edge")
+			}
+			if d_2.ScanDown(e2+1, j) >= 0 {
+				panic("too many ones in column")
+			}
+			v0 := edgeBasis[e0][0]
+			v1 := edgeBasis[e0][1]
+			var v2 ZVertex[ZVertexInt]
+			found := false
+			k := 0
 			if edgeBasis[e1][k] != v0 && edgeBasis[e1][k] != v1 {
 				v2 = edgeBasis[e1][k]
 				found = true
 			}
+			if !found {
+				k = 1
+				if edgeBasis[e1][k] != v0 && edgeBasis[e1][k] != v1 {
+					v2 = edgeBasis[e1][k]
+					found = true
+				}
+			}
+			if !found {
+				panic("expected three vertices in triangle")
+			}
+			triangleBasis = append(triangleBasis, NewZTriangle[ZVertexInt](v0, v1, v2))
 		}
-		if !found {
-			panic("expected three vertices in triangle")
-		}
-		triangleBasis = append(triangleBasis, NewZTriangle[ZVertexInt](v0, v1, v2))
+	} else {
+		triangleBasis = make([]ZTriangle[ZVertexInt], 0)
 	}
 	sortBases := false
 	verbose := false
