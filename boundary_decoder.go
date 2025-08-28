@@ -1,6 +1,7 @@
 package golsv
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -54,13 +55,14 @@ func (D *BoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorVec 
 // 	statIntervalSteps := 100
 
 	for fWeight > 0 {
+		log.Printf("xxx round %d; fWeight=%d", round, fWeight)
 		round++
 		found := false
 		for i, _ := range vertexBasis {
 			// let S = Star(v) \subset E
 			incidentEdges := D.vertexToEdges[i]
 			nbrsf := 0
-			halfDegree := len(incidentEdges) / 2
+			halfDegree := float64(len(incidentEdges)) / 2
 			vertex_i := vertexBasis[i]
 			vertexIndex := D.graph.VertexIndex()
 			edgeBasis := D.graph.EdgeBasis()
@@ -73,7 +75,9 @@ func (D *BoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorVec 
 					nbrsf++
 				}
 			}
-			if nbrsf > halfDegree {
+			//log.Printf("xxx vertex %d, halfDegree=%f nbrsf=%d", i, halfDegree, nbrsf)
+			if float64(nbrsf) > halfDegree {
+				//log.Printf("xxx flipping")
 				// set f = f + \partial_1(S)
 				for _, edgeIndex := range incidentEdges {
 					edge := edgeBasis[edgeIndex]
@@ -94,7 +98,9 @@ func (D *BoundaryDecoder[T]) Decode(syndrome BinaryVector) (err error, errorVec 
 			}
 		}
 		if !found {
-			break
+			err := fmt.Errorf("failed to make progress at weight=%d", fWeight)
+			log.Print(err)
+			return err, NewBinaryVector(D.graph.NumEdges())
 		}
 	}
 	return nil, curError
