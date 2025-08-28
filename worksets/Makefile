@@ -423,6 +423,9 @@ simplicial-cosystole: d1.txt d2.txt Z1.txt Z^1.txt B^1.txt
 coboundary-threshold: d1.txt d2.txt Z1.txt
 	coboundary-decoder -find-threshold -d1 d1.txt -d2 d2.txt -Z_1 Z1.txt -samples-per-weight 10 -verbose -results results-$(log).json 2>&1 | tee coboundary-decoder-threshold.$(log)
 
+boundary-threshold: d1.txt d2.txt
+	sample-decoder -decoder boundary -find-threshold -d1 d1.txt -d2 d2.txt -verbose -results results-$(log).json 2>&1 | tee boundary-threshold.$(log)
+
 random-clique-complex:
 	random-complex -dimC0 60480 -p 0.0002315 -clique -d1 d1.txt -d2 d2.txt 2>&1 | tee random.$(log)
 
