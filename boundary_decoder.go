@@ -220,6 +220,9 @@ func (D *SSFBoundaryDecoder[T]) processVertexGreedy(vertexIndex int, f *BinaryVe
 	
 	if len(edgesToFlip) == 0 {
 		return false
+	} else if len(edgesToFlip) == 1 && f.Get(vertexIndex) == 0 {
+		// this would leave the syndrome weight unchanged
+		return false
 	}
 
 	if D.verbose {
