@@ -224,6 +224,10 @@ func (D *SSFBoundaryDecoder[T]) Length() int {
 	return D.graph.NumEdges()
 }
 
+func (D *SSFBoundaryDecoder[T]) Name() string {
+	return "SSFBoundaryDecoder"
+}
+
 // e is typically an error vector and c is a decoded error vector
 func (D *SSFBoundaryDecoder[T]) SameCoset(e, c BinaryVector) bool {
 	u := e.Add(c)

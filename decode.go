@@ -344,9 +344,14 @@ func (D *CoboundaryDecoder[T]) Syndrome(error BinaryVector) BinaryVector {
 	return D.delta_1.MultiplyRight(error.SparseBinaryMatrix()).ColumnVector(0)
 }
 
+func (D *CoboundaryDecoder[T]) Name() string {
+	return "CoboundaryDecoder"
+}
+
 type Decoder interface {
 	Decode(syndrome BinaryVector) (err error, errorVec BinaryVector)
 	Length() int
+	Name() string
 	SameCoset(e, c BinaryVector) bool
 	Syndrome(error BinaryVector) BinaryVector
 }
@@ -362,6 +367,7 @@ type DecoderSampler struct {
 }
 
 type DecoderSamplerResults struct {
+	DecoderType string
 	ErrorWeight int
 	SuccessCount int
 	FailCount int
@@ -383,6 +389,7 @@ func NewDecoderSampler(decoder Decoder, errorWeight int, samplesPerWeight int, r
 func (S *DecoderSampler) Run() {
 	n := S.decoder.Length()
 	log.Printf("Sampling error weight=%d samples=%d", S.errorWeight, S.samplesPerWeight)
+	S.results.DecoderType = S.decoder.Name()
 	S.results.ErrorWeight = S.errorWeight
 	S.results.SuccessCount = 0
 	S.results.EqualCount = 0
