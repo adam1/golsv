@@ -342,12 +342,19 @@ def cmd_volume_size_set(volume_id, new_size):
 
 def cmd_volume_size(instance_id, args):
     """Report or set the root volume size"""
-    volume_id = get_root_volume_id(instance_id)
-    
     if len(args) == 0:
+        print("Usage: volume-size <name|id> [new_size_gb]")
+        sys.exit(1)
+    
+    target_instance_id = resolve_instance_id(args[0])
+    volume_id = get_root_volume_id(target_instance_id)
+    
+    if len(args) == 1:
+        # Just report size
         cmd_volume_size_get(volume_id)
     else:
-        cmd_volume_size_set(volume_id, args[0])
+        # Set new size
+        cmd_volume_size_set(volume_id, args[1])
 
 def get_instance_config(instance_id):
     """Get instance configuration needed for cloning"""
@@ -887,6 +894,103 @@ def cmd_terminate(instance_id, args):
         print(f"Error parsing instance data: {e}")
         sys.exit(1)
 
+def cmd_health(instance_id, args):
+    """Report EC2 instance health status and status checks"""
+    # Determine which instance to check
+    if len(args) > 0:
+        target_instance_id = resolve_instance_id(args[0])
+    else:
+        target_instance_id = instance_id
+    
+    try:
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instance-status',
+            '--instance-id', target_instance_id,
+            '--include-all-instances',
+            '--output', 'json'
+        ], capture_output=True, text=True, check=True)
+        
+        data = json.loads(result.stdout)
+        
+        if not data['InstanceStatuses']:
+            print(f"No status information available for instance {target_instance_id}")
+            return
+        
+        status = data['InstanceStatuses'][0]
+        
+        # Basic instance info
+        print(f"Instance: {target_instance_id}")
+        print(f"Availability Zone: {status['AvailabilityZone']}")
+        print(f"Instance State: {status['InstanceState']['Name']}")
+        print()
+        
+        # System status checks
+        system_status = status.get('SystemStatus', {})
+        if system_status:
+            print(f"System Status: {system_status['Status']}")
+            if 'Details' in system_status:
+                for detail in system_status['Details']:
+                    status_name = detail['Name']
+                    status_value = detail['Status']
+                    print(f"  {status_name}: {status_value}")
+                    if status_value != 'passed':
+                        print(f"    Issue detected with {status_name}")
+        else:
+            print("System Status: No data available")
+        
+        print()
+        
+        # Instance status checks
+        instance_status = status.get('InstanceStatus', {})
+        if instance_status:
+            print(f"Instance Status: {instance_status['Status']}")
+            if 'Details' in instance_status:
+                for detail in instance_status['Details']:
+                    status_name = detail['Name']
+                    status_value = detail['Status']
+                    print(f"  {status_name}: {status_value}")
+                    if status_value != 'passed':
+                        print(f"    Issue detected with {status_name}")
+        else:
+            print("Instance Status: No data available")
+        
+        # Events (if any)
+        if 'Events' in status and status['Events']:
+            print("\nScheduled Events:")
+            for event in status['Events']:
+                event_code = event.get('Code', 'Unknown')
+                event_description = event.get('Description', '')
+                not_before = event.get('NotBefore', '')
+                not_after = event.get('NotAfter', '')
+                print(f"  {event_code}: {event_description}")
+                if not_before:
+                    print(f"    Not before: {not_before}")
+                if not_after:
+                    print(f"    Not after: {not_after}")
+        
+        # Overall health summary
+        print()
+        system_ok = system_status.get('Status') == 'ok'
+        instance_ok = instance_status.get('Status') == 'ok'
+        
+        if system_ok and instance_ok:
+            print("Overall Health: ✓ HEALTHY")
+        elif not system_ok and not instance_ok:
+            print("Overall Health: ✗ UNHEALTHY (both system and instance checks failing)")
+        elif not system_ok:
+            print("Overall Health: ✗ UNHEALTHY (system checks failing)")
+        else:
+            print("Overall Health: ✗ UNHEALTHY (instance checks failing)")
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        if e.stderr:
+            print(f"Error details: {e.stderr}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing health data: {e}")
+        sys.exit(1)
+
 def cmd_clone_mod_reduce_volume(instance_id, args):
     """Clone instance with reduced 100GB volume"""
     # Determine which instance to clone
@@ -957,19 +1061,20 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: ec2 <command> [args]")
         print("Commands:")
-        print("  clone <name|id> - Clone instance by creating AMI and launching new instance")
-        print("  clone-mod-reduce-volume [name|id] - Clone instance with 100GB volume (uses INSTANCE_ID if no arg)")
-        print("  ip [name|id]   - Report the public IP address (uses INSTANCE_ID if no arg)")
-        print("  launch-ami <ami-id> [instance-type] - Launch instance from AMI (default: t3.medium)")
-        print("  list           - List all EC2 instances with ID, Name, and IP")
-        print("  list-ami       - List all AMIs owned by this account")
-        print("  name [instance] [new_name] - Get or set instance Name tag")
-        print("  start [name|id] - Start the instance (uses INSTANCE_ID if no arg)")
-        print("  state [name|id] - Report the instance state (uses INSTANCE_ID if no arg)")
-        print("  stop [name|id] - Stop the instance (uses INSTANCE_ID if no arg)")
-        print("  terminate <name|id> - Terminate instance with confirmation")
-        print("  type [instance] [new_type] - Get or set instance type")
-        print("  volume-size [size] - Report current volume size or resize to [size] GB")
+        print("  clone <name|id>                        Clone instance by creating AMI and launching new instance")
+        print("  clone-mod-reduce-volume [name|id]      Clone instance with 100GB volume (uses INSTANCE_ID if no arg)")
+        print("  health [name|id]                       Report instance health status and status checks (uses INSTANCE_ID if no arg)")
+        print("  ip [name|id]                           Report the public IP address (uses INSTANCE_ID if no arg)")
+        print("  launch-ami <ami-id> [instance-type]    Launch instance from AMI (default: t3.medium)")
+        print("  list                                   List all EC2 instances with ID, Name, and IP")
+        print("  list-ami                               List all AMIs owned by this account")
+        print("  name [instance] [new_name]             Get or set instance Name tag")
+        print("  start [name|id]                        Start the instance (uses INSTANCE_ID if no arg)")
+        print("  state [name|id]                        Report the instance state (uses INSTANCE_ID if no arg)")
+        print("  stop [name|id]                         Stop the instance (uses INSTANCE_ID if no arg)")
+        print("  terminate <name|id>                    Terminate instance with confirmation")
+        print("  type [instance] [new_type]             Get or set instance type")
+        print("  volume-size <name|id> [size]           Report current volume size or resize to [size] GB")
         sys.exit(1)
     
     command = sys.argv[1]
@@ -991,6 +1096,9 @@ def main():
     elif command == "terminate":
         cmd_terminate(None, args)
         return
+    elif command == "volume-size":
+        cmd_volume_size(None, args)
+        return
     
     # Check for required environment variable for other commands
     instance_id = os.environ.get('INSTANCE_ID')
@@ -1011,13 +1119,13 @@ def main():
         cmd_stop(instance_id, args)
     elif command == "ip":
         cmd_ip(instance_id, args)
-    elif command == "volume-size":
-        cmd_volume_size(instance_id, args)
+    elif command == "health":
+        cmd_health(instance_id, args)
     elif command == "clone-mod-reduce-volume":
         cmd_clone_mod_reduce_volume(instance_id, args)
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: clone, clone-mod-reduce-volume, ip, launch-ami, list, list-ami, name, start, state, stop, terminate, type, volume-size")
+        print("Available commands: clone, clone-mod-reduce-volume, health, ip, launch-ami, list, list-ami, name, start, state, stop, terminate, type, volume-size")
         sys.exit(1)
 
 if __name__ == "__main__":
