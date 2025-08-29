@@ -5,6 +5,7 @@ import sys
 import subprocess
 import time
 import json
+import random
 
 def cmd_type_get(instance_id):
     """Report the instance type"""
@@ -809,6 +810,83 @@ def cmd_launch_ami(instance_id, args):
         print(f"Error parsing AWS response: {e}")
         sys.exit(1)
 
+def cmd_terminate(instance_id, args):
+    """Terminate instance with confirmation"""
+    if len(args) == 0:
+        print("Usage: terminate <name|id>")
+        sys.exit(1)
+    
+    target_instance_id = resolve_instance_id(args[0])
+    
+    try:
+        # Get instance info
+        result = subprocess.run([
+            'aws', 'ec2', 'describe-instances',
+            '--instance-id', target_instance_id,
+            '--output', 'json'
+        ], capture_output=True, text=True, check=True)
+        
+        data = json.loads(result.stdout)
+        if not data['Reservations'] or not data['Reservations'][0]['Instances']:
+            print(f"Error: Instance {target_instance_id} not found")
+            sys.exit(1)
+            
+        instance = data['Reservations'][0]['Instances'][0]
+        state = instance['State']['Name']
+        instance_type = instance['InstanceType']
+        
+        # Get Name tag if it exists
+        name = None
+        for tag in instance.get('Tags', []):
+            if tag['Key'] == 'Name':
+                name = tag['Value']
+                break
+        
+        name_display = name if name else '(no name)'
+        
+        print(f"Instance to terminate:")
+        print(f"  ID: {target_instance_id}")
+        print(f"  Name: {name_display}")
+        print(f"  Type: {instance_type}")
+        print(f"  State: {state}")
+        
+        if state == 'terminated':
+            print("Instance is already terminated")
+            return
+        
+        # Generate random 3-digit confirmation code
+        confirmation_code = f"{random.randint(100, 999)}"
+        print(f"\nWARNING: This will permanently terminate the instance!")
+        print(f"To confirm, type the following 3-digit code: {confirmation_code}")
+        
+        try:
+            user_input = input("Confirmation code: ").strip()
+        except KeyboardInterrupt:
+            print("\nTermination cancelled")
+            sys.exit(0)
+        
+        if user_input != confirmation_code:
+            print("Incorrect confirmation code. Termination cancelled.")
+            sys.exit(1)
+        
+        # Terminate the instance
+        print(f"Terminating instance {target_instance_id}...")
+        subprocess.run([
+            'aws', 'ec2', 'terminate-instances',
+            '--instance-ids', target_instance_id
+        ], capture_output=True, text=True, check=True)
+        
+        print(f"Instance {target_instance_id} termination initiated")
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Error running AWS command: {e}")
+        if e.stderr:
+            print(f"Error details: {e.stderr}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing instance data: {e}")
+        sys.exit(1)
+
 def cmd_clone_mod_reduce_volume(instance_id, args):
     """Clone instance with reduced 100GB volume"""
     # Determine which instance to clone
@@ -889,6 +967,7 @@ def main():
         print("  start [name|id] - Start the instance (uses INSTANCE_ID if no arg)")
         print("  state [name|id] - Report the instance state (uses INSTANCE_ID if no arg)")
         print("  stop [name|id] - Stop the instance (uses INSTANCE_ID if no arg)")
+        print("  terminate <name|id> - Terminate instance with confirmation")
         print("  type [instance] [new_type] - Get or set instance type")
         print("  volume-size [size] - Report current volume size or resize to [size] GB")
         sys.exit(1)
@@ -908,6 +987,9 @@ def main():
         return
     elif command == "launch-ami":
         cmd_launch_ami(None, args)
+        return
+    elif command == "terminate":
+        cmd_terminate(None, args)
         return
     
     # Check for required environment variable for other commands
@@ -935,7 +1017,7 @@ def main():
         cmd_clone_mod_reduce_volume(instance_id, args)
     else:
         print(f"Unknown command: {command}")
-        print("Available commands: clone, clone-mod-reduce-volume, ip, launch-ami, list, list-ami, name, start, state, stop, type, volume-size")
+        print("Available commands: clone, clone-mod-reduce-volume, ip, launch-ami, list, list-ami, name, start, state, stop, terminate, type, volume-size")
         sys.exit(1)
 
 if __name__ == "__main__":
