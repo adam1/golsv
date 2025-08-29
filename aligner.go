@@ -92,7 +92,7 @@ func (a *Aligner) Align() BinaryMatrix {
 	Z := a.Z1
 	rows := Z.NumRows()
 
-	statInterval := 10
+	statInterval := 100
 	timeStart := time.Now()
 	timeLastReport := timeStart
 	doneLastReport := 0
@@ -113,9 +113,9 @@ func (a *Aligner) Align() BinaryMatrix {
 			cRate := float64(doneLastReport) / reportElapsed.Seconds()
 			tRate := float64(j) / totalElapsed.Seconds()
 			if a.verbose {
-				log.Printf("align: processed %d/%d (%.2f%%) cols; crate=%1.0f trate=%1.0f found=%d",
+				log.Printf("align: processed %d/%d (%.2f%%) cols; crate=%1.0f trate=%1.0f found=%d minWeight=%d",
 					j, Z.NumColumns(), 100.0 * float64(j) / float64(Z.NumColumns()),
-					cRate, tRate, a.U.NumColumns())
+					cRate, tRate, a.U.NumColumns(), a.minWeight)
 			}
 			timeLastReport = now
 			doneLastReport = 0
