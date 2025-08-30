@@ -245,17 +245,32 @@ def get_root_volume_id(instance_id):
         result = subprocess.run([
             'aws', 'ec2', 'describe-instances',
             '--instance-id', instance_id,
-            '--query', 'Reservations[].Instances[].BlockDeviceMappings[?DeviceName==`/dev/sda1` || DeviceName==`/dev/xvda`].Ebs.VolumeId',
-            '--output', 'text'
+            '--output', 'json'
         ], capture_output=True, text=True, check=True)
-        volume_id = result.stdout.strip()
-        if volume_id and volume_id != "None":
-            return volume_id
-        else:
-            print("No root volume found")
+        
+        data = json.loads(result.stdout)
+        if not data['Reservations'] or not data['Reservations'][0]['Instances']:
+            print("Instance not found")
             sys.exit(1)
+            
+        instance = data['Reservations'][0]['Instances'][0]
+        
+        # Look for root volume in block device mappings
+        for mapping in instance.get('BlockDeviceMappings', []):
+            device_name = mapping.get('DeviceName')
+            if device_name in ['/dev/sda1', '/dev/xvda']:
+                volume_id = mapping.get('Ebs', {}).get('VolumeId')
+                if volume_id:
+                    return volume_id
+        
+        print("No root volume found")
+        sys.exit(1)
+        
     except subprocess.CalledProcessError as e:
         print(f"Error running AWS command: {e}")
+        sys.exit(1)
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error parsing instance data: {e}")
         sys.exit(1)
 
 def cmd_volume_size_get(volume_id):
@@ -455,12 +470,32 @@ def cmd_list():
                 # Get public IP
                 public_ip = instance.get('PublicIpAddress', 'None')
                 
+                # Get root volume size
+                volume_size = "N/A"
+                for mapping in instance.get('BlockDeviceMappings', []):
+                    device_name = mapping.get('DeviceName', '')
+                    if device_name in ['/dev/sda1', '/dev/xvda']:
+                        volume_id = mapping.get('Ebs', {}).get('VolumeId')
+                        if volume_id:
+                            try:
+                                vol_result = subprocess.run([
+                                    'aws', 'ec2', 'describe-volumes',
+                                    '--volume-ids', volume_id,
+                                    '--query', 'Volumes[0].Size',
+                                    '--output', 'text'
+                                ], capture_output=True, text=True, check=True)
+                                volume_size = f"{vol_result.stdout.strip()} GB"
+                            except:
+                                volume_size = "N/A"
+                        break
+                
                 instances.append({
                     'id': instance_id,
                     'name': name,
                     'state': state,
                     'type': instance_type,
-                    'ip': public_ip
+                    'ip': public_ip,
+                    'volume_size': volume_size
                 })
         
         if not instances:
@@ -471,14 +506,14 @@ def cmd_list():
         instances.sort(key=lambda x: (x['name'] is None, x['name'] or '', x['id']))
             
         # Print header
-        print(f"{'Instance ID':<19} {'Name':<20} {'Type':<12} {'State':<10} {'Public IP'}")
-        print("-" * 85)
+        print(f"{'Instance ID':<19} {'Name':<20} {'Type':<12} {'State':<10} {'Vol Size':<9} {'Public IP'}")
+        print("-" * 95)
         
         # Print instances
         for inst in instances:
             name_display = inst['name'] if inst['name'] else '(no name)'
             ip_display = inst['ip'] if inst['ip'] != 'None' else '(none)'
-            print(f"{inst['id']:<19} {name_display:<20} {inst['type']:<12} {inst['state']:<10} {ip_display}")
+            print(f"{inst['id']:<19} {name_display:<20} {inst['type']:<12} {inst['state']:<10} {inst['volume_size']:<9} {ip_display}")
             
     except subprocess.CalledProcessError as e:
         print(f"Error running AWS command: {e}")
@@ -689,13 +724,23 @@ def cmd_list_ami():
         images.sort(key=lambda x: x['CreationDate'], reverse=True)
         
         # Print header
-        print(f"{'AMI ID':<21} {'Name':<40} {'Created':<20} {'Source Instance'}")
-        print("-" * 100)
+        print(f"{'AMI ID':<21} {'Name':<40} {'Created':<20} {'Vol Size':<9} {'Source Instance'}")
+        print("-" * 110)
         
         for img in images:
             ami_id = img['ImageId']
             name = img.get('Name', '(no name)')
             created = img['CreationDate'][:19].replace('T', ' ')  # Format: YYYY-MM-DD HH:MM:SS
+            
+            # Get root volume size from block device mappings
+            volume_size = "N/A"
+            for mapping in img.get('BlockDeviceMappings', []):
+                device_name = mapping.get('DeviceName', '')
+                if device_name in ['/dev/sda1', '/dev/xvda']:
+                    ebs = mapping.get('Ebs', {})
+                    if 'VolumeSize' in ebs:
+                        volume_size = f"{ebs['VolumeSize']} GB"
+                    break
             
             # Try to extract source instance ID from clone AMI names
             source_instance = ""
@@ -708,7 +753,7 @@ def cmd_list_ami():
             if len(name) > 40:
                 name = name[:37] + "..."
                 
-            print(f"{ami_id:<21} {name:<40} {created:<20} {source_instance}")
+            print(f"{ami_id:<21} {name:<40} {created:<20} {volume_size:<9} {source_instance}")
             
     except subprocess.CalledProcessError as e:
         print(f"Error running AWS command: {e}")
@@ -1005,13 +1050,39 @@ def cmd_clone_mod_reduce_volume(instance_id, args):
     config = get_instance_config(target_instance_id)
     print(f"Source instance config: AMI {config['image_id']}, type {config['instance_type']}")
     
+    # Get root device name from AMI
+    try:
+        ami_result = subprocess.run([
+            'aws', 'ec2', 'describe-images',
+            '--image-ids', config['image_id'],
+            '--output', 'json'
+        ], capture_output=True, text=True, check=True)
+        
+        ami_data = json.loads(ami_result.stdout)
+        root_device_name = "/dev/xvda"  # default
+        if ami_data['Images']:
+            for mapping in ami_data['Images'][0].get('BlockDeviceMappings', []):
+                device_name = mapping.get('DeviceName', '')
+                if device_name in ['/dev/sda1', '/dev/xvda']:
+                    root_device_name = device_name
+                    break
+        
+        print(f"Using root device: {root_device_name}")
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Could not get AMI info, using /dev/xvda: {e}")
+        root_device_name = "/dev/xvda"
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Warning: Could not parse AMI info, using /dev/xvda: {e}")
+        root_device_name = "/dev/xvda"
+    
     # Build run-instances command
     cmd_args = [
         'aws', 'ec2', 'run-instances',
         '--image-id', config['image_id'],
         '--instance-type', config['instance_type'],
         '--block-device-mappings', 
-        '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":100,"VolumeType":"gp3","DeleteOnTermination":true}}]'
+        f'[{{"DeviceName":"{root_device_name}","Ebs":{{"VolumeSize":100,"VolumeType":"gp3","DeleteOnTermination":true}}}}]'
     ]
     
     # Add optional parameters
