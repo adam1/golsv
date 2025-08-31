@@ -7,7 +7,6 @@
 - `go test -v ./path/to/package`: Run tests in specific package with verbose output
 - `go test -run TestName`: Run a single test function
 - `make coverage`: Show test coverage summary
-- `make watch`: Watch for file changes and rebuild/test
 
 ## Code Style
 - Package: Use single package `golsv` for all main code
@@ -17,4 +16,9 @@
 - Error handling: Panic for programmer errors, return errors for expected failures
 - Testing: Table-driven tests with clear input/output descriptions
 - Math notation: Use standard mathematical notation in comments
-- Documentation: All exported functions and types should have comments
+- Documentation: All exported functions and types should have
+  comments, but comments that are obviously redundant with the code
+  they preceed should be omitted.
+
+## Practices
+- Implement test-driven-development where feasible.

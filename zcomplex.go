@@ -1158,6 +1158,31 @@ func NewZComplexJoinedFilledTriangles() *ZComplex[ZVertexInt] {
 	return NewZComplexFromMaximalSimplices([][]int{{0, 1, 2}, {1, 2}})
 }
 
+// CompleteGraph returns the complete graph K_n as a ZComplex (1-skeleton only, no triangles)
+func CompleteGraph(n int) *ZComplex[ZVertexInt] {
+	// Create vertex basis: 0, 1, ..., n-1
+	vertexBasis := make([]ZVertex[ZVertexInt], n)
+	for i := 0; i < n; i++ {
+		vertexBasis[i] = ZVertexInt(i)
+	}
+	
+	// Create edge basis: all pairs {i,j} with i < j
+	edgeBasis := make([]ZEdge[ZVertexInt], 0, n*(n-1)/2)
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			edge := NewZEdge(ZVertexInt(i), ZVertexInt(j))
+			edgeBasis = append(edgeBasis, edge)
+		}
+	}
+	
+	// No triangles (just the 1-skeleton)
+	triangleBasis := make([]ZTriangle[ZVertexInt], 0)
+	
+	sortBases := true
+	verbose := false
+	return NewZComplex(vertexBasis, edgeBasis, triangleBasis, sortBases, verbose)
+}
+
 func NewZComplexFromTriangles(S []ZTriangle[ZVertexInt]) *ZComplex[ZVertexInt] {
 	vertices := make(map[ZVertex[ZVertexInt]]bool)
 	edges := make(map[ZEdge[ZVertexInt]]bool)
