@@ -106,7 +106,7 @@ func parseFlags() *Args {
 	flag.Float64Var(&args.ProbEdge, "p", args.ProbEdge, "probability of edge in random graph")
 	flag.IntVar(&args.RegularityDegree, "regular", args.RegularityDegree, fmt.Sprintf("regularity degree for regular complex (default %d)", args.RegularityDegree))
 	flag.BoolVar(&args.LLR, "llr", args.LLR, "Generate LLR random coboundary expander")
-	flag.IntVar(&args.LLRk, "k", args.LLRk, fmt.Sprintf("number of Steiner systems for LLR construction (default %d)", args.LLRk))
+	flag.IntVar(&args.LLRk, "llrk", args.LLRk, fmt.Sprintf("number of Steiner systems for LLR construction (default %d)", args.LLRk))
 	flag.IntVar(&args.MaxRetries, "retries", args.MaxRetries, fmt.Sprintf("max retries for regular graph generation (default %d)", args.MaxRetries))
 	flag.IntVar(&args.MaxIterations, "iterations", args.MaxIterations, fmt.Sprintf("max iterations for balancing algorithm (default %d)", args.MaxIterations))
 	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "complex should be simplicial")
