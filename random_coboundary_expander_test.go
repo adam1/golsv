@@ -19,14 +19,20 @@ func TestSteinerSystemGenerator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			gen := NewSteinerSystemGenerator(test.numVertices, test.verbose)
 			
-			triangles, err := gen.Generate()
+			triangleMap, err := gen.Generate()
 			if err != nil {
 				t.Fatalf("Generate() failed: %v", err)
 			}
 			
 			// Basic sanity checks
-			if triangles == nil {
+			if triangleMap == nil {
 				t.Fatal("Generate() returned nil triangles")
+			}
+			
+			// Convert map to slice for iteration
+			triangles := make([]ZTriangle[ZVertexInt], 0, len(triangleMap))
+			for triangle := range triangleMap {
+				triangles = append(triangles, triangle)
 			}
 			
 			// Verify triangle properties
@@ -96,10 +102,16 @@ func TestSteinerSystemGeneratorManual(t *testing.T) {
 	n := 13 // Change this to test different sizes: 3, 7, 9, 13, 15, 19, etc.
 	
 	gen := NewSteinerSystemGenerator(n, true) // verbose=true for debugging
-	triangles, err := gen.Generate()
+	triangleMap, err := gen.Generate()
 	
 	if err != nil {
 		t.Fatalf("Generate() failed: %v", err)
+	}
+	
+	// Convert map to slice for display
+	triangles := make([]ZTriangle[ZVertexInt], 0, len(triangleMap))
+	for triangle := range triangleMap {
+		triangles = append(triangles, triangle)
 	}
 	
 	t.Logf("Generated %d triangles for n=%d:", len(triangles), n)
@@ -133,4 +145,49 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func TestRandomCoboundaryExpanderGenerator(t *testing.T) {
+	// Test the full LLR construction
+	n := 7  // Start with n=7 (perfect STS exists)
+	k := 2  // Use k=2 systems
+	
+	gen := NewRandomCoboundaryExpanderGenerator(n, k, true)
+	complex, err := gen.Generate()
+	
+	if err != nil {
+		t.Fatalf("Generate() failed: %v", err)
+	}
+	
+	if complex == nil {
+		t.Fatal("Generate() returned nil complex")
+	}
+	
+	// Verify basic structure
+	expectedVertices := n
+	expectedEdges := n * (n - 1) / 2  // Complete graph
+	
+	if len(complex.VertexBasis()) != expectedVertices {
+		t.Errorf("Expected %d vertices, got %d", expectedVertices, len(complex.VertexBasis()))
+	}
+	
+	if len(complex.EdgeBasis()) != expectedEdges {
+		t.Errorf("Expected %d edges, got %d", expectedEdges, len(complex.EdgeBasis()))
+	}
+	
+	t.Logf("Generated LLR complex: %d vertices, %d edges, %d triangles",
+		len(complex.VertexBasis()), len(complex.EdgeBasis()), len(complex.TriangleBasis()))
+	
+	// Verify all triangles are valid
+	for i, triangle := range complex.TriangleBasis() {
+		v0, v1, v2 := int(triangle[0].(ZVertexInt)), int(triangle[1].(ZVertexInt)), int(triangle[2].(ZVertexInt))
+		
+		if v0 < 0 || v0 >= n || v1 < 0 || v1 >= n || v2 < 0 || v2 >= n {
+			t.Errorf("Triangle %d has vertex out of range: {%d, %d, %d}", i, v0, v1, v2)
+		}
+		
+		if v0 == v1 || v1 == v2 || v0 == v2 {
+			t.Errorf("Triangle %d has duplicate vertices: {%d, %d, %d}", i, v0, v1, v2)
+		}
+	}
 }

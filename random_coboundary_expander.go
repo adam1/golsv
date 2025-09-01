@@ -43,11 +43,55 @@ func (gen *RandomCoboundaryExpanderGenerator) Generate() (*ZComplex[ZVertexInt],
 			gen.numVertices, gen.numSystems)
 	}
 	
-	// TODO: Implement the full construction
-	// 1. Generate k independent (n,2)-Steiner systems using greedy algorithm
-	// 2. Union them with the complete 1-skeleton to form X_{n,k}^{(2)}
+	// Step 1: Generate k independent (n,2)-Steiner systems  
+	allTriangles := make(map[ZTriangle[ZVertexInt]]bool)
+	steinerGen := NewSteinerSystemGenerator(gen.numVertices, gen.verbose)
 	
-	return nil, fmt.Errorf("Generate not yet implemented")
+	for i := 0; i < gen.numSystems; i++ {
+		if gen.verbose {
+			fmt.Printf("Generating Steiner system %d/%d\n", i+1, gen.numSystems)
+		}
+		
+		triangleMap, err := steinerGen.Generate()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate Steiner system %d: %v", i+1, err)
+		}
+		
+		// Union triangles (map automatically deduplicates)
+		for triangle := range triangleMap {
+			allTriangles[triangle] = true
+		}
+		
+		if gen.verbose {
+			fmt.Printf("  Added %d triangles from system %d (total unique: %d)\n", 
+				len(triangleMap), i+1, len(allTriangles))
+		}
+	}
+	
+	// Step 2: Create complete graph K_n^{(1)}
+	completeGraph := CompleteGraph(gen.numVertices)
+	
+	// Step 3: Convert triangle map to slice
+	triangleBasis := make([]ZTriangle[ZVertexInt], 0, len(allTriangles))
+	for triangle := range allTriangles {
+		triangleBasis = append(triangleBasis, triangle)
+	}
+	
+	// Step 4: Build LLR complex X_{n,k}^{(2)} = K_n^{(1)} ∪ S_1 ∪ ... ∪ S_k
+	sortBases := true
+	complex := NewZComplex(
+		completeGraph.VertexBasis(), 
+		completeGraph.EdgeBasis(), 
+		triangleBasis, 
+		sortBases, 
+		gen.verbose)
+	
+	if gen.verbose {
+		fmt.Printf("Generated LLR complex with %d vertices, %d edges, %d triangles\n",
+			len(complex.VertexBasis()), len(complex.EdgeBasis()), len(complex.TriangleBasis()))
+	}
+	
+	return complex, nil
 }
 
 // SteinerSystemGenerator generates (n,2)-Steiner systems using the greedy
@@ -65,8 +109,8 @@ func NewSteinerSystemGenerator(n int, verbose bool) *SteinerSystemGenerator {
 }
 
 // Generate runs the greedy algorithm to produce a partial (n,2)-Steiner system.
-// Returns a slice of triangles such that every edge appears in at most one triangle.
-func (g *SteinerSystemGenerator) Generate() ([]ZTriangle[ZVertexInt], error) {
+// Returns a map of triangles such that every edge appears in at most one triangle.
+func (g *SteinerSystemGenerator) Generate() (map[ZTriangle[ZVertexInt]]bool, error) {
 	// Check that we have enough vertices to form triangles
 	if g.numVertices < 3 {
 		return nil, fmt.Errorf("cannot form Steiner Triple System with n=%d vertices (need n >= 3)", g.numVertices)
@@ -114,7 +158,7 @@ func (g *SteinerSystemGenerator) Generate() ([]ZTriangle[ZVertexInt], error) {
 	
 	// Greedily select legal triangles
 	coveredEdges := make(map[int]bool)
-	selectedTriangles := make([]ZTriangle[ZVertexInt], 0)
+	selectedTriangles := make(map[ZTriangle[ZVertexInt]]bool)
 	
 	for _, triangle := range allTriangles {
 		// Get edge IDs for this triangle
@@ -128,7 +172,7 @@ func (g *SteinerSystemGenerator) Generate() ([]ZTriangle[ZVertexInt], error) {
 		}
 		
 		// Legal triangle - adopt it
-		selectedTriangles = append(selectedTriangles, triangle)
+		selectedTriangles[triangle] = true
 		coveredEdges[id1] = true
 		coveredEdges[id2] = true
 		coveredEdges[id3] = true
