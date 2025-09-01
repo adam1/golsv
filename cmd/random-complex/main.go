@@ -11,6 +11,7 @@ import (
 //
 //   random-complex -d1 d1.txt -d2 d2.txt -dimC0 100
 //   random-complex -regularity 3 -dimC0 50 -iterations 2000
+//   random-complex -llr -dimC0 13 -k 2
 //
 func main() {
 	args := parseFlags()
@@ -23,6 +24,13 @@ func main() {
 	if args.Circulant {
 		var complex *golsv.ZComplex[golsv.ZVertexInt]
 		complex, err = gen.RandomCirculantComplex(args.DimC0, args.RegularityDegree)
+		if err == nil {
+			d_1, d_2 = complex.D1(), complex.D2()
+		}
+	} else if args.LLR {
+		var complex *golsv.ZComplex[golsv.ZVertexInt]
+		llrGen := golsv.NewRandomCoboundaryExpanderGenerator(args.DimC0, args.LLRk, args.Verbose)
+		complex, err = llrGen.Generate()
 		if err == nil {
 			d_1, d_2 = complex.D1(), complex.D2()
 		}
@@ -70,6 +78,8 @@ type Args struct {
 	Simplicial         bool
 	Clique             bool
 	Circulant          bool
+	LLR                bool
+	LLRk               int
 	ProbEdge           float64
 	RegularityDegree   int
 	MaxRetries         int
@@ -85,6 +95,7 @@ func parseFlags() *Args {
 		RegularityDegree: -1,
 		MaxRetries: 100,
 		MaxIterations: 1000,
+		LLRk: 2,
 	}
 	args.ProfileArgs.ConfigureFlags()
 	flag.BoolVar(&args.Circulant, "circulant", args.Circulant, "Generate a circulant clique complex")
@@ -94,6 +105,8 @@ func parseFlags() *Args {
 	flag.IntVar(&args.DimC0, "dimC0", args.DimC0, fmt.Sprintf("dim C_0 (default %d)", args.DimC0))
 	flag.Float64Var(&args.ProbEdge, "p", args.ProbEdge, "probability of edge in random graph")
 	flag.IntVar(&args.RegularityDegree, "regular", args.RegularityDegree, fmt.Sprintf("regularity degree for regular complex (default %d)", args.RegularityDegree))
+	flag.BoolVar(&args.LLR, "llr", args.LLR, "Generate LLR random coboundary expander")
+	flag.IntVar(&args.LLRk, "k", args.LLRk, fmt.Sprintf("number of Steiner systems for LLR construction (default %d)", args.LLRk))
 	flag.IntVar(&args.MaxRetries, "retries", args.MaxRetries, fmt.Sprintf("max retries for regular graph generation (default %d)", args.MaxRetries))
 	flag.IntVar(&args.MaxIterations, "iterations", args.MaxIterations, fmt.Sprintf("max iterations for balancing algorithm (default %d)", args.MaxIterations))
 	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "complex should be simplicial")
