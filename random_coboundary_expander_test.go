@@ -83,7 +83,8 @@ func TestSteinerSystemGeneratorEdgeCases(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gen := NewSteinerSystemGenerator(test.numVertices, false)
+			verbose := false
+			gen := NewSteinerSystemGenerator(test.numVertices, verbose)
 			
 			_, err := gen.Generate()
 			
@@ -100,8 +101,9 @@ func TestSteinerSystemGeneratorEdgeCases(t *testing.T) {
 func TestSteinerSystemGeneratorManual(t *testing.T) {
 	// Hardcoded n for manual testing - adjust as needed
 	n := 13 // Change this to test different sizes: 3, 7, 9, 13, 15, 19, etc.
-	
-	gen := NewSteinerSystemGenerator(n, true) // verbose=true for debugging
+
+	verbose := false
+	gen := NewSteinerSystemGenerator(n, verbose)
 	triangleMap, err := gen.Generate()
 	
 	if err != nil {
@@ -117,19 +119,23 @@ func TestSteinerSystemGeneratorManual(t *testing.T) {
 	t.Logf("Generated %d triangles for n=%d:", len(triangles), n)
 	for i, triangle := range triangles {
 		v0, v1, v2 := int(triangle[0].(ZVertexInt)), int(triangle[1].(ZVertexInt)), int(triangle[2].(ZVertexInt))
-		t.Logf("  %d: {%d, %d, %d}", i, v0, v1, v2)
+		if verbose {
+			t.Logf("  %d: {%d, %d, %d}", i, v0, v1, v2)
+		}
 	}
 	
 	// Calculate theoretical maximum
 	totalEdges := n * (n - 1) / 2
 	theoreticalMaxTriangles := totalEdges / 3 // Each triangle covers 3 edges
-	
-	t.Logf("Coverage analysis:")
-	t.Logf("  Total edges in K_%d: %d", n, totalEdges)
-	t.Logf("  Edges covered: %d", len(triangles)*3)
-	t.Logf("  Coverage ratio: %.2f%%", float64(len(triangles)*3)/float64(totalEdges)*100)
-	t.Logf("  Theoretical max triangles: %d", theoreticalMaxTriangles)
-	t.Logf("  Efficiency: %.2f%%", float64(len(triangles))/float64(theoreticalMaxTriangles)*100)
+
+	if verbose {
+		t.Logf("Coverage analysis:")
+		t.Logf("  Total edges in K_%d: %d", n, totalEdges)
+		t.Logf("  Edges covered: %d", len(triangles)*3)
+		t.Logf("  Coverage ratio: %.2f%%", float64(len(triangles)*3)/float64(totalEdges)*100)
+		t.Logf("  Theoretical max triangles: %d", theoreticalMaxTriangles)
+		t.Logf("  Efficiency: %.2f%%", float64(len(triangles))/float64(theoreticalMaxTriangles)*100)
+	}
 }
 
 // Helper functions
@@ -151,8 +157,9 @@ func TestRandomCoboundaryExpanderGenerator(t *testing.T) {
 	// Test the full LLR construction
 	n := 7  // Start with n=7 (perfect STS exists)
 	k := 2  // Use k=2 systems
-	
-	gen := NewRandomCoboundaryExpanderGenerator(n, k, true)
+
+	verbose := false
+	gen := NewRandomCoboundaryExpanderGenerator(n, k, verbose)
 	complex, err := gen.Generate()
 	
 	if err != nil {
