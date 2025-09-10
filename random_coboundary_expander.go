@@ -2,6 +2,7 @@ package golsv
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"time"
@@ -39,7 +40,7 @@ func NewRandomCoboundaryExpanderGenerator(n, k int, verbose bool) *RandomCobound
 
 func (gen *RandomCoboundaryExpanderGenerator) Generate() (*ZComplex[ZVertexInt], error) {
 	if gen.verbose {
-		fmt.Printf("Generating 2D random coboundary expander: n=%d, k=%d\n", 
+		log.Printf("Generating 2D random coboundary expander: n=%d, k=%d\n", 
 			gen.numVertices, gen.numSystems)
 	}
 	
@@ -49,7 +50,7 @@ func (gen *RandomCoboundaryExpanderGenerator) Generate() (*ZComplex[ZVertexInt],
 	
 	for i := 0; i < gen.numSystems; i++ {
 		if gen.verbose {
-			fmt.Printf("Generating Steiner system %d/%d\n", i+1, gen.numSystems)
+			log.Printf("Generating Steiner system %d/%d\n", i+1, gen.numSystems)
 		}
 		
 		triangleMap, err := steinerGen.Generate()
@@ -63,7 +64,7 @@ func (gen *RandomCoboundaryExpanderGenerator) Generate() (*ZComplex[ZVertexInt],
 		}
 		
 		if gen.verbose {
-			fmt.Printf("  Added %d triangles from system %d (total unique: %d)\n", 
+			log.Printf("  Added %d triangles from system %d (total unique: %d)\n", 
 				len(triangleMap), i+1, len(allTriangles))
 		}
 	}
@@ -87,7 +88,7 @@ func (gen *RandomCoboundaryExpanderGenerator) Generate() (*ZComplex[ZVertexInt],
 		gen.verbose)
 	
 	if gen.verbose {
-		fmt.Printf("Generated LLR complex with %d vertices, %d edges, %d triangles\n",
+		log.Printf("Generated LLR complex with %d vertices, %d edges, %d triangles\n",
 			len(complex.VertexBasis()), len(complex.EdgeBasis()), len(complex.TriangleBasis()))
 	}
 	
@@ -127,7 +128,7 @@ func (g *SteinerSystemGenerator) Generate() (map[ZTriangle[ZVertexInt]]bool, err
 	}
 	
 	if g.verbose {
-		fmt.Printf("Generating (n,2)-Steiner system with n=%d vertices\n", g.numVertices)
+		log.Printf("Generating (n,2)-Steiner system with n=%d vertices\n", g.numVertices)
 	}
 	
 	// Edge encoding function: maps edge (i,j) where i < j to unique int
@@ -181,7 +182,7 @@ func (g *SteinerSystemGenerator) Generate() (map[ZTriangle[ZVertexInt]]bool, err
 	if g.verbose {
 		totalEdges := g.numVertices * (g.numVertices - 1) / 2
 		coveredCount := len(coveredEdges)
-		fmt.Printf("Generated %d triangles covering %d/%d edges\n", 
+		log.Printf("Generated %d triangles covering %d/%d edges\n", 
 			len(selectedTriangles), coveredCount, totalEdges)
 	}
 	
