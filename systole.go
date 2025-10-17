@@ -154,25 +154,24 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 // algebra search on subcomplexes for expediency. The two are thought
 // to be equivalent in the case of Cayley complexes.
 type SimplicialSystoleSearch[T any] struct {
-	C           *ZComplex[T]
-	StopNonzero bool
-	Verbose     bool
+	C               *ZComplex[T]
+	StartFiltration int
+	StopNonzero     bool
+	Verbose         bool
 }
 
-func NewSimplicialSystoleSearch[T any](C *ZComplex[T], stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
 	return &SimplicialSystoleSearch[T]{
-		C:           C,
-		StopNonzero: stopNonzero,
-		Verbose:     verbose,
+		C:               C,
+		StartFiltration: startFiltration,
+		StopNonzero:     stopNonzero,
+		Verbose:         verbose,
 	}
 }
 
 func (S *SimplicialSystoleSearch[T]) Search() int {
 	minWeight := 0
 	for i, v := range S.C.VertexBasis() {
-		if S.Verbose {
-			log.Printf("Complex: %s\ndoing simplicial search at vertex %d", S.C, i)
-		}
 		w := S.SearchAtVertex(v)
 		if w > 0 && (w < minWeight || minWeight == 0) {
 			minWeight = w
@@ -186,8 +185,15 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 
 // xxx potential optimization? reuse/extend UB from one filtration step to the next
 func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
+	if S.Verbose {
+		log.Printf("Complex: %s", S.C)
+		log.Printf("Starting simplicial search at vertex v=%v step=%d", v, S.StartFiltration)
+	}
 	minWeight := 0
 	S.C.TriangularDepthFiltration(v, func(step int, subcomplex *ZComplex[T]) (stop bool) {
+		if step < S.StartFiltration {
+			return false
+		}
 		if S.Verbose {
 			//log.Printf("checking subcomplex of triangle depth filtration step %d", step)
 			//log.Printf("subcomplex: %s", subcomplex.MaximalSimplicesString())

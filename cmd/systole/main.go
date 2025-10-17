@@ -72,7 +72,7 @@ func doExhaustiveSystoleAndCosystoleSearchFromComplex(args *Args) {
 
 func doSimplicialSystoleSearch(args *Args) {
 	X := complexFromBoundaryMatrices(args)
-	S := golsv.NewSimplicialSystoleSearch(X, args.SimplicialStopNonzero, args.Verbose)
+	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialStopNonzero, args.Verbose)
 	weight := S.Search()
 	if args.SystoleFile != "" {
 		writeIntegerFile(weight, args.SystoleFile)
@@ -82,7 +82,7 @@ func doSimplicialSystoleSearch(args *Args) {
 
 func doSimplicialSystoleSearchAtVertex(args *Args) {
 	X := complexFromBoundaryMatrices(args)
-	S := golsv.NewSimplicialSystoleSearch(X, args.SimplicialStopNonzero, args.Verbose)
+	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialStopNonzero, args.Verbose)
 	weight := S.SearchAtVertex(X.VertexBasis()[args.SimplicialAtVertex])
 	if args.SystoleFile != "" {
 		writeIntegerFile(weight, args.SystoleFile)
@@ -161,6 +161,7 @@ type Args struct {
 	Simplicial            bool
 	SimplicialAtVertex    int
 	SimplicialStopNonzero bool
+	StartFiltration       int
 	SystoleFile           string
 	Trials                int
 	UFile                 string
@@ -180,6 +181,7 @@ func parseFlags() *Args {
 	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "do simplicial systole search (global)")
 	flag.IntVar(&args.SimplicialAtVertex, "simplicial-at-vertex", args.SimplicialAtVertex, "do simplicial systole search starting at given vertex index")
 	flag.BoolVar(&args.SimplicialStopNonzero, "simplicial-stop-nonzero", args.SimplicialStopNonzero, "stop simplicial systole search at first nonzero finding")
+	flag.IntVar(&args.StartFiltration, "start-filtration", args.StartFiltration, "start filtration at given step (default 0)")
 	flag.StringVar(&args.SystoleFile, "systole", args.SystoleFile, "systole output file (text)")
 	flag.IntVar(&args.Trials, "trials", args.Trials, "number of samples of minimum weight search (0=exhaustive search)")
 	flag.StringVar(&args.UFile, "U", args.UFile, "matrix U input file (sparse column support txt format)")

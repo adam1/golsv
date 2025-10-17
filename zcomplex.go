@@ -854,8 +854,7 @@ func nearerTriangleInNewIndex[T any](index map[ZVertex[T]]int, a ZTriangle[T], b
 }
 
 func (C *ZComplex[T]) String() string {
-	return fmt.Sprintf("complex with %v triangles, %v edges, %v vertices",
-		len(C.triangleBasis), len(C.edgeBasis), len(C.vertexBasis))
+	return fmt.Sprintf("V=%d E=%d F=%d", len(C.vertexBasis), len(C.edgeBasis), len(C.triangleBasis))
 }
 
 func (C *ZComplex[T]) DumpBases() (s string) {
