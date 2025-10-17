@@ -481,7 +481,7 @@ func TestShor9qubit(t *testing.T) {
 		log.Printf("Z_1: %s\n%s", Z_1, DumpMatrix(Z_1))
 		log.Printf("B_1: %s\n%s", B_1, DumpMatrix(B_1))
 	}
-	S_1 := SystoleExhaustiveSearch(U_1, B_1, verbose)
+	S_1, _ := SystoleExhaustiveSearch(U_1, B_1, verbose)
 	if S_1 != 3 {
 		t.Errorf("S_1 = %d, want 3", S_1)
 	}

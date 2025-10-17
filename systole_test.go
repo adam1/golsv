@@ -41,7 +41,7 @@ func TestSystoleSearchSmallExamples(t *testing.T) {
 		if gotSystoleRandom != test.wantSystole {
 			t.Errorf("systole random search [%d] got=%d want=%d", i, gotSystoleRandom, test.wantSystole)
 		}
-		gotSystoleExhaustive := SystoleExhaustiveSearch(U, B, verbose)
+		gotSystoleExhaustive, _ := SystoleExhaustiveSearch(U, B, verbose)
 		if gotSystoleExhaustive != test.wantSystole {
 			t.Errorf("systole exhaustive search [%d] got=%d want=%d", i, gotSystoleExhaustive, test.wantSystole)
 		}
@@ -52,7 +52,7 @@ func TestSystoleSearchSmallExamples(t *testing.T) {
 		if gotCosystoleRandom != test.wantCosystole {
 			t.Errorf("cosystole random search [%d] got=%d want=%d", i, gotCosystoleRandom, test.wantCosystole)
 		}
-		gotCosystoleExhaustive := SystoleExhaustiveSearch(U, B, verbose)
+		gotCosystoleExhaustive, _ := SystoleExhaustiveSearch(U, B, verbose)
 		if gotCosystoleExhaustive != test.wantCosystole {
 			t.Errorf("cosystole exhaustive search [%d] got=%d want=%d", i, gotCosystoleExhaustive, test.wantCosystole)
 		}
@@ -65,14 +65,14 @@ func TestSystoleCyclicGraphs(t *testing.T) {
 	for i := 3; i < maxLength; i++ {
 		d1, d2 := cyclicGraph(i)
 		U, B, _, _, _, _ := UBDecomposition(d1, d2, verbose)
-		gotSystole := SystoleExhaustiveSearch(U, B, verbose)
+		gotSystole, _ := SystoleExhaustiveSearch(U, B, verbose)
 		if gotSystole != i {
 			t.Errorf("systole search for cyclic graph %d got=%d want=%d", i, gotSystole, i)
 		}
 		delta0 := d1.Transpose().Dense()
 		delta1 := d2.Transpose().Dense()
 		U, B, _, _, _, _ = UBDecomposition(delta1, delta0, verbose)
-		gotCosystole := SystoleExhaustiveSearch(U, B, verbose)
+		gotCosystole, _ := SystoleExhaustiveSearch(U, B, verbose)
 		if gotCosystole != 1 {
 			t.Errorf("cosystole search for cyclic graph %d got=%d want=1", i, gotCosystole)
 		}

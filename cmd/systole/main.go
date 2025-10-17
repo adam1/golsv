@@ -134,7 +134,7 @@ func doSystoleSearchFromUB(args *Args) {
 
 	var minWeight int
 	if args.Trials <= 0 {
-		minWeight = golsv.SystoleExhaustiveSearch(Udense, Bdense, args.Verbose)
+		minWeight, _ = golsv.SystoleExhaustiveSearch(Udense, Bdense, args.Verbose)
 	} else {
 		minWeight = golsv.SystoleRandomSearch(Udense, Bdense, args.Trials, args.Verbose)
 	}

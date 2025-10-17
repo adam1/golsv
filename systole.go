@@ -91,9 +91,9 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 	return minWeight
 }
 
-func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
+func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int, minVector BinaryMatrix) {
 	if U.NumColumns() == 0 {
-		return 0
+		return 0, nil
 	}
 	minWeight = math.MaxInt
 	EnumerateBinaryVectorSpace(U, func(a BinaryMatrix, indexU int) bool {
@@ -106,6 +106,7 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 			weight := sum.ColumnWeight(0)
 			if weight < minWeight {
 				minWeight = weight
+				minVector = sum.Copy()
 				if verbose {
 					log.Printf("exhaustive search; new min weight: %d", minWeight)
 					//log.Printf("c: %s", sum.ColumnVector(0).SupportString())
@@ -116,9 +117,9 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 		return true
 	})
 	if minWeight == math.MaxInt {
-		return 0
+		return 0, nil
 	}
-	return minWeight
+	return minWeight, minVector
 }
 
 // ComputeFirstSystole computes the degree one systole of the complex.
@@ -134,7 +135,7 @@ func ComputeFirstSystole(d1, d2 BinaryMatrix, verbose bool) (systole, dimZ1, dim
 	var U, B BinaryMatrix
 	U, B, _, dimZ1, dimB1, dimH1 = UBDecomposition(d1, d2, verbose)
 	U, B = U.Dense(), B.Dense()
-	systole = SystoleExhaustiveSearch(U, B, verbose)
+	systole, _ = SystoleExhaustiveSearch(U, B, verbose)
 	return
 }
 
@@ -146,7 +147,8 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	delta1 := d2.Transpose().Dense()
 	U, B, _, _, _, _ := UBDecomposition(delta1, delta0, verbose)
 	U, B = U.Dense(), B.Dense()
-	return SystoleExhaustiveSearch(U, B, verbose)
+	cosystole, _ = SystoleExhaustiveSearch(U, B, verbose)
+	return
 }
 
 // The simplicial systole search algorithm is not guaranteed to find
@@ -207,9 +209,10 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 			log.Printf("step=%d %s dimZ1=%d dimB1=%d dimH1=%d", step, subcomplex, dimZ1, dimB1, dimH1)
 		}
 		U, B = U.Dense(), B.Dense()
-		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
+		localSystole, localVector := SystoleExhaustiveSearch(U, B, S.Verbose)
 		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
 			minWeight = localSystole
+			_ = localVector // TODO: use this vector to compute minimum degree
 			if S.StopNonzero {
 				if S.Verbose {
 					log.Printf("stopping at triangle step %d", step)
