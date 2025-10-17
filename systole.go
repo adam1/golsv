@@ -115,6 +115,9 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 		})
 		return true
 	})
+	if minWeight == math.MaxInt {
+		return 0
+	}
 	return minWeight
 }
 
@@ -201,7 +204,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
 		if S.Verbose {
-			log.Printf("step=%d dimZ1=%d dimB1=%d dimH1=%d", step, dimZ1, dimB1, dimH1)
+			log.Printf("step=%d %s dimZ1=%d dimB1=%d dimH1=%d", step, subcomplex, dimZ1, dimB1, dimH1)
 		}
 		U, B = U.Dense(), B.Dense()
 		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
