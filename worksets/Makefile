@@ -34,6 +34,15 @@ $(shell touch $(log))
 # approaches.
 
 
+# default modulus is 111, i.e. 1+y+y^2
+modulus.txt:
+	echo 111 > $@
+
+
+# default max-depth is 0, i.e. unlimited
+max-depth.txt:
+	echo 0 > $@
+
 # Tool 1.  This target computes simplicial complex
 #
 #     X= Cay(PGL(F_4), S)
@@ -403,7 +412,7 @@ check-FG: FG.txt
 	rank=$$(dim -in FG.txt -image) && if [[ $$rank -eq `dim -in M.txt -domain` ]]; then echo "FG=I"; else echo "FG does not equal I!"; false; fi
 
 simplicial-systole: d1.txt d2.txt
-	systole -simplicial -simplicial-at-vertex 0 -simplicial-stop-nonzero -d1 d1.txt -d2 d2.txt
+	systole -simplicial -simplicial-at-vertex 0 -simplicial-stop-nonzero -d1 d1.txt -d2 d2.txt 2>&1 | tee simp-sys.$(log)
 
 simplicial-cosystole: d1.txt d2.txt Z1.txt Z^1.txt B^1.txt
 	simplicial-cosystole -verbose -d1 d1.txt -d2 d2.txt -Z1 Z1.txt -Z^1 Z^1.txt -B^1 B^1.txt 2>&1 | tee simp-cosys.$(log)

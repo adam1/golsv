@@ -1286,7 +1286,7 @@ func TestZComplexSortBasesByDistance(t *testing.T) {
 			expectedTriangleBasis[i] = NewZTriangle(ZVertexInt(s[0]), ZVertexInt(s[1]), ZVertexInt(s[2]))
 		}
 
-		Y := X.SortBasesByDistance(test.initialVertex)
+		Y, _ := X.SortBasesByDistance(test.initialVertex)
 		gotVertexBasis := Y.VertexBasis()
 		if !reflect.DeepEqual(gotVertexBasis, expectedVertexBasis) {
 			t.Errorf("Test %d: vertex basis: got=%v, expected=%v", n, gotVertexBasis, expectedVertexBasis)
@@ -1326,7 +1326,7 @@ func TestZComplexSortBasesByDistanceRandomComplexes(t *testing.T) {
 					t.Errorf("Trial %d: Panic during SortBasesByDistance: %v\noriginal complex:\n%v", i, r, Xoriginal.DumpBases())
 				}
 			}()
-			Xsorted = Xoriginal.SortBasesByDistance(initialVertex)
+			Xsorted, _ = Xoriginal.SortBasesByDistance(initialVertex)
 		}()
 		//log.Printf("XSorted:\n%s", Xsorted.DumpBases())
 
@@ -1480,7 +1480,7 @@ func TestZComplexTriangularDepthFiltration(t *testing.T) {
 	}
 	for n, test := range tests {
 		var got []*ZComplex[ZVertexInt]
-		test.C.TriangularDepthFiltration(test.C.VertexBasis()[test.Start], func(step int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
+		test.C.TriangularDepthFiltration(test.C.VertexBasis()[test.Start], func(triangleIndex int, distanceMap map[int]int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
 			got = append(got, subcomplex)
 			return false
 		})

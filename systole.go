@@ -23,9 +23,9 @@ import (
 // The two functions below implement a random search and an exhaustive
 // search for the minimum weight of such a vector.
 
-func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight int) {
+func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight int, minVector BinaryVector) {
 	if U.NumColumns() == 0 {
-		return 0
+		return 0, BinaryVector{}
 	}
 	reportInterval := 10
 	timeStart := time.Now()
@@ -41,6 +41,7 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 		}
 		if weight < minWeight {
 			minWeight = weight
+			minVector = U.ColumnVector(j)
 			if verbose {
 				log.Printf("new min weight: %d", minWeight)
 			}
@@ -68,6 +69,7 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 		}
 		if weight < minWeight {
 			minWeight = weight
+			minVector = a.ColumnVector(0)
 			if verbose {
 				log.Printf("new min weight: %d", minWeight)
 			}
@@ -84,16 +86,16 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 					float64(n)/timeElapsed.Seconds())
 			}
 			if timeInterval.Seconds() < 10 {
-				reportInterval *= 2
+				reportInterval = int(float64(reportInterval)*1.5)
 			}
 		}
 	}
-	return minWeight
+	return minWeight, minVector
 }
 
-func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
+func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int, minVector BinaryVector) {
 	if U.NumColumns() == 0 {
-		return 0
+		return 0, BinaryVector{}
 	}
 	minWeight = math.MaxInt
 	EnumerateBinaryVectorSpace(U, func(a BinaryMatrix, indexU int) bool {
@@ -106,6 +108,7 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 			weight := sum.ColumnWeight(0)
 			if weight < minWeight {
 				minWeight = weight
+				minVector = sum.ColumnVector(0)
 				if verbose {
 					log.Printf("exhaustive search; new min weight: %d", minWeight)
 					//log.Printf("c: %s", sum.ColumnVector(0).SupportString())
@@ -115,7 +118,10 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int) {
 		})
 		return true
 	})
-	return minWeight
+	if minWeight == math.MaxInt {
+		return 0, BinaryVector{}
+	}
+	return minWeight, minVector
 }
 
 // ComputeFirstSystole computes the degree one systole of the complex.
@@ -131,7 +137,7 @@ func ComputeFirstSystole(d1, d2 BinaryMatrix, verbose bool) (systole, dimZ1, dim
 	var U, B BinaryMatrix
 	U, B, _, dimZ1, dimB1, dimH1 = UBDecomposition(d1, d2, verbose)
 	U, B = U.Dense(), B.Dense()
-	systole = SystoleExhaustiveSearch(U, B, verbose)
+	systole, _ = SystoleExhaustiveSearch(U, B, verbose)
 	return
 }
 
@@ -143,36 +149,43 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 	delta1 := d2.Transpose().Dense()
 	U, B, _, _, _, _ := UBDecomposition(delta1, delta0, verbose)
 	U, B = U.Dense(), B.Dense()
-	return SystoleExhaustiveSearch(U, B, verbose)
+	cosystole, _ = SystoleExhaustiveSearch(U, B, verbose)
+	return
 }
 
 // The simplicial systole search algorithm is not guaranteed to find
 // the global systole in all cases.  See thesis for details.  NB: The
 // thesis describes "local" systoles where we restrict our attention
 // to cycles incident to some vertex.  That is different in general to
-// what is implemented here, which uses the ordinary exhaustive linear
-// algebra search on subcomplexes for expediency. The two are thought
-// to be equivalent in the case of Cayley complexes.
+// what is implemented here, which uses the ordinary exhaustive or
+// randomized linear algebra search on subcomplexes for
+// expediency. The two are thought to be equivalent in the case of
+// Cayley complexes.
 type SimplicialSystoleSearch[T any] struct {
-	C           *ZComplex[T]
-	StopNonzero bool
-	Verbose     bool
+	C                     *ZComplex[T]
+	RandomTrials          int
+	StartFiltration       int
+	StopAtMinDegree       int
+	StopNonzero           bool
+	LogTriangleDepthsOnly bool
+	Verbose               bool
 }
 
-func NewSimplicialSystoleSearch[T any](C *ZComplex[T], stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, randomTrials int, stopAtMinDegree int, stopNonzero bool, logTriangleDepthsOnly bool, verbose bool) *SimplicialSystoleSearch[T] {
 	return &SimplicialSystoleSearch[T]{
-		C:           C,
-		StopNonzero: stopNonzero,
-		Verbose:     verbose,
+		C:                     C,
+		RandomTrials:          randomTrials,
+		StartFiltration:       startFiltration,
+		StopAtMinDegree:       stopAtMinDegree,
+		StopNonzero:           stopNonzero,
+		LogTriangleDepthsOnly: logTriangleDepthsOnly,
+		Verbose:               verbose,
 	}
 }
 
 func (S *SimplicialSystoleSearch[T]) Search() int {
 	minWeight := 0
 	for i, v := range S.C.VertexBasis() {
-		if S.Verbose {
-			log.Printf("Complex: %s\ndoing simplicial search at vertex %d", S.C, i)
-		}
 		w := S.SearchAtVertex(v)
 		if w > 0 && (w < minWeight || minWeight == 0) {
 			minWeight = w
@@ -184,32 +197,194 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 	return minWeight
 }
 
+func minVertexDegreeInEdgeVector[T any](C *ZComplex[T], edgeVector BinaryVector) int {
+	vertexSet := make(map[int]bool)
+	edgeBasis := C.EdgeBasis()
+	vertexIndex := C.VertexIndex()
+
+	for i := 0; i < edgeVector.Length(); i++ {
+		if edgeVector.Get(i) == 1 {
+			edge := edgeBasis[i]
+			v0Index := vertexIndex[edge[0]]
+			v1Index := vertexIndex[edge[1]]
+			vertexSet[v0Index] = true
+			vertexSet[v1Index] = true
+		}
+	}
+
+	minDegree := math.MaxInt
+	for vIndex := range vertexSet {
+		degree := C.Degree(vIndex)
+		if degree < minDegree {
+			minDegree = degree
+		}
+	}
+
+	if minDegree == math.MaxInt {
+		return 0
+	}
+	return minDegree
+}
+
 // xxx potential optimization? reuse/extend UB from one filtration step to the next
 func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
+	if S.Verbose {
+		log.Printf("Complex: %s", S.C)
+		log.Printf("Starting simplicial search at vertex v=%v step=%d", v, S.StartFiltration)
+	}
 	minWeight := 0
-	S.C.TriangularDepthFiltration(v, func(step int, subcomplex *ZComplex[T]) (stop bool) {
+	prevTriangleDist := 0
+	S.C.TriangularDepthFiltration(v, func(triangleIndex int, distanceMap map[int]int, subcomplex *ZComplex[T]) (stop bool) {
+		if triangleIndex < S.StartFiltration {
+			return false
+		}
 		if S.Verbose {
-			//log.Printf("checking subcomplex of triangle depth filtration step %d", step)
+			//log.Printf("checking subcomplex of triangle depth filtration step %d", triangleIndex)
 			//log.Printf("subcomplex: %s", subcomplex.MaximalSimplicesString())
+		}
+		if triangleIndex < len(subcomplex.TriangleBasis()) {
+			t := subcomplex.TriangleBasis()[triangleIndex]
+			vind := subcomplex.VertexIndex()
+			v0 := vind[t[0]]
+			v1 := vind[t[1]]
+			v2 := vind[t[2]]
+			d0 := distanceMap[v0]
+			d1 := distanceMap[v1]
+			d2 := distanceMap[v2]
+			mindist := d0
+			if d1 < mindist {
+				mindist = d1
+			}
+			if d2 < mindist {
+				mindist = d2
+			}
+			if mindist > prevTriangleDist {
+				if S.Verbose {
+					log.Printf("step=%d triangle distance increases to %d", triangleIndex, mindist)
+				}
+				prevTriangleDist = mindist
+			}
+			if S.LogTriangleDepthsOnly {
+				return false
+			}
 		}
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
-		if S.Verbose {
-			log.Printf("step=%d dimZ1=%d dimB1=%d dimH1=%d", step, dimZ1, dimB1, dimH1)
+		if S.Verbose && triangleIndex < len(subcomplex.TriangleBasis()) {
+			t := subcomplex.TriangleBasis()[triangleIndex]
+			vind := subcomplex.VertexIndex()
+			v0 := vind[t[0]]
+			v1 := vind[t[1]]
+			v2 := vind[t[2]]
+			d0 := distanceMap[v0]
+			d1 := distanceMap[v1]
+			d2 := distanceMap[v2]
+			log.Printf("step=%d vertices=[%d %d %d] distances=[%d %d %d] %s dimZ1=%d dimB1=%d dimH1=%d",
+				triangleIndex, v0, v1, v2, d0, d1, d2, subcomplex, dimZ1, dimB1, dimH1)
 		}
 		U, B = U.Dense(), B.Dense()
-		localSystole := SystoleExhaustiveSearch(U, B, S.Verbose)
+		var localSystole int
+		var localVector BinaryVector
+		if S.RandomTrials > 0 {
+			localSystole, localVector = SystoleRandomSearch(U, B, S.RandomTrials, S.Verbose)
+		} else {
+			localSystole, localVector = SystoleExhaustiveSearch(U, B, S.Verbose)
+		}
 		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
 			minWeight = localSystole
 			if S.StopNonzero {
 				if S.Verbose {
-					log.Printf("stopping at triangle step %d", step)
+					log.Printf("stopping at triangle step %d", triangleIndex)
 				}
 				return true
 			}
 		}
-
+		if !localVector.IsZero() {
+			minDegree := minVertexDegreeInEdgeVector(subcomplex, localVector)
+			if S.Verbose {
+				log.Printf("step=%d systole=%d minDegree=%d", triangleIndex, localSystole, minDegree)
+			}
+			if S.StopAtMinDegree > 0 && minDegree >= S.StopAtMinDegree {
+				if S.Verbose {
+					log.Printf("stopping at triangle step %d (minDegree=%d >= %d)", triangleIndex, minDegree, S.StopAtMinDegree)
+				}
+				return true
+			}
+			if S.Verbose && triangleIndex < len(subcomplex.TriangleBasis()) {
+				logIntersection(subcomplex, triangleIndex, localVector)
+			}
+		}
 		return false
 	})
 	return minWeight
+}
+
+func EdgeVectorSupports[T any] (subcomplex *ZComplex[T], edgeVector BinaryVector) (vertexSupport map[int]bool, edgeSupport map[int]bool) {
+	vertexSupport = make(map[int]bool)
+	edgeSupport = make(map[int]bool)
+	edgeBasis := subcomplex.EdgeBasis()
+	vertexIndex := subcomplex.VertexIndex()
+	for i := 0; i < edgeVector.Length(); i++ {
+		if edgeVector.Get(i) == 1 {
+			edgeSupport[i] = true
+			edge := edgeBasis[i]
+			v0 := vertexIndex[edge[0]]
+			v1 := vertexIndex[edge[1]]
+			vertexSupport[v0] = true
+			vertexSupport[v1] = true
+		}
+	}
+	return vertexSupport, edgeSupport
+}
+
+func TriangleSupports[T any](subcomplex *ZComplex[T], triangleIndex int) (vertexSupport map[int]bool, edgeSupport map[int]bool) {
+	vertexSupport = make(map[int]bool)
+	edgeSupport = make(map[int]bool)
+	t := subcomplex.TriangleBasis()[triangleIndex]
+	edges := t.Edges()
+	edgeIndex := subcomplex.EdgeIndex()
+	vertexIndex := subcomplex.VertexIndex()
+
+	v0 := vertexIndex[t[0]]
+	v1 := vertexIndex[t[1]]
+	v2 := vertexIndex[t[2]]
+	vertexSupport[v0] = true
+	vertexSupport[v1] = true
+	vertexSupport[v2] = true
+
+	for _, edge := range edges {
+		n := edgeIndex[edge]
+		edgeSupport[n] = true
+	}
+	return vertexSupport, edgeSupport
+}
+
+func logIntersection[T any](subcomplex *ZComplex[T], triangleIndex int, edgeVector BinaryVector) {
+	triangleVertexSupport, triangleEdgeSupport := TriangleSupports(subcomplex, triangleIndex)
+
+	edgeVecVertexSupport, edgeVecEdgeSupport := EdgeVectorSupports(subcomplex, edgeVector)
+
+	edgeIntersection := supportIntersection(edgeVecEdgeSupport, triangleEdgeSupport)
+	edgeKeys := make([]int, 0, len(edgeIntersection))
+	for k := range edgeIntersection {
+		edgeKeys = append(edgeKeys, k)
+	}
+	log.Printf("local vector edge intersection with triangle t: %v", edgeKeys)
+
+	vertexIntersection := supportIntersection(edgeVecVertexSupport, triangleVertexSupport)
+	vertexKeys := make([]int, 0, len(vertexIntersection))
+	for k := range vertexIntersection {
+		vertexKeys = append(vertexKeys, k)
+	}
+	log.Printf("local vector vertex intersection with triangle t: %v", vertexKeys)
+}
+
+func supportIntersection(a, b map[int]bool) (result map[int]bool) {
+	result = make(map[int]bool)
+	for k := range a {
+		if _, ok := b[k]; ok {
+			result[k] = true
+		}
+	}
+	return result
 }

@@ -347,7 +347,11 @@ func LinearCombination(generators BinaryMatrix, coefficients *Sparse) BinaryMatr
 func pow(base, exp int) int {
 	result := 1
 	for i := 0; i < exp; i++ {
-		result *= base
+		p := result * base
+		if p < result {
+			panic("Power overflowed")
+		}
+		result = p
 	}
 	return result
 }

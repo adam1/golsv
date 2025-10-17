@@ -739,11 +739,13 @@ func (C *ZComplex[T]) PathToEdgeVector(path ZPath[T]) BinaryVector {
 	return v
 }
 
-// Returns a new complex with the bases sorted by distance from the given vertex.
-func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) *ZComplex[T] {
+// Returns a new complex with the bases sorted by distance from the given vertex,
+// and a map from vertex index (in the new complex) to distance from the initial vertex.
+func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) (*ZComplex[T], map[int]int) {
 	initialVertex := C.vertexBasis[vertexIndex]
 	newVertices := make([]ZVertex[T], len(C.vertexBasis))
 	newVertexIndex := make(map[ZVertex[T]]int)
+	distanceMap := make(map[int]int)
 	i := 0
 	// Note that we handle each connected component of the complex.
 	nextInitialVertex := initialVertex
@@ -751,6 +753,7 @@ func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) *ZComplex[T] {
 		C.BFS(nextInitialVertex, func(v ZVertex[T], depth int) (stop bool) {
 			newVertices[i] = v
 			newVertexIndex[v] = i
+			distanceMap[i] = depth
 			i++
 			return false
 		})
@@ -780,7 +783,7 @@ func (C *ZComplex[T]) SortBasesByDistance(vertexIndex int) *ZComplex[T] {
 	})
 	sortBases := false
 	verbose := C.verbose
-	return NewZComplex(newVertices, newEdges, newTriangles, sortBases, verbose)
+	return NewZComplex(newVertices, newEdges, newTriangles, sortBases, verbose), distanceMap
 }
 
 func nearerEdgeInNewIndex[T any](index map[ZVertex[T]]int, a ZEdge[T], b ZEdge[T]) bool {
@@ -854,8 +857,7 @@ func nearerTriangleInNewIndex[T any](index map[ZVertex[T]]int, a ZTriangle[T], b
 }
 
 func (C *ZComplex[T]) String() string {
-	return fmt.Sprintf("complex with %v triangles, %v edges, %v vertices",
-		len(C.triangleBasis), len(C.edgeBasis), len(C.vertexBasis))
+	return fmt.Sprintf("V=%d E=%d F=%d", len(C.vertexBasis), len(C.edgeBasis), len(C.triangleBasis))
 }
 
 func (C *ZComplex[T]) DumpBases() (s string) {
@@ -953,8 +955,8 @@ func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 }
 
 func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
-	handler func(depth int, subcomplex *ZComplex[T]) (stop bool)) {
-	Y := C.SortBasesByDistance(C.vertexIndex[initialVertex])
+	handler func(triangleIndex int, distanceMap map[int]int, subcomplex *ZComplex[T]) (stop bool)) {
+	Y, distanceMap := C.SortBasesByDistance(C.vertexIndex[initialVertex])
 	vertexIndicesToInclude := make(map[int]bool)
 	stop := false
 	for i, t := range Y.triangleBasis {
@@ -962,7 +964,7 @@ func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
 		vertexIndicesToInclude[Y.vertexIndex[t[1]]] = true
 		vertexIndicesToInclude[Y.vertexIndex[t[2]]] = true
 		subcomplex := Y.SubcomplexByVertices(vertexIndicesToInclude)
-		stop = handler(i, subcomplex)
+		stop = handler(i, distanceMap, subcomplex)
 		if stop {
 			break
 		}
@@ -970,7 +972,7 @@ func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
 	if !stop {
 		// one last call that includes any vertices not already included
 		if len(vertexIndicesToInclude) < len(Y.vertexBasis) {
-			handler(len(Y.triangleBasis), Y)
+			handler(len(Y.triangleBasis), distanceMap, Y)
 		}
 	}
 }
