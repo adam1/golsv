@@ -23,9 +23,9 @@ import (
 // The two functions below implement a random search and an exhaustive
 // search for the minimum weight of such a vector.
 
-func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight int) {
+func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight int, minVector BinaryVector) {
 	if U.NumColumns() == 0 {
-		return 0
+		return 0, BinaryVector{}
 	}
 	reportInterval := 10
 	timeStart := time.Now()
@@ -41,6 +41,7 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 		}
 		if weight < minWeight {
 			minWeight = weight
+			minVector = U.ColumnVector(j)
 			if verbose {
 				log.Printf("new min weight: %d", minWeight)
 			}
@@ -68,6 +69,7 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 		}
 		if weight < minWeight {
 			minWeight = weight
+			minVector = a.ColumnVector(0)
 			if verbose {
 				log.Printf("new min weight: %d", minWeight)
 			}
@@ -88,25 +90,30 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 			}
 		}
 	}
-	return minWeight
+	return minWeight, minVector
 }
 
-func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int, minVector BinaryMatrix) {
+func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int, minVector BinaryVector) {
 	if U.NumColumns() == 0 {
-		return 0, nil
+		return 0, BinaryVector{}
 	}
 	minWeight = math.MaxInt
 	EnumerateBinaryVectorSpace(U, func(a BinaryMatrix, indexU int) bool {
+// 		log.Printf("xxx |a|=%d", a.ColumnWeight(0))
 		if a.IsZero() {
 			return true
 		}
+// 		log.Printf("xxx HERE 1 iu=%d", indexU)
+// 		log.Printf("xxx U=%v B=%v", U, B)
 		EnumerateBinaryVectorSpace(B, func(b BinaryMatrix, indexB int) bool {
+// 			log.Printf("xxx HERE 2 ib=%d", indexB)
 			sum := a.Copy().Dense()
 			sum.AddMatrix(b)
 			weight := sum.ColumnWeight(0)
+// 			log.Printf("xxx |sum|=%d", weight)
 			if weight < minWeight {
 				minWeight = weight
-				minVector = sum.Copy()
+				minVector = sum.ColumnVector(0)
 				if verbose {
 					log.Printf("exhaustive search; new min weight: %d", minWeight)
 					//log.Printf("c: %s", sum.ColumnVector(0).SupportString())
@@ -114,10 +121,11 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int, mi
 			}
 			return true
 		})
+// 		log.Printf("xxx HERE 3 iu=%d", indexU)
 		return true
 	})
 	if minWeight == math.MaxInt {
-		return 0, nil
+		return 0, BinaryVector{}
 	}
 	return minWeight, minVector
 }
@@ -155,19 +163,22 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 // the global systole in all cases.  See thesis for details.  NB: The
 // thesis describes "local" systoles where we restrict our attention
 // to cycles incident to some vertex.  That is different in general to
-// what is implemented here, which uses the ordinary exhaustive linear
-// algebra search on subcomplexes for expediency. The two are thought
-// to be equivalent in the case of Cayley complexes.
+// what is implemented here, which uses the ordinary exhaustive or
+// randomized linear algebra search on subcomplexes for
+// expediency. The two are thought to be equivalent in the case of
+// Cayley complexes.
 type SimplicialSystoleSearch[T any] struct {
 	C               *ZComplex[T]
+	RandomTrials    int
 	StartFiltration int
 	StopNonzero     bool
 	Verbose         bool
 }
 
-func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, randomTrials int, stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
 	return &SimplicialSystoleSearch[T]{
 		C:               C,
+		RandomTrials:    randomTrials,
 		StartFiltration: startFiltration,
 		StopNonzero:     stopNonzero,
 		Verbose:         verbose,
@@ -186,6 +197,35 @@ func (S *SimplicialSystoleSearch[T]) Search() int {
 		}
 	}
 	return minWeight
+}
+
+func minVertexDegreeInEdgeVector[T any](C *ZComplex[T], edgeVector BinaryVector) int {
+	vertexSet := make(map[int]bool)
+	edgeBasis := C.EdgeBasis()
+	vertexIndex := C.VertexIndex()
+
+	for i := 0; i < edgeVector.Length(); i++ {
+		if edgeVector.Get(i) == 1 {
+			edge := edgeBasis[i]
+			v0Index := vertexIndex[edge[0]]
+			v1Index := vertexIndex[edge[1]]
+			vertexSet[v0Index] = true
+			vertexSet[v1Index] = true
+		}
+	}
+
+	minDegree := math.MaxInt
+	for vIndex := range vertexSet {
+		degree := C.Degree(vIndex)
+		if degree < minDegree {
+			minDegree = degree
+		}
+	}
+
+	if minDegree == math.MaxInt {
+		return 0
+	}
+	return minDegree
 }
 
 // xxx potential optimization? reuse/extend UB from one filtration step to the next
@@ -208,11 +248,24 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		if S.Verbose {
 			log.Printf("step=%d %s dimZ1=%d dimB1=%d dimH1=%d", step, subcomplex, dimZ1, dimB1, dimH1)
 		}
+// 		log.Printf("xxx U=%v B=%v", U, B)
 		U, B = U.Dense(), B.Dense()
-		localSystole, localVector := SystoleExhaustiveSearch(U, B, S.Verbose)
+		var localSystole int
+		var localVector BinaryVector
+		if S.RandomTrials > 0 {
+			localSystole, localVector = SystoleRandomSearch(U, B, S.RandomTrials, S.Verbose)
+		} else {
+			localSystole, localVector = SystoleExhaustiveSearch(U, B, S.Verbose)
+		}
+// 		log.Printf("xxx localSystole=%d localVector=%v", localSystole, localVector)
 		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
 			minWeight = localSystole
-			_ = localVector // TODO: use this vector to compute minimum degree
+			if !localVector.IsZero() {
+				minDegree := minVertexDegreeInEdgeVector(subcomplex, localVector)
+				if S.Verbose {
+					log.Printf("step=%d systole=%d minDegree=%d", step, localSystole, minDegree)
+				}
+			}
 			if S.StopNonzero {
 				if S.Verbose {
 					log.Printf("stopping at triangle step %d", step)

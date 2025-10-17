@@ -72,7 +72,7 @@ func doExhaustiveSystoleAndCosystoleSearchFromComplex(args *Args) {
 
 func doSimplicialSystoleSearch(args *Args) {
 	X := complexFromBoundaryMatrices(args)
-	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialStopNonzero, args.Verbose)
+	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialTrials, args.SimplicialStopNonzero, args.Verbose)
 	weight := S.Search()
 	if args.SystoleFile != "" {
 		writeIntegerFile(weight, args.SystoleFile)
@@ -82,7 +82,7 @@ func doSimplicialSystoleSearch(args *Args) {
 
 func doSimplicialSystoleSearchAtVertex(args *Args) {
 	X := complexFromBoundaryMatrices(args)
-	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialStopNonzero, args.Verbose)
+	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialTrials, args.SimplicialStopNonzero, args.Verbose)
 	weight := S.SearchAtVertex(X.VertexBasis()[args.SimplicialAtVertex])
 	if args.SystoleFile != "" {
 		writeIntegerFile(weight, args.SystoleFile)
@@ -136,7 +136,7 @@ func doSystoleSearchFromUB(args *Args) {
 	if args.Trials <= 0 {
 		minWeight, _ = golsv.SystoleExhaustiveSearch(Udense, Bdense, args.Verbose)
 	} else {
-		minWeight = golsv.SystoleRandomSearch(Udense, Bdense, args.Trials, args.Verbose)
+		minWeight, _ = golsv.SystoleRandomSearch(Udense, Bdense, args.Trials, args.Verbose)
 	}
 	if args.SystoleFile != "" {
 		writeIntegerFile(minWeight, args.SystoleFile)
@@ -160,6 +160,7 @@ type Args struct {
 	D2File                string
 	Simplicial            bool
 	SimplicialAtVertex    int
+	SimplicialTrials      int
 	SimplicialStopNonzero bool
 	StartFiltration       int
 	SystoleFile           string
@@ -180,6 +181,7 @@ func parseFlags() *Args {
 	flag.StringVar(&args.BFile, "B", args.BFile, "matrix B input file (sparse column support txt format)")
 	flag.BoolVar(&args.Simplicial, "simplicial", args.Simplicial, "do simplicial systole search (global)")
 	flag.IntVar(&args.SimplicialAtVertex, "simplicial-at-vertex", args.SimplicialAtVertex, "do simplicial systole search starting at given vertex index")
+	flag.IntVar(&args.SimplicialTrials, "simplicial-trials", args.SimplicialTrials, "number of random trials over coset in systole search; 0 for exhaustive")
 	flag.BoolVar(&args.SimplicialStopNonzero, "simplicial-stop-nonzero", args.SimplicialStopNonzero, "stop simplicial systole search at first nonzero finding")
 	flag.IntVar(&args.StartFiltration, "start-filtration", args.StartFiltration, "start filtration at given step (default 0)")
 	flag.StringVar(&args.SystoleFile, "systole", args.SystoleFile, "systole output file (text)")
