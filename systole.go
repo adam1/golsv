@@ -237,7 +237,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		log.Printf("Starting simplicial search at vertex v=%v step=%d", v, S.StartFiltration)
 	}
 	minWeight := 0
-	S.C.TriangularDepthFiltration(v, func(step int, subcomplex *ZComplex[T]) (stop bool) {
+	S.C.TriangularDepthFiltration(v, func(step int, distance int, subcomplex *ZComplex[T]) (stop bool) {
 		if step < S.StartFiltration {
 			return false
 		}
@@ -248,7 +248,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
 		if S.Verbose {
-			log.Printf("step=%d %s dimZ1=%d dimB1=%d dimH1=%d", step, subcomplex, dimZ1, dimB1, dimH1)
+			log.Printf("step=%d distance=%d %s dimZ1=%d dimB1=%d dimH1=%d", step, distance, subcomplex, dimZ1, dimB1, dimH1)
 		}
 // 		log.Printf("xxx U=%v B=%v", U, B)
 		U, B = U.Dense(), B.Dense()

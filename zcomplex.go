@@ -955,8 +955,8 @@ func (C *ZComplex[T]) TriangleBasis() []ZTriangle[T] {
 }
 
 func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
-	handler func(depth int, subcomplex *ZComplex[T]) (stop bool)) {
-	Y, _ := C.SortBasesByDistance(C.vertexIndex[initialVertex])
+	handler func(depth int, distance int, subcomplex *ZComplex[T]) (stop bool)) {
+	Y, distanceMap := C.SortBasesByDistance(C.vertexIndex[initialVertex])
 	vertexIndicesToInclude := make(map[int]bool)
 	stop := false
 	for i, t := range Y.triangleBasis {
@@ -964,7 +964,18 @@ func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
 		vertexIndicesToInclude[Y.vertexIndex[t[1]]] = true
 		vertexIndicesToInclude[Y.vertexIndex[t[2]]] = true
 		subcomplex := Y.SubcomplexByVertices(vertexIndicesToInclude)
-		stop = handler(i, subcomplex)
+		// Compute distance as min over the three vertices
+		d0 := distanceMap[Y.vertexIndex[t[0]]]
+		d1 := distanceMap[Y.vertexIndex[t[1]]]
+		d2 := distanceMap[Y.vertexIndex[t[2]]]
+		distance := d0
+		if d1 < distance {
+			distance = d1
+		}
+		if d2 < distance {
+			distance = d2
+		}
+		stop = handler(i, distance, subcomplex)
 		if stop {
 			break
 		}
@@ -972,7 +983,14 @@ func (C *ZComplex[T]) TriangularDepthFiltration(initialVertex ZVertex[T],
 	if !stop {
 		// one last call that includes any vertices not already included
 		if len(vertexIndicesToInclude) < len(Y.vertexBasis) {
-			handler(len(Y.triangleBasis), Y)
+			// For the final call, find the maximum distance in the entire complex
+			maxDistance := 0
+			for _, d := range distanceMap {
+				if d > maxDistance {
+					maxDistance = d
+				}
+			}
+			handler(len(Y.triangleBasis), maxDistance, Y)
 		}
 	}
 }
