@@ -86,7 +86,7 @@ func SystoleRandomSearch(U, B BinaryMatrix, trials int, verbose bool) (minWeight
 					float64(n)/timeElapsed.Seconds())
 			}
 			if timeInterval.Seconds() < 10 {
-				reportInterval *= 2
+				reportInterval = int(float64(reportInterval)*1.5)
 			}
 		}
 	}
@@ -171,15 +171,17 @@ type SimplicialSystoleSearch[T any] struct {
 	C               *ZComplex[T]
 	RandomTrials    int
 	StartFiltration int
+	StopAtMinDegree int
 	StopNonzero     bool
 	Verbose         bool
 }
 
-func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, randomTrials int, stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, randomTrials int, stopAtMinDegree int, stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
 	return &SimplicialSystoleSearch[T]{
 		C:               C,
 		RandomTrials:    randomTrials,
 		StartFiltration: startFiltration,
+		StopAtMinDegree: stopAtMinDegree,
 		StopNonzero:     stopNonzero,
 		Verbose:         verbose,
 	}
@@ -260,12 +262,6 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 // 		log.Printf("xxx localSystole=%d localVector=%v", localSystole, localVector)
 		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
 			minWeight = localSystole
-			if !localVector.IsZero() {
-				minDegree := minVertexDegreeInEdgeVector(subcomplex, localVector)
-				if S.Verbose {
-					log.Printf("step=%d systole=%d minDegree=%d", step, localSystole, minDegree)
-				}
-			}
 			if S.StopNonzero {
 				if S.Verbose {
 					log.Printf("stopping at triangle step %d", step)
@@ -273,7 +269,18 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 				return true
 			}
 		}
-
+		if !localVector.IsZero() {
+			minDegree := minVertexDegreeInEdgeVector(subcomplex, localVector)
+			if S.Verbose {
+				log.Printf("step=%d systole=%d minDegree=%d", step, localSystole, minDegree)
+			}
+			if S.StopAtMinDegree > 0 && minDegree >= S.StopAtMinDegree {
+				if S.Verbose {
+					log.Printf("stopping at triangle step %d (minDegree=%d >= %d)", step, minDegree, S.StopAtMinDegree)
+				}
+				return true
+			}
+		}
 		return false
 	})
 	return minWeight

@@ -72,7 +72,7 @@ func doExhaustiveSystoleAndCosystoleSearchFromComplex(args *Args) {
 
 func doSimplicialSystoleSearch(args *Args) {
 	X := complexFromBoundaryMatrices(args)
-	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialTrials, args.SimplicialStopNonzero, args.Verbose)
+	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialTrials, args.StopAtMinDegree, args.SimplicialStopNonzero, args.Verbose)
 	weight := S.Search()
 	if args.SystoleFile != "" {
 		writeIntegerFile(weight, args.SystoleFile)
@@ -82,7 +82,7 @@ func doSimplicialSystoleSearch(args *Args) {
 
 func doSimplicialSystoleSearchAtVertex(args *Args) {
 	X := complexFromBoundaryMatrices(args)
-	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialTrials, args.SimplicialStopNonzero, args.Verbose)
+	S := golsv.NewSimplicialSystoleSearch(X, args.StartFiltration, args.SimplicialTrials, args.StopAtMinDegree, args.SimplicialStopNonzero, args.Verbose)
 	weight := S.SearchAtVertex(X.VertexBasis()[args.SimplicialAtVertex])
 	if args.SystoleFile != "" {
 		writeIntegerFile(weight, args.SystoleFile)
@@ -163,6 +163,7 @@ type Args struct {
 	SimplicialTrials      int
 	SimplicialStopNonzero bool
 	StartFiltration       int
+	StopAtMinDegree       int
 	SystoleFile           string
 	Trials                int
 	UFile                 string
@@ -184,6 +185,7 @@ func parseFlags() *Args {
 	flag.IntVar(&args.SimplicialTrials, "simplicial-trials", args.SimplicialTrials, "number of random trials over coset in systole search; 0 for exhaustive")
 	flag.BoolVar(&args.SimplicialStopNonzero, "simplicial-stop-nonzero", args.SimplicialStopNonzero, "stop simplicial systole search at first nonzero finding")
 	flag.IntVar(&args.StartFiltration, "start-filtration", args.StartFiltration, "start filtration at given step (default 0)")
+	flag.IntVar(&args.StopAtMinDegree, "stop-at-min-degree", args.StopAtMinDegree, "stop when min degree of vertices incident to systolic cycle reaches or exceeds this value (default 0=disabled)")
 	flag.StringVar(&args.SystoleFile, "systole", args.SystoleFile, "systole output file (text)")
 	flag.IntVar(&args.Trials, "trials", args.Trials, "number of samples of minimum weight search (0=exhaustive search)")
 	flag.StringVar(&args.UFile, "U", args.UFile, "matrix U input file (sparse column support txt format)")
