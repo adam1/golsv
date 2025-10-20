@@ -237,18 +237,24 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		log.Printf("Starting simplicial search at vertex v=%v step=%d", v, S.StartFiltration)
 	}
 	minWeight := 0
-	S.C.TriangularDepthFiltration(v, func(step int, distance int, subcomplex *ZComplex[T]) (stop bool) {
-		if step < S.StartFiltration {
+	S.C.TriangularDepthFiltration(v, func(triangleIndex int, distanceMap map[int]int, subcomplex *ZComplex[T]) (stop bool) {
+		if triangleIndex < S.StartFiltration {
 			return false
 		}
 		if S.Verbose {
-			//log.Printf("checking subcomplex of triangle depth filtration step %d", step)
+			//log.Printf("checking subcomplex of triangle depth filtration step %d", triangleIndex)
 			//log.Printf("subcomplex: %s", subcomplex.MaximalSimplicesString())
 		}
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
 		if S.Verbose {
-			log.Printf("step=%d distance=%d %s dimZ1=%d dimB1=%d dimH1=%d", step, distance, subcomplex, dimZ1, dimB1, dimH1)
+			t := subcomplex.TriangleBasis()[triangleIndex]
+			vind := subcomplex.VertexIndex()
+			d0 := distanceMap[vind[t[0]]]
+			d1 := distanceMap[vind[t[1]]]
+			d2 := distanceMap[vind[t[2]]]
+			log.Printf("step=%d distances=[%d %d %d] %s dimZ1=%d dimB1=%d dimH1=%d",
+				triangleIndex, d0, d1, d2, subcomplex, dimZ1, dimB1, dimH1)
 		}
 // 		log.Printf("xxx U=%v B=%v", U, B)
 		U, B = U.Dense(), B.Dense()
@@ -264,7 +270,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 			minWeight = localSystole
 			if S.StopNonzero {
 				if S.Verbose {
-					log.Printf("stopping at triangle step %d", step)
+					log.Printf("stopping at triangle step %d", triangleIndex)
 				}
 				return true
 			}
@@ -272,11 +278,11 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		if !localVector.IsZero() {
 			minDegree := minVertexDegreeInEdgeVector(subcomplex, localVector)
 			if S.Verbose {
-				log.Printf("step=%d systole=%d minDegree=%d", step, localSystole, minDegree)
+				log.Printf("step=%d systole=%d minDegree=%d", triangleIndex, localSystole, minDegree)
 			}
 			if S.StopAtMinDegree > 0 && minDegree >= S.StopAtMinDegree {
 				if S.Verbose {
-					log.Printf("stopping at triangle step %d (minDegree=%d >= %d)", step, minDegree, S.StopAtMinDegree)
+					log.Printf("stopping at triangle step %d (minDegree=%d >= %d)", triangleIndex, minDegree, S.StopAtMinDegree)
 				}
 				return true
 			}

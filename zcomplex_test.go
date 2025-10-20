@@ -1480,7 +1480,7 @@ func TestZComplexTriangularDepthFiltration(t *testing.T) {
 	}
 	for n, test := range tests {
 		var got []*ZComplex[ZVertexInt]
-		test.C.TriangularDepthFiltration(test.C.VertexBasis()[test.Start], func(step int, distance int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
+		test.C.TriangularDepthFiltration(test.C.VertexBasis()[test.Start], func(triangleIndex int, distanceMap map[int]int, subcomplex *ZComplex[ZVertexInt]) (stop bool) {
 			got = append(got, subcomplex)
 			return false
 		})
