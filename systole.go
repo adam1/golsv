@@ -250,11 +250,14 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		if S.Verbose {
 			t := subcomplex.TriangleBasis()[triangleIndex]
 			vind := subcomplex.VertexIndex()
-			d0 := distanceMap[vind[t[0]]]
-			d1 := distanceMap[vind[t[1]]]
-			d2 := distanceMap[vind[t[2]]]
-			log.Printf("step=%d distances=[%d %d %d] %s dimZ1=%d dimB1=%d dimH1=%d",
-				triangleIndex, d0, d1, d2, subcomplex, dimZ1, dimB1, dimH1)
+			v0 := vind[t[0]]
+			v1 := vind[t[1]]
+			v2 := vind[t[2]]
+			d0 := distanceMap[v0]
+			d1 := distanceMap[v1]
+			d2 := distanceMap[v2]
+			log.Printf("step=%d vertices=[%d %d %d] distances=[%d %d %d] %s dimZ1=%d dimB1=%d dimH1=%d",
+				triangleIndex, v0, v1, v2, d0, d1, d2, subcomplex, dimZ1, dimB1, dimH1)
 		}
 // 		log.Printf("xxx U=%v B=%v", U, B)
 		U, B = U.Dense(), B.Dense()
@@ -286,8 +289,81 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 				}
 				return true
 			}
+			if S.Verbose {
+				logIntersection(subcomplex, triangleIndex, localVector)
+			}
 		}
 		return false
 	})
 	return minWeight
+}
+
+func EdgeVectorSupports[T any] (subcomplex *ZComplex[T], edgeVector BinaryVector) (vertexSupport map[int]bool, edgeSupport map[int]bool) {
+	vertexSupport = make(map[int]bool)
+	edgeSupport = make(map[int]bool)
+	edgeBasis := subcomplex.EdgeBasis()
+	vertexIndex := subcomplex.VertexIndex()
+	for i := 0; i < edgeVector.Length(); i++ {
+		if edgeVector.Get(i) == 1 {
+			edgeSupport[i] = true
+			edge := edgeBasis[i]
+			v0 := vertexIndex[edge[0]]
+			v1 := vertexIndex[edge[1]]
+			vertexSupport[v0] = true
+			vertexSupport[v1] = true
+		}
+	}
+	return vertexSupport, edgeSupport
+}
+
+func TriangleSupports[T any](subcomplex *ZComplex[T], triangleIndex int) (vertexSupport map[int]bool, edgeSupport map[int]bool) {
+	vertexSupport = make(map[int]bool)
+	edgeSupport = make(map[int]bool)
+	t := subcomplex.TriangleBasis()[triangleIndex]
+	edges := t.Edges()
+	edgeIndex := subcomplex.EdgeIndex()
+	vertexIndex := subcomplex.VertexIndex()
+
+	v0 := vertexIndex[t[0]]
+	v1 := vertexIndex[t[1]]
+	v2 := vertexIndex[t[2]]
+	vertexSupport[v0] = true
+	vertexSupport[v1] = true
+	vertexSupport[v2] = true
+
+	for _, edge := range edges {
+		n := edgeIndex[edge]
+		edgeSupport[n] = true
+	}
+	return vertexSupport, edgeSupport
+}
+
+func logIntersection[T any](subcomplex *ZComplex[T], triangleIndex int, edgeVector BinaryVector) {
+	triangleVertexSupport, triangleEdgeSupport := TriangleSupports(subcomplex, triangleIndex)
+
+	edgeVecVertexSupport, edgeVecEdgeSupport := EdgeVectorSupports(subcomplex, edgeVector)
+
+	edgeIntersection := supportIntersection(edgeVecEdgeSupport, triangleEdgeSupport)
+	edgeKeys := make([]int, 0, len(edgeIntersection))
+	for k := range edgeIntersection {
+		edgeKeys = append(edgeKeys, k)
+	}
+	log.Printf("local vector edge intersection with triangle t: %v", edgeKeys)
+
+	vertexIntersection := supportIntersection(edgeVecVertexSupport, triangleVertexSupport)
+	vertexKeys := make([]int, 0, len(vertexIntersection))
+	for k := range vertexIntersection {
+		vertexKeys = append(vertexKeys, k)
+	}
+	log.Printf("local vector vertex intersection with triangle t: %v", vertexKeys)
+}
+
+func supportIntersection(a, b map[int]bool) (result map[int]bool) {
+	result = make(map[int]bool)
+	for k := range a {
+		if _, ok := b[k]; ok {
+			result[k] = true
+		}
+	}
+	return result
 }
