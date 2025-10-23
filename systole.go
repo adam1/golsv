@@ -99,18 +99,13 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int, mi
 	}
 	minWeight = math.MaxInt
 	EnumerateBinaryVectorSpace(U, func(a BinaryMatrix, indexU int) bool {
-// 		log.Printf("xxx |a|=%d", a.ColumnWeight(0))
 		if a.IsZero() {
 			return true
 		}
-// 		log.Printf("xxx HERE 1 iu=%d", indexU)
-// 		log.Printf("xxx U=%v B=%v", U, B)
 		EnumerateBinaryVectorSpace(B, func(b BinaryMatrix, indexB int) bool {
-// 			log.Printf("xxx HERE 2 ib=%d", indexB)
 			sum := a.Copy().Dense()
 			sum.AddMatrix(b)
 			weight := sum.ColumnWeight(0)
-// 			log.Printf("xxx |sum|=%d", weight)
 			if weight < minWeight {
 				minWeight = weight
 				minVector = sum.ColumnVector(0)
@@ -121,7 +116,6 @@ func SystoleExhaustiveSearch(U, B BinaryMatrix, verbose bool) (minWeight int, mi
 			}
 			return true
 		})
-// 		log.Printf("xxx HERE 3 iu=%d", indexU)
 		return true
 	})
 	if minWeight == math.MaxInt {
@@ -288,7 +282,6 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 			log.Printf("step=%d vertices=[%d %d %d] distances=[%d %d %d] %s dimZ1=%d dimB1=%d dimH1=%d",
 				triangleIndex, v0, v1, v2, d0, d1, d2, subcomplex, dimZ1, dimB1, dimH1)
 		}
-// 		log.Printf("xxx U=%v B=%v", U, B)
 		U, B = U.Dense(), B.Dense()
 		var localSystole int
 		var localVector BinaryVector
@@ -297,7 +290,6 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		} else {
 			localSystole, localVector = SystoleExhaustiveSearch(U, B, S.Verbose)
 		}
-// 		log.Printf("xxx localSystole=%d localVector=%v", localSystole, localVector)
 		if localSystole > 0 && (localSystole < minWeight || minWeight == 0) {
 			minWeight = localSystole
 			if S.StopNonzero {

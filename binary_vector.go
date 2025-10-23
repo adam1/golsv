@@ -290,7 +290,6 @@ func EnumerateBinaryVectorSpaceList(generators BinaryMatrix) []BinaryVector {
 // linearly independent.
 func EnumerateBinaryVectorSpace(generators BinaryMatrix, F func(v BinaryMatrix, index int) (ok bool) ) {
 	n := generators.NumColumns()
-// 	log.Printf("xxx EBVS gen=%p n=%d", generators, n)
 	if n == 0 {
 		F(NewDenseBinaryMatrix(generators.NumRows(), 1), 0)
 		return
@@ -300,9 +299,7 @@ func EnumerateBinaryVectorSpace(generators BinaryMatrix, F func(v BinaryMatrix, 
 	// combination of the generators.  this is pretty fast if we
 	// utilize optimized dense * sparse multiplication.
 	m := pow(2, n)
-// 	log.Printf("xxx EBVS gen=%p m=%d", generators, m)
 	for i := 0; i < m; i++ {
-// 		log.Printf("xxx EBVS gen=%p i=%d", generators, i)
 		support := make([]int, 0)
 		for j := 0; j < n; j++ {
 			coefficient := uint8((i >> j) & 1)
@@ -314,11 +311,9 @@ func EnumerateBinaryVectorSpace(generators BinaryMatrix, F func(v BinaryMatrix, 
 		coefficients.SetColumnData(0, support)
 		vector := LinearCombination(generators, coefficients)
 		if !F(vector, i) {
-// 			log.Printf("xxx EVBS gen=%p handler returned false", generators)
 			break
 		}
 	}
-// 	log.Printf("xxx EBVS gen=%p done", generators)
 }
 
 func SampleBinaryVectorSpaceList(generators BinaryMatrix, numSamples int, secureRandom bool) []BinaryVector {
