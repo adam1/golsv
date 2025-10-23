@@ -230,7 +230,7 @@ func TestSimplicialSystoleVsExhaustiveSearchSpecificExamples(t *testing.T) {
 	for i, test := range tests {
 		stopNonzero := true
 		verbose := false
-		S := NewSimplicialSystoleSearch(test.X, 0, 0, 0, stopNonzero, verbose)
+		S := NewSimplicialSystoleSearch(test.X, 0, 0, 0, stopNonzero, false, verbose)
 		gotSystoleSimplicialSearch := S.Search()
 		if gotSystoleSimplicialSearch != test.ExpectedSystoleSimplicialSearch {
 			t.Errorf("test %d: gotSystoleSimplicialSearch=%d expected=%d", i, gotSystoleSimplicialSearch, test.ExpectedSystoleSimplicialSearch)
@@ -256,7 +256,7 @@ func TestSimplicialSystoleSearchCyclicGraphs(t *testing.T) {
 	maxLength := 10
 	for i := 3; i < maxLength; i++ {
 		X := cyclicGraphComplex(i)
-		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, verbose)
+		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, false, verbose)
 		gotSystole := S.Search()
 		if gotSystole != i {
 			t.Errorf("test %d: got=%d expected=%d", i, gotSystole, i)
@@ -271,7 +271,7 @@ func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 	// whereas starting at 2 finds a systole of 3.
 	X := NewZComplexFromMaximalSimplices([][]int{{0, 1, 4}, {1, 2, 5}, {2, 3, 6}, {0, 3, 7}, {2, 6, 8}, {2, 5, 9}, {5, 8, 9}})
 	{
-		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, verbose)
+		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, false, verbose)
 		got := S.SearchAtVertex(ZVertexInt(0))
 		expected := 4
 		if got != expected {
@@ -279,7 +279,7 @@ func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 		}
 	}
 	{
-		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, verbose)
+		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, false, verbose)
 		got := S.SearchAtVertex(ZVertexInt(2))
 		expected := 3
 		if got != expected {
@@ -287,7 +287,7 @@ func TestSimplicialSystoleSearchAtVertexVsGlobal(t *testing.T) {
 		}
 	}
 	{
-		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, verbose)
+		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, false, verbose)
 		got := S.Search()
 		expected := 3
 		if got != expected {
@@ -320,7 +320,7 @@ func TestSimplicialSystoleSearchRandomCliqueComplex(t *testing.T) {
 
 		exhaustiveSystole, _, _, _ := ComputeFirstSystole(X.D1(), X.D2(), verbose)
 
-		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, verbose)
+		S := NewSimplicialSystoleSearch(X, 0, 0, 0, stopNonzero, false, verbose)
 		simplicialSystole := S.Search()
 
 		if exhaustiveSystole == 0 {

@@ -168,22 +168,24 @@ func ComputeFirstCosystole(d1, d2 BinaryMatrix, verbose bool) (cosystole int) {
 // expediency. The two are thought to be equivalent in the case of
 // Cayley complexes.
 type SimplicialSystoleSearch[T any] struct {
-	C               *ZComplex[T]
-	RandomTrials    int
-	StartFiltration int
-	StopAtMinDegree int
-	StopNonzero     bool
-	Verbose         bool
+	C                     *ZComplex[T]
+	RandomTrials          int
+	StartFiltration       int
+	StopAtMinDegree       int
+	StopNonzero           bool
+	LogTriangleDepthsOnly bool
+	Verbose               bool
 }
 
-func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, randomTrials int, stopAtMinDegree int, stopNonzero bool, verbose bool) *SimplicialSystoleSearch[T] {
+func NewSimplicialSystoleSearch[T any](C *ZComplex[T], startFiltration int, randomTrials int, stopAtMinDegree int, stopNonzero bool, logTriangleDepthsOnly bool, verbose bool) *SimplicialSystoleSearch[T] {
 	return &SimplicialSystoleSearch[T]{
-		C:               C,
-		RandomTrials:    randomTrials,
-		StartFiltration: startFiltration,
-		StopAtMinDegree: stopAtMinDegree,
-		StopNonzero:     stopNonzero,
-		Verbose:         verbose,
+		C:                     C,
+		RandomTrials:          randomTrials,
+		StartFiltration:       startFiltration,
+		StopAtMinDegree:       stopAtMinDegree,
+		StopNonzero:           stopNonzero,
+		LogTriangleDepthsOnly: logTriangleDepthsOnly,
+		Verbose:               verbose,
 	}
 }
 
@@ -237,6 +239,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 		log.Printf("Starting simplicial search at vertex v=%v step=%d", v, S.StartFiltration)
 	}
 	minWeight := 0
+	prevTriangleDist := 0
 	S.C.TriangularDepthFiltration(v, func(triangleIndex int, distanceMap map[int]int, subcomplex *ZComplex[T]) (stop bool) {
 		if triangleIndex < S.StartFiltration {
 			return false
@@ -245,9 +248,35 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 			//log.Printf("checking subcomplex of triangle depth filtration step %d", triangleIndex)
 			//log.Printf("subcomplex: %s", subcomplex.MaximalSimplicesString())
 		}
+		if triangleIndex < len(subcomplex.TriangleBasis()) {
+			t := subcomplex.TriangleBasis()[triangleIndex]
+			vind := subcomplex.VertexIndex()
+			v0 := vind[t[0]]
+			v1 := vind[t[1]]
+			v2 := vind[t[2]]
+			d0 := distanceMap[v0]
+			d1 := distanceMap[v1]
+			d2 := distanceMap[v2]
+			mindist := d0
+			if d1 < mindist {
+				mindist = d1
+			}
+			if d2 < mindist {
+				mindist = d2
+			}
+			if mindist > prevTriangleDist {
+				if S.Verbose {
+					log.Printf("step=%d triangle distance increases to %d", triangleIndex, mindist)
+				}
+				prevTriangleDist = mindist
+			}
+			if S.LogTriangleDepthsOnly {
+				return false
+			}
+		}
 		ubVerbose := false
 		U, B, _, dimZ1, dimB1, dimH1 := UBDecomposition(subcomplex.D1(), subcomplex.D2(), ubVerbose)
-		if S.Verbose {
+		if S.Verbose && triangleIndex < len(subcomplex.TriangleBasis()) {
 			t := subcomplex.TriangleBasis()[triangleIndex]
 			vind := subcomplex.VertexIndex()
 			v0 := vind[t[0]]
@@ -289,7 +318,7 @@ func (S *SimplicialSystoleSearch[T]) SearchAtVertex(v ZVertex[T]) int {
 				}
 				return true
 			}
-			if S.Verbose {
+			if S.Verbose && triangleIndex < len(subcomplex.TriangleBasis()) {
 				logIntersection(subcomplex, triangleIndex, localVector)
 			}
 		}
